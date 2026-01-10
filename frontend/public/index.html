@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Weather App</title>
+    <style>
+        body { font-family: sans-serif; padding: 2rem; }
+        .container { max-width: 600px; margin: 0 auto; }
+        input, button { padding: 0.5rem; font-size: 1rem; }
+        #result { margin-top: 1rem; padding: 1rem; border: 1px solid #ccc; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Agent Weather Checker</h1>
+        <p>地域を入力して、エージェントに天気を聞いてみよう！</p>
+        <input type="text" id="regionInput" placeholder="例: 東京">
+        <button onclick="getWeather()">天気を確認</button>
+        <div id="result" style="display:none;"></div>
+    </div>
+
+    <script>
+        async function getWeather() {
+            const region = document.getElementById('regionInput').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!region) {
+                alert('地域を入力してください');
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'エージェントに問い合わせ中...';
+
+            try {
+                const response = await fetch('/api/weather', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ region: region })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json();
+                resultDiv.textContent = `エージェントからの回答: ${data.message}`;
+            } catch (error) {
+                resultDiv.textContent = `エラーが発生しました: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
