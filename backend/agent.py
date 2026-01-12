@@ -49,7 +49,7 @@ def create_session() -> str:
     # Session creation payload
     # user_id is often required or good practice for tracking.
     payload = {
-        "user": "test-user"
+        "userId": "test-user"
     } 
     
     logging.info(f"Creating session for agent: {agent_id}")
