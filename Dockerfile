@@ -25,6 +25,9 @@ RUN chmod +x start.sh
 
 # Expose the port Cloud Run expects
 ENV PORT=8080
+# Set the Agent Engine endpoint here.
+# Replace with your actual resource name: projects/PROJECT_ID/locations/LOCATION/reasoningEngines/ID
+ENV AGENT_ENDPOINT="projects/ai-agentic-hackathon-4/locations/us-central1/reasoningEngines/3602682889315024896"
 EXPOSE 8080
 
 CMD ["./start.sh"]
