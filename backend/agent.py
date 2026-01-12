@@ -60,9 +60,52 @@ def create_session() -> str:
         logging.error(f"Failed to create session. Status: {response.status_code}, Body: {response.text}")
         raise ValueError(f"Session creation failed: {e}. Body: {response.text}") from e
     
-    session_name = response.json().get("name")
-    logging.info(f"Session created: {session_name}")
-    return session_name
+    resp_json = response.json()
+    operation_name = resp_json.get("name")
+    
+    # Check if it's a Long Running Operation
+    if "/operations/" in operation_name:
+        logging.info(f"Session creation returned LRO: {operation_name}. Waiting for completion...")
+        return wait_for_lro(operation_name)
+    
+    # Immediate success (unlikely for this API but possible)
+    logging.info(f"Session created immediately: {operation_name}")
+    return operation_name
+
+def wait_for_lro(operation_name: str) -> str:
+    """Polls a Long Running Operation until it completes."""
+    import time
+    location, _ = get_agent_location_and_id()
+    # Operation name is full resource path: projects/.../locations/.../operations/...
+    # But we need to construct the URL. The operation_name usually starts with projects/
+    base_url = f"https://{location}-aiplatform.googleapis.com/v1beta1"
+    url = f"{base_url}/{operation_name}"
+    
+    headers = get_auth_headers()
+    
+    for _ in range(30): # Timeout after roughly 30-60 seconds
+        logging.info(f"Polling LRO: {operation_name}")
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        op_json = response.json()
+        if op_json.get("done"):
+            if "error" in op_json:
+                raise ValueError(f"LRO failed: {op_json['error']}")
+            
+            # Success! Extract the resource name from the 'response' field
+            # The 'response' field contains the Session resource
+            if "response" in op_json and "name" in op_json["response"]:
+                session_name = op_json["response"]["name"]
+                logging.info(f"LRO completed. Session created: {session_name}")
+                return session_name
+            else:
+                logging.error(f"LRO completed but missing 'response.name': {op_json}")
+                raise ValueError("LRO completed but returned invalid response format")
+        
+        time.sleep(2)
+        
+    raise TimeoutError(f"Timed out waiting for LRO: {operation_name}")
 
 def query_session(session_name: str, query_text: str) -> str:
     """Queries an existing session."""
