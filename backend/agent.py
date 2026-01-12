@@ -3,6 +3,7 @@ import requests
 import google.auth
 import google.auth.transport.requests
 import logging
+import json
 
 # Setup Cloud Logging
 try:
@@ -109,52 +110,90 @@ def wait_for_lro(operation_name: str) -> str:
 
 def query_session(session_name: str, query_text: str) -> str:
     """Queries an existing session."""
-    location, _ = get_agent_location_and_id()
-    url = f"https://{location}-aiplatform.googleapis.com/v1beta1/{session_name}:query"
+    location, agent_id = get_agent_location_and_id()
+    # Use the Reasoning Engine streamQuery endpoint with SSE
+    url = f"https://{location}-aiplatform.googleapis.com/v1beta1/{agent_id}:streamQuery?alt=sse"
     
     headers = get_auth_headers()
+    
+    # Based on official docs:
+    # class_method must be "async_stream_query"
+    # input keys: user_id, session_id, message
+    # Note: user_id is required even if session exists? Docs say yes.
+    # We use "test-user" as used in creation.
+    # IMPORTANT: session_id must be the ID only, not the full resource name
+    session_id_only = session_name.split("/")[-1]
+    
     payload = {
+        "class_method": "async_stream_query",
         "input": {
-            "role": "user",
-            "content": query_text
+            "user_id": "test-user",
+            "session_id": session_id_only,
+            "message": query_text
         }
     }
     
-    logging.info(f"Sending query to session {session_name}: {query_text}", extra={"query_text": query_text})
-    response = requests.post(url, json=payload, headers=headers, timeout=30)
+    logging.info(f"Sending query to agent {agent_id} (session: {session_name}): {query_text}", extra={"query_text": query_text})
+    logging.info(f"Sending query to agent {agent_id} (session: {session_name}): {query_text}", extra={"query_text": query_text})
+    
+    # Use stream=True for SSE
+    response = requests.post(url, json=payload, headers=headers, stream=True, timeout=60)
+    
     try:
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
         logging.error(f"Failed to query session. Status: {response.status_code}, Body: {response.text}")
         raise ValueError(f"Query session failed: {e}. Body: {response.text}") from e
     
-    result_json = response.json()
+    combined_text = ""
     
-    if "output" not in result_json:
-        logging.warning(f"Unexpected response format (no 'output'): {result_json}")
-        raise ValueError("Agent response missing 'output' field")
+    # Parse SSE stream
+    for line in response.iter_lines():
+        if line:
+            decoded_line = line.decode('utf-8').strip()
+            if not decoded_line:
+                continue
+                
+            # Handle standard SSE "data: " prefix
+            if decoded_line.startswith("data:"):
+                json_str = decoded_line[5:].strip()
+            else:
+                # Handle raw NDJSON or other formats
+                json_str = decoded_line
+                
+            try:
+                # Skip simple "data: " keep-alives or empty data
+                if not json_str:
+                    continue
+                    
+                event_data = json.loads(json_str)
+                
+                # Extract text content from the complex event structure
+                # Structure: {'author': '...', 'content': {'parts': [{'text': '...'}]}, ...}
+                if "content" in event_data:
+                    content = event_data["content"]
+                    if "parts" in content and isinstance(content["parts"], list):
+                        for part in content["parts"]:
+                            if "text" in part:
+                                combined_text += part["text"]
+                    elif isinstance(content, str):
+                            # Fallback if content is string
+                            combined_text += content
+                            
+                
+            except json.JSONDecodeError:
+                logging.warning(f"Failed to decode stream line: {decoded_line}")
+            except Exception as e:
+                logging.warning(f"Error processing event data: {e} - {json_str}")
 
-    output = result_json["output"]
+    if not combined_text:
+         logging.warning("No text content received from stream.")
+         # It's possible the agent returned function calls or other non-text parts?
+         # For now, return empty string or specific message?
+         # raise ValueError("Agent returned empty response")
     
-    if output is None:
-        raise ValueError("Agent returned None output")
-
-    if isinstance(output, dict):
-        if "content" in output and output["content"]:
-            content = output["content"]
-            logging.info(f"Received response from agent: {content}", extra={"agent_response": content})
-            return content
-        else:
-            logging.warning(f"Agent response dict missing 'content' or empty: {output}")
-            raise ValueError("Agent response content is empty")
-    
-    # If output is string or other type
-    output_str = str(output)
-    if not output_str.strip():
-        raise ValueError("Agent returned empty string output")
-
-    logging.info(f"Received response from agent: {output_str}", extra={"agent_response": output_str})
-    return output_str
+    logging.info(f"Received response from agent: {combined_text}", extra={"agent_response": combined_text})
+    return combined_text
 
 def get_weather_from_agent(region: str) -> str:
     """
