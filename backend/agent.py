@@ -46,7 +46,11 @@ def create_session() -> str:
     url = f"https://{location}-aiplatform.googleapis.com/v1beta1/{agent_id}/sessions"
     
     headers = get_auth_headers()
-    payload = {} 
+    # Session creation payload
+    # user_id is often required or good practice for tracking.
+    payload = {
+        "user": "test-user"
+    } 
     
     logging.info(f"Creating session for agent: {agent_id}")
     response = requests.post(url, json=payload, headers=headers, timeout=30)
