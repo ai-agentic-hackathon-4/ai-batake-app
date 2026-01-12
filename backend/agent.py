@@ -50,7 +50,11 @@ def create_session() -> str:
     
     logging.info(f"Creating session for agent: {agent_id}")
     response = requests.post(url, json=payload, headers=headers, timeout=30)
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        logging.error(f"Failed to create session. Status: {response.status_code}, Body: {response.text}")
+        raise ValueError(f"Session creation failed: {e}. Body: {response.text}") from e
     
     session_name = response.json().get("name")
     logging.info(f"Session created: {session_name}")
@@ -71,7 +75,11 @@ def query_session(session_name: str, query_text: str) -> str:
     
     logging.info(f"Sending query to session {session_name}: {query_text}", extra={"query_text": query_text})
     response = requests.post(url, json=payload, headers=headers, timeout=30)
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        logging.error(f"Failed to query session. Status: {response.status_code}, Body: {response.text}")
+        raise ValueError(f"Query session failed: {e}. Body: {response.text}") from e
     
     result_json = response.json()
     
