@@ -75,15 +75,31 @@ def query_session(session_name: str, query_text: str) -> str:
     
     result_json = response.json()
     
-    if "output" in result_json:
-        output = result_json["output"]
-        logging.info(f"Received response from agent: {output}", extra={"agent_response": output})
-        if isinstance(output, dict) and "content" in output:
-            return output["content"]
-        return str(output)
+    if "output" not in result_json:
+        logging.warning(f"Unexpected response format (no 'output'): {result_json}")
+        raise ValueError("Agent response missing 'output' field")
+
+    output = result_json["output"]
     
-    logging.warning(f"Unexpected response format: {result_json}")
-    return str(result_json)
+    if output is None:
+        raise ValueError("Agent returned None output")
+
+    if isinstance(output, dict):
+        if "content" in output and output["content"]:
+            content = output["content"]
+            logging.info(f"Received response from agent: {content}", extra={"agent_response": content})
+            return content
+        else:
+            logging.warning(f"Agent response dict missing 'content' or empty: {output}")
+            raise ValueError("Agent response content is empty")
+    
+    # If output is string or other type
+    output_str = str(output)
+    if not output_str.strip():
+        raise ValueError("Agent returned empty string output")
+
+    logging.info(f"Received response from agent: {output_str}", extra={"agent_response": output_str})
+    return output_str
 
 def get_weather_from_agent(region: str) -> str:
     """
