@@ -4,3 +4,5 @@ requests
 google-auth
 google-cloud-logging
 
+google-cloud-firestore
+python-multipart
