@@ -10,6 +10,10 @@ except ImportError:
     from research_agent import analyze_seed_packet, perform_deep_research
     # from agent import get_weather_from_agent
 import logging
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 

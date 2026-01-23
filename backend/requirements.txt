@@ -6,3 +6,4 @@ google-cloud-logging
 
 google-cloud-firestore
 python-multipart
+python-dotenv

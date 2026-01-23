@@ -16,7 +16,13 @@ def get_auth_headers():
     
     # Try ADC
     try:
-        creds, project = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        # Request both cloud-platform and generative-language scopes
+        # "https://www.googleapis.com/auth/generative-language" is required for AI Studio APIs via ADC
+        scopes = [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/generative-language"
+        ]
+        creds, project = google.auth.default(scopes=scopes)
         auth_req = google.auth.transport.requests.Request()
         creds.refresh(auth_req)
         return {
@@ -108,20 +114,25 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
              return {"name": vegetable_name, "error": f"Start failed: {response.status_code} - {response.text}"}
              
         interaction_data = response.json()
-        interaction_name = interaction_data.get("name") 
+        logging.info(f"Start Response JSON: {json.dumps(interaction_data)}")
+        # API returns 'id' not 'name' in this preview version
+        interaction_id = interaction_data.get("id")
+        if not interaction_id:
+             return {"name": vegetable_name, "error": "No ID in response"}
+        interaction_name = f"interactions/{interaction_id}" 
         
         logging.info(f"Research started: {interaction_name}")
         
         # 2. Poll (GET)
         poll_url = f"https://generativelanguage.googleapis.com/v1beta/{interaction_name}{query_param}"
         
-        max_retries = 60
+        max_retries = 180
         final_text = ""
         
         for _ in range(max_retries):
             poll_resp = requests.get(poll_url, headers=headers)
             if poll_resp.status_code != 200:
-                logging.warning(f"Poll failed: {poll_resp.status_code}")
+                logging.warning(f"Poll failed: {poll_resp.status_code} - {poll_resp.text}")
                 # Don't break immediately on temp error, but interaction 404 might be bad.
                 time.sleep(5)
                 continue
@@ -164,7 +175,7 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
         }}
         """
         
-        gen_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent{query_param}"
+        gen_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent{query_param}"
         gen_payload = {
             "contents": [{"parts": [{"text": extraction_prompt}]}],
             "generation_config": {"response_mime_type": "application/json"}
