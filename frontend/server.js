@@ -12,6 +12,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api', createProxyMiddleware({
     target: 'http://127.0.0.1:8081',
     changeOrigin: true,
+    proxyTimeout: 1800000, // 30 minutes
+    timeout: 1800000,      // 30 minutes
 }));
 
 app.listen(PORT, () => {
