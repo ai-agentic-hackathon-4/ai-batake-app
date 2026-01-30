@@ -1,17 +1,24 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 try:
-    from .db import save_growing_instructions
+    from .db import save_growing_instructions, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs
     from .research_agent import analyze_seed_packet, perform_deep_research
-    # from .agent import get_weather_from_agent
 except ImportError:
     # When running directly as a script
-    from db import save_growing_instructions
+    from db import save_growing_instructions, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs
     from research_agent import analyze_seed_packet, perform_deep_research
-    # from agent import get_weather_from_agent
 import logging
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow requests from any origin (e.g. localhost:3000)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class WeatherRequest(BaseModel):
     region: str
@@ -23,6 +30,38 @@ class WeatherRequest(BaseModel):
 #         return {"message": weather_info}
 #     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/sensors/latest")
+async def get_latest_sensor_log_endpoint():
+    try:
+        # Get most recent 1 log
+        logs = get_recent_sensor_logs(limit=1)
+        if logs and len(logs) > 0:
+            return logs[0]
+        return {}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/sensor-history")
+async def get_sensor_history_endpoint(hours: int = 24):
+    try:
+        data = get_sensor_history(hours=hours)
+        return {"data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/vegetables/latest")
+async def get_latest_vegetable_endpoint():
+    try:
+        data = get_latest_vegetable()
+        if data:
+            return data
+        else:
+            # Return empty object or specific message if no data, or 404
+            # user just wants to "display 1 item", so 404 is appropriate if truly empty
+            return {} 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/register-seed")
 async def register_seed(file: UploadFile = File(...)):

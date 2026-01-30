@@ -1,3 +1,6 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import { Thermometer, Droplets, Leaf } from "lucide-react"
 import { PlantCamera } from "@/components/plant-camera"
 import { MetricCard } from "@/components/metric-card"
@@ -7,6 +10,32 @@ import { WeatherCard } from "@/components/weather-card"
 import { GrowthStageCard } from "@/components/growth-stage-card"
 
 export default function Dashboard() {
+    const [sensorData, setSensorData] = useState<{ temperature: number | string; humidity: number | string }>({
+        temperature: "--",
+        humidity: "--"
+    })
+
+    useEffect(() => {
+        const fetchSensorData = async () => {
+            try {
+                const res = await fetch('http://localhost:8081/api/sensors/latest')
+                const data = await res.json()
+                if (data && data.temperature !== undefined) {
+                    setSensorData({
+                        temperature: data.temperature,
+                        humidity: data.humidity
+                    })
+                }
+            } catch (error) {
+                console.error("Failed to fetch latest sensor data:", error)
+            }
+        }
+
+        fetchSensorData()
+        const interval = setInterval(fetchSensorData, 60000) // Update every minute
+        return () => clearInterval(interval)
+    }, [])
+
     return (
         <div className="min-h-screen bg-background">
             {/* Header */}
@@ -36,8 +65,8 @@ export default function Dashboard() {
 
                 {/* Metrics Section */}
                 <div className="grid grid-cols-2 gap-4">
-                    <MetricCard title="現在の気温" value="26.5" unit="°C" icon={Thermometer} status="normal" />
-                    <MetricCard title="現在の湿度" value="58" unit="%" icon={Droplets} status="normal" />
+                    <MetricCard title="現在の気温" value={String(sensorData.temperature)} unit="°C" icon={Thermometer} status="normal" />
+                    <MetricCard title="現在の湿度" value={String(sensorData.humidity)} unit="%" icon={Droplets} status="normal" />
                 </div>
 
                 {/* Chart Section */}
