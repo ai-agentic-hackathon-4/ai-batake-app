@@ -12,7 +12,6 @@ except ImportError:
 import logging
 import base64
 from google.cloud import storage
-
 app = FastAPI()
 
 app.add_middleware(
@@ -80,10 +79,7 @@ async def register_seed(file: UploadFile = File(...)):
         logging.info("Analyzing seed packet image...")
         packet_analysis_json = analyze_seed_packet(content)
         
-        # Parse analysis result (assuming it returns JSON string or dictionary)
-        # The agent returns a string, we might need to be careful or parse it.
-        # Ideally analyze_seed_packet should return a dict or we parse it here.
-        # For simplicity, let's treat the text specifically or expect JSON in text.
+        # Parse analysis result
         import json
         try:
             # Simple soft parsing if the model returns markdown code block 
