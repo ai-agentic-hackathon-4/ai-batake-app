@@ -23,7 +23,7 @@ function App() {
                     <p>Simple Weather Checker (ported from index.html)</p>
                     {/* Porting text logic if needed, but for now simple placeholder */}
                     <iframe
-                        src="/legacy_weather_placeholder.html"
+                        src="./legacy_weather_placeholder.html"
                         style={{ width: '100%', height: '300px', border: 'none' }}
                         title="weather"
                     />

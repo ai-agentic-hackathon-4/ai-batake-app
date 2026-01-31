@@ -15,10 +15,15 @@ def get_access_token():
     credentials.refresh(Request())
     return credentials.token
 
-async def analyze_seed_and_generate_guide(image_bytes: bytes):
+async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=None):
     """
     Analyzes a seed image and generates a step-by-step planting guide with images using Vertex AI REST API.
+    Args:
+        image_bytes: The image content.
+        progress_callback: Optional async function(message: str) to report progress.
     """
+    if progress_callback: await progress_callback("🌱 AI is analyzing the seed image (Gemini 3 Pro)...")
+
     # API Key Authentication
     api_key = os.environ.get("SEED_GUIDE_GEMINI_KEY")
     if not api_key:
@@ -30,7 +35,7 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes):
     }
 
     # Helper for Exponential Backoff
-    def call_api_with_backoff(url, payload, headers, max_retries=5):
+    def call_api_with_backoff(url, payload, headers, max_retries=10):
         import time
         import random
         base_delay = 2
@@ -73,15 +78,20 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes):
 
     prompt_text = """
     このタネの画像を分析し、何の植物のタネか特定してください。
-    そして、このタネを植えてから発芽、成長させるまでの手順をステップバイステップで説明してください。
+    そして、家庭菜園（プランターや庭）でこのタネを育てるための手順を教えてください。
+    
+    特に詳しく教えて欲しい点は以下です：
+    1. 必要な道具（プランターのサイズ、土の種類など）
+    2. 種まきの詳細な手順（深さ、間隔、数など具体的に）
+    
     各ステップについて、以下のJSON形式で出力してください。
     
     出力フォーマット(JSON):
     [
         {
             "step_title": "ステップのタイトル",
-            "description": "具体的な手順の説明（日本語）",
-            "image_prompt": "An illustration of [description] for [plant name], photorealistic, high quality"
+            "description": "具体的な手順の説明（日本語）。種まきの際は深さや定規なども言及してください。",
+            "image_prompt": "A visual depiction of [description] for [plant name]"
         },
         ...
     ]
@@ -89,6 +99,7 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes):
     注意:
     - 日本語で出力してください。
     - image_promptは画像生成AI(Nanobanana Pro)に入力するため、英語で具体的に記述してください。
+    - 家庭菜園初心者にもわかりやすく説明してください。
     - JSONリストのみを出力してください。Markdownコードブロックは不要です。
     """
 
@@ -144,41 +155,46 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes):
         print(f"Analysis failed: {e}")
         raise e
 
+    if progress_callback: await progress_callback(f"🎨 Generating illustrations for {len(steps)} steps (Nanobanana Pro)...")
+
     # 2. Generate Images with Nanobanana Pro (gemini-3-pro-image-preview)
     img_model_id = "gemini-3-pro-image-preview" 
-    
-    final_steps = []
     
     # Url: https://aiplatform.googleapis.com/v1/publishers/google/models/{img_model_id}:generateContent?key={API_KEY}
     img_url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{img_model_id}:generateContent?key={api_key}"
     
+    import concurrent.futures
+    import random
     import time
     
-    for step in steps:
-        time.sleep(1) # Basic interval
+    # Define a consistent style for all images
+    UNIFIED_STYLE = "soft digital illustration, warm sunlight, gentle pastel colors, white background, home gardening context, consistent character design, high quality"
+
+    def process_step(step):
+        """Generates image for a single step (Parallel Execution Helper)"""
+        # Small start jitter to avoid hitting rate limit exactly simultaneously
+        time.sleep(random.uniform(0, 1.0))
+        
         print(f"Generating Image with Nanobanana Pro ({img_model_id}) for: {step['image_prompt']}")
-        image_generated = False
         
-        img_prompt = f"Generate an image of {step['image_prompt']}"
-        
+        # Append style keywords to ensure consistency
+        img_prompt = f"Generate an image of {step['image_prompt']}, {UNIFIED_STYLE}"
         img_payload = {
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": img_prompt}]
-                }
-            ],
-            # Minimal config for Image Gen
-            "generationConfig": {
-                 # "responseMimeType": "image/jpeg" # Removed: Unsupported by Nanobanana Pro
-            }
+            "contents": [{ "role": "user", "parts": [{"text": img_prompt}] }],
+            "generationConfig": {} # responseMimeType removed
         }
         
         try:
-            img_response = call_api_with_backoff(img_url, img_payload, headers, max_retries=5)
+            img_response = call_api_with_backoff(img_url, img_payload, headers, max_retries=10)
             
             if img_response.status_code != 200:
                 print(f"Nanobanana Pro Generation failed: {img_response.status_code} - {img_response.text}")
+                return {
+                    "title": step['step_title'],
+                    "description": step['description'],
+                    "image_base64": None,
+                    "error": f"API Error: {img_response.status_code}"
+                }
             else:
                 img_resp_json = img_response.json()
                 try:
@@ -190,26 +206,44 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes):
                             break
                     
                     if b64_data:
-                        final_steps.append({
+                        return {
                             "title": step['step_title'],
                             "description": step['description'],
                             "image_base64": b64_data
-                        })
-                        image_generated = True
+                        }
                     else:
                         print(f"No inline image data in Nanobanana response: {img_resp_json}")
+                        return {
+                            "title": step['step_title'],
+                            "description": step['description'],
+                            "image_base64": None,
+                            "error": "No image data returned"
+                        }
                 except Exception as e:
                     print(f"Failed to parse Nanobanana response: {e}")
+                    return {
+                        "title": step['step_title'],
+                        "description": step['description'],
+                        "image_base64": None,
+                        "error": f"Parse Error: {str(e)}"
+                    }
 
         except Exception as e:
             print(f"Image request failed: {e}")
-        
-        if not image_generated:
-             final_steps.append({
+            return {
                 "title": step['step_title'],
                 "description": step['description'],
                 "image_base64": None,
-                "error": "Image generation failed (Nanobanana Pro)"
-            })
+                "error": f"Request Failed: {str(e)}"
+            }
+
+    # Run in parallel using ThreadPoolExecutor
+    # max_workers=5 (matches max_retries essentially, allowing full parallelism for typical 5-6 steps)
+    print("Starting Parallel Image Generation...")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        # map preserves the order of results corresponding to 'steps'
+        final_steps = list(executor.map(process_step, steps))
+    
+    if progress_callback: await progress_callback("✨ Guide generation complete!")
             
     return final_steps

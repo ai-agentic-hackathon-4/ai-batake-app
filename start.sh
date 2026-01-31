@@ -17,6 +17,7 @@ fi
 
 # Start the Node Frontend
 # It will listen on the PORT environment variable (default 8080 provided by Cloud Run)
-echo "Starting Frontend..."
+echo "Starting Frontend with BASE_PATH: ${BASE_PATH:-/}"
 cd frontend
+# BASE_PATH is preserved from environment
 node server.js
