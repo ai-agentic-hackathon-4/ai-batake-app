@@ -6,11 +6,11 @@ import json
 from dotenv import load_dotenv
 
 try:
-    from .db import init_vegetable_status, update_vegetable_status, get_all_vegetables
+    from .db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config
     from .research_agent import analyze_seed_packet, perform_deep_research
 except ImportError:
     # When running directly as a script
-    from db import init_vegetable_status, update_vegetable_status, get_all_vegetables
+    from db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config
     from research_agent import analyze_seed_packet, perform_deep_research
 
 # Setup Logging
@@ -37,6 +37,10 @@ def process_research(doc_id: str, vegetable_name: str, analysis_data: dict):
         
         # Update DB to completed
         update_vegetable_status(doc_id, "completed", research_result)
+        
+        # NEW: Update Edge Agent Configuration
+        update_edge_agent_config(research_result)
+        
         logging.info(f"[Background] Research completed for {vegetable_name}")
         
     except Exception as e:

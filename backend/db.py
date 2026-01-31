@@ -91,3 +91,31 @@ def get_all_vegetables():
     except Exception as e:
         logging.error(f"Error listing vegetables: {e}")
         return []
+    except Exception as e:
+        logging.error(f"Error listing vegetables: {e}")
+        return []
+
+def update_edge_agent_config(research_data: dict):
+    """
+    Updates /configurations/edge_agent document with the specific system prompt 
+    (complete_support_prompt) only. Overwrites existing instruction.
+    """
+    if db is None: return
+
+    try:
+        support_prompt = research_data.get("complete_support_prompt", "")
+        # Fallback if complete_support_prompt is missing (e.g. older data or error)
+        if not support_prompt:
+             # Try constructing it from other fields
+             name = research_data.get("name", "Unknown Plant")
+             temp = research_data.get("optimal_temp_range", "")
+             water = research_data.get("volumetric_water_content", "")
+             support_prompt = f"【栽培データ: {name}】\n最適気温: {temp}\n水分基準: {water}"
+
+        # Overwrite the instruction field directly with the support prompt
+        doc_ref = db.collection("configurations").document("edge_agent")
+        doc_ref.set({"instruction": support_prompt}, merge=True)
+        logging.info("Updated edge_agent configuration with new research data (overwrite).")
+        
+    except Exception as e:
+        logging.error(f"Error updating edge_agent config: {e}")

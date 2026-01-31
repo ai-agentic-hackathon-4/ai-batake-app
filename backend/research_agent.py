@@ -91,7 +91,7 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
     """
     headers, query_param = get_auth_headers()
 
-    research_topic = f"「{vegetable_name}」の育て方について、家庭菜園や農業の専門的な情報を詳しく調べてください。特に最適な気温、湿度、土壌水分量、水やり頻度、日照条件について数値を含めて調査してください。"
+    research_topic = f"「{vegetable_name}」の育て方について、家庭菜園や農業の専門的な情報を詳しく調べてください。特に最適な気温、湿度、土壌の『体積含水率(%)』、水やり頻度、日照条件について数値を含めて調査してください（pF値ではなく体積含水率を優先）。"
     if packet_info:
         research_topic += f" また、種の袋には以下の情報がありました: {packet_info}"
 
@@ -162,16 +162,22 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
         {final_text}
         -------------
         
+        【抽出ルール】
+        1. 土壌水分量はpF値ではなく「体積含水率(%)」での目安を抽出・計算してください。
+        2. pHの情報は不要です。
+        3. 「complete_support_prompt」には、この野菜を自律エージェントが育てるために必要な全ての条件（気温、湿度、水分率、光量、水やり頻度、注意点など）を網羅した、包括的な指示プロンプトを作成してください。
+        
         出力フォーマット(JSON):
         {{
             "name": "{vegetable_name}",
             "optimal_temp_range": "...",
             "optimal_humidity_range": "...",
-            "soil_moisture_standard": "...",
+            "volumetric_water_content": "...",
             "watering_instructions": "...",
             "light_requirements": "...",
             "care_tips": "...",
-            "summary_prompt": "..."
+            "summary_prompt": "...",
+            "complete_support_prompt": "..."
         }}
         """
         
