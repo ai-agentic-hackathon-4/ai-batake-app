@@ -17,6 +17,12 @@ fi
 
 # Start the Node Frontend
 # It will listen on the PORT environment variable (default 8080 provided by Cloud Run)
-echo "Starting Frontend..."
+echo "Starting Frontend on port ${PORT:-8080}..."
 cd frontend
-node server.js
+
+# Use npx next start to ensure we pass the correct port and host
+# We use -- to pass arguments to the underlying next command if using npm start,
+# but calling npx next start directly is clearer.
+# Next.js 13.4.1+ should pick up PORT, but being explicit is safer.
+npx next start -p ${PORT:-8080} -H 0.0.0.0
+
