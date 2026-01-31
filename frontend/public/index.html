@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Vegetable Research Agent</title>
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            --accent-green: #00ff9d;
+            --accent-blue: #00d2ff;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --card-bg: rgba(20, 20, 20, 0.6);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0a0a;
+            background-image:
+                radial-gradient(circle at 10% 20%, rgba(0, 255, 157, 0.1) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(0, 210, 255, 0.1) 0%, transparent 20%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Glassmorphism Utilities */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            box-shadow: var(--glass-shadow);
+        }
+
+        .header {
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(10, 10, 10, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .logo {
+            font-family: 'Clash Display', sans-serif;
+            font-weight: 600;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            background: rgba(0, 255, 157, 0.1);
+            border: 1px solid var(--accent-green);
+            color: var(--accent-green);
+            padding: 0.5rem 1rem;
+            border-radius: 999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-badge.executing {
+            background: rgba(0, 210, 255, 0.1);
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .main-content {
+            padding: 3rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-family: 'Clash Display', sans-serif;
+            font-size: 2rem;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            color: #000;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            opacity: 0.9;
+        }
+
+        /* Grid Layout */
+        .vegetable-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-green);
+            box-shadow: 0 10px 40px -10px rgba(0, 255, 157, 0.2);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 1rem;
+        }
+
+        .veg-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .veg-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .card-status {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .status-processing {
+            background: rgba(255, 179, 0, 0.1);
+            color: #ffb300;
+            border: 1px solid rgba(255, 179, 0, 0.2);
+        }
+
+        .status-completed {
+            background: rgba(0, 255, 157, 0.1);
+            color: var(--accent-green);
+            border: 1px solid rgba(0, 255, 157, 0.2);
+        }
+
+        .status-failed {
+            background: rgba(255, 59, 48, 0.1);
+            color: #ff3b30;
+            border: 1px solid rgba(255, 59, 48, 0.2);
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin-top: 1rem;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .progress-fill.processing {
+            width: 60%;
+            animation: shimmer 1s infinite linear;
+            background: linear-gradient(90deg, var(--accent-green) 0%, var(--accent-blue) 50%, var(--accent-green) 100%);
+            background-size: 200% 100%;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            width: 100%;
+            max-width: 600px;
+            padding: 2.5rem;
+            transform: scale(0.95);
+            transition: transform 0.3s;
+            position: relative;
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .close-btn:hover {
+            color: #fff;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .file-drop-zone {
+            border: 2px dashed var(--glass-border);
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .file-drop-zone:hover {
+            border-color: var(--accent-green);
+            background: rgba(0, 255, 157, 0.05);
+        }
+
+        /* Detail View */
+        .detail-content {
+            max-height: 70vh;
+            overflow-y: auto;
+            color: #d0d0d0;
+            line-height: 1.6;
+        }
+
+        .detail-item {
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .detail-label {
+            color: var(--accent-blue);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Loader */
+        .loader {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #000;
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+
+        @keyframes rotation {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="header">
+        <div class="logo">
+            <i class="fa-solid fa-leaf"></i>
+            AI Batake
+        </div>
+        <div class="status-badge" id="systemStatus">
+            <div class="status-dot"></div>
+            <span>System Idle</span>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="section-header">
+            <h1 class="section-title">Vegetable Research</h1>
+            <button class="btn-primary" onclick="openModal()">
+                <i class="fa-solid fa-plus"></i>
+                New Seed
+            </button>
+        </div>
+
+        <div class="vegetable-grid" id="vegetableGrid">
+            <!-- Cards will be injected here -->
+        </div>
+    </main>
+
+    <!-- Registration Modal -->
+    <div class="modal-overlay" id="regModal">
+        <div class="modal-content glass">
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+            <h2 class="section-title" style="margin-bottom: 0.5rem; font-size: 1.5rem;">Register New Seed</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Upload an image of the seed packet to begin AI
+                analysis.</p>
+
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label class="form-label">Seed Packet Image</label>
+                    <div class="file-drop-zone" onclick="document.getElementById('seedImage').click()">
+                        <i class="fa-solid fa-cloud-arrow-up"
+                            style="font-size: 2rem; margin-bottom: 1rem; color: var(--accent-green);"></i>
+                        <p id="fileName">Click to browse or drag file here</p>
+                        <input type="file" id="seedImage" accept="image/*" style="display: none"
+                            onchange="updateFileName(this)">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                    <span id="submitBtnText">Register & Analyze</span>
+                    <div class="loader hidden" id="submitLoader"></div>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal-overlay" id="detailModal">
+        <div class="modal-content glass" style="max-width: 800px;">
+            <button class="close-btn" onclick="closeDetailModal()">&times;</button>
+            <h2 class="section-title" id="detailTitle" style="margin-bottom: 1.5rem; font-size: 1.5rem;"></h2>
+            <div class="detail-content" id="detailBody">
+                <!-- Details injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Modal Logic
+        function openModal() {
+            document.getElementById('regModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('regModal').classList.remove('active');
+            document.getElementById('uploadForm').reset();
+            document.getElementById('fileName').textContent = "Click to browse or drag file here";
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.remove('active');
+        }
+
+        function updateFileName(input) {
+            if (input.files && input.files[0]) {
+                document.getElementById('fileName').textContent = input.files[0].name;
+            }
+        }
+
+        // Fetch Data & Refresh UI
+        async function fetchVegetables() {
+            try {
+                const response = await fetch('/api/vegetables');
+                const vegetables = await response.json();
+                renderGrid(vegetables);
+                updateSystemStatus(vegetables);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        function renderGrid(vegetables) {
+            const grid = document.getElementById('vegetableGrid');
+            grid.innerHTML = ''; // Clear current
+
+            vegetables.forEach(veg => {
+                const isProcessing = veg.status === 'processing';
+                const statusClass = `status-${veg.status}`;
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.onclick = () => showDetail(veg);
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div>
+                            <div class="veg-name">${veg.name}</div>
+                            <div class="veg-id">ID: ${veg.id.substring(0, 8)}...</div>
+                        </div>
+                        <span class="card-status ${statusClass}">${veg.status}</span>
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 0.875rem; display: flex; gap: 1rem; margin-bottom: 1rem;">
+                        <span><i class="fa-regular fa-clock"></i> ${new Date(veg.created_at).toLocaleTimeString()}</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill ${isProcessing ? 'processing' : ''}" style="width: ${isProcessing ? '60%' : '100%'}"></div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function updateSystemStatus(vegetables) {
+            const isAnyProcessing = vegetables.some(v => v.status === 'processing');
+            const badge = document.getElementById('systemStatus');
+            if (isAnyProcessing) {
+                badge.classList.add('executing');
+                badge.querySelector('span').textContent = "Executing Deep Research...";
+            } else {
+                badge.classList.remove('executing');
+                badge.querySelector('span').textContent = "System Idle";
+            }
+        }
+
+        function showDetail(veg) {
+            if (veg.status === 'processing') return; // Or show partial info
+
+            const modal = document.getElementById('detailModal');
+            const title = document.getElementById('detailTitle');
+            const body = document.getElementById('detailBody');
+
+            title.textContent = veg.name;
+
+            let content = '';
+
+            if (veg.instructions) {
+                // Assuming instructions is the JSON structure
+                const data = veg.instructions;
+
+                // Add Volumetric Water Content specifically
+                if (data.volumetric_water_content) {
+                    content += `
+                        <div class="detail-item">
+                            <div class="detail-label">Volumetric Water Content (%)</div>
+                            <div>${data.volumetric_water_content}</div>
+                        </div>
+                    `;
+                }
+
+                for (const [key, value] of Object.entries(data)) {
+                    if (key === 'original_analysis' || key === 'name' || key === 'volumetric_water_content') continue;
+                    content += `
+                        <div class="detail-item">
+                            <div class="detail-label">${key.replace(/_/g, ' ')}</div>
+                            <div>${value}</div>
+                        </div>
+                    `;
+                }
+            } else {
+                content = '<p>No detailed data available.</p>';
+            }
+
+            body.innerHTML = content;
+            modal.classList.add('active');
+        }
+
+        // Form Submission
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('seedImage');
+
+            if (!fileInput.files[0]) return;
+
+            const btnText = document.getElementById('submitBtnText');
+            const loader = document.getElementById('submitLoader');
+
+            btnText.classList.add('hidden');
+            loader.classList.remove('hidden');
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const res = await fetch('/api/register-seed', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (res.ok) {
+                    closeModal();
+                    fetchVegetables(); // Refresh immediately
+                } else {
+                    alert('Upload failed');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Error uploading file');
+            } finally {
+                btnText.classList.remove('hidden');
+                loader.classList.add('hidden');
+            }
+        });
+
+        // Polling
+        fetchVegetables();
+        setInterval(fetchVegetables, 5000); // Poll every 5 seconds
+
+    </script>
+</body>
+
+</html>
