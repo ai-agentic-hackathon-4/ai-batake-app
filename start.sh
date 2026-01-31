@@ -15,12 +15,9 @@ if ! kill -0 $BACKEND_PID > /dev/null 2>&1; then
     exit 1
 fi
 
-# Start the Node Frontend
-# It will listen on the PORT environment variable (default 8080 provided by Cloud Run)
-# Run the custom Express server (server.js) which handles:
-# 1. Serving static files at /dashboard
-# 2. Proxying /api requests to the backend
-# 3. Serving a root landing page
+# Run Next.js to serve the Main Dashboard at / and 
+# Static Research Dashboard at /dashboard (from public folder)
+echo "Starting Next.js Frontend on port ${PORT:-8080}..."
 cd frontend
-node server.js
+npx next start -p ${PORT:-8080} -H 0.0.0.0
 
