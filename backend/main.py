@@ -8,7 +8,10 @@ except ImportError:
     # When running directly as a script
     from db import save_growing_instructions, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs
     from research_agent import analyze_seed_packet, perform_deep_research
+    from research_agent import analyze_seed_packet, perform_deep_research
 import logging
+import base64
+from google.cloud import storage
 
 app = FastAPI()
 
@@ -109,6 +112,47 @@ async def register_seed(file: UploadFile = File(...)):
         
     except Exception as e:
         logging.error(f"Error in register_seed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/plant-camera/latest")
+async def get_latest_plant_image():
+    try:
+        # Initialize client
+        storage_client = storage.Client()
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        bucket = storage_client.bucket(bucket_name)
+
+        # List blobs in the directory
+        prefix = "logger-captures/"
+        blobs = list(bucket.list_blobs(prefix=prefix))
+
+        if not blobs:
+            return {"error": "No images found"}
+        
+        # Sort by created time
+        # Filter out directories
+        image_blobs = [b for b in blobs if not b.name.endswith('/')]
+        
+        if not image_blobs:
+            return {"error": "No image files found"}
+
+        # Get latest
+        latest_blob = max(image_blobs, key=lambda b: b.time_created)
+        
+        # Download as bytes
+        image_data = latest_blob.download_as_bytes()
+        
+        # Encode to base64
+        b64_image = base64.b64encode(image_data).decode('utf-8')
+        content_type = latest_blob.content_type or "image/jpeg"
+        
+        return {
+            "image": f"data:{content_type};base64,{b64_image}",
+            "timestamp": latest_blob.time_created.isoformat()
+        }
+    except Exception as e:
+        import traceback
+        logging.error(f"Error serving plant image: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
