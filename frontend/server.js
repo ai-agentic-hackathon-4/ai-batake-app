@@ -18,8 +18,6 @@ app.get('/', (req, res) => {
 app.use('/api', createProxyMiddleware({
     target: 'http://127.0.0.1:8081',
     changeOrigin: true,
-    proxyTimeout: 1800000, // 30 minutes
-    timeout: 1800000,      // 30 minutes
 }));
 
 app.listen(PORT, () => {
