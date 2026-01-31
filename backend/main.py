@@ -3,12 +3,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 try:
     from .db import save_growing_instructions, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs
+    from .db import save_growing_instructions, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs
     from .research_agent import analyze_seed_packet, perform_deep_research
+    from .agent import get_weather_from_agent
 except ImportError:
     # When running directly as a script
     from db import save_growing_instructions, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs
     from research_agent import analyze_seed_packet, perform_deep_research
     from research_agent import analyze_seed_packet, perform_deep_research
+    from agent import get_weather_from_agent
 import logging
 import base64
 from google.cloud import storage
@@ -25,13 +28,13 @@ app.add_middleware(
 class WeatherRequest(BaseModel):
     region: str
 
-# @app.post("/api/weather")
-# async def get_weather(request: WeatherRequest):
-#     try:
-#         weather_info = get_weather_from_agent(request.region)
-#         return {"message": weather_info}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
+@app.post("/api/weather")
+async def get_weather(request: WeatherRequest):
+    try:
+        weather_info = get_weather_from_agent(request.region)
+        return {"message": weather_info}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/sensors/latest")
 async def get_latest_sensor_log_endpoint():
