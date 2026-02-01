@@ -17,7 +17,7 @@ fi
 
 # Run Next.js to serve the Main Dashboard at / and 
 # Static Research Dashboard at /dashboard (from public folder)
-echo "Starting Next.js Frontend on port ${PORT:-8080}..."
+echo "Starting Next.js Frontend on port ${PORT:-3000}..."
 cd frontend
-npx next start -p ${PORT:-8080} -H 0.0.0.0
+npx next start -p ${PORT:-3000} -H 0.0.0.0
 
