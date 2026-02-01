@@ -1,7 +1,7 @@
 """Tests for FastAPI endpoints in main.py"""
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, MagicMock, AsyncMock
 import sys
 import os
 
@@ -164,8 +164,6 @@ class TestSeedGuideJobEndpoints:
     @patch('main.db')
     def test_create_seed_guide_job_success(self, mock_db, client):
         """Test successful seed guide job creation"""
-        from unittest.mock import AsyncMock
-        
         # Mock the async Firestore client
         mock_collection = Mock()
         mock_doc_ref = AsyncMock()
@@ -184,8 +182,6 @@ class TestSeedGuideJobEndpoints:
     @patch('main.db')
     def test_get_seed_guide_job_not_found(self, mock_db, client):
         """Test getting non-existent job"""
-        from unittest.mock import AsyncMock
-        
         mock_collection = Mock()
         mock_doc_ref = AsyncMock()
         mock_doc = Mock()
