@@ -1,87 +1,75 @@
-"use client"
+import Link from "next/link"
+import { Leaf, Sprout, Microscope, Activity } from "lucide-react"
 
-import { useEffect, useState } from "react"
-import { Thermometer, Droplets, Leaf } from "lucide-react"
-import { PlantCamera } from "@/components/plant-camera"
-import { MetricCard } from "@/components/metric-card"
-import { EnvironmentChart } from "@/components/environment-chart"
-import { AIActivityLog } from "@/components/ai-activity-log"
-import { WeatherCard } from "@/components/weather-card"
-import { GrowthStageCard } from "@/components/growth-stage-card"
-
-export default function Dashboard() {
-    const [sensorData, setSensorData] = useState<{ temperature: number | string; humidity: number | string }>({
-        temperature: "--",
-        humidity: "--"
-    })
-
-    useEffect(() => {
-        const fetchSensorData = async () => {
-            try {
-                const res = await fetch('http://localhost:8081/api/sensors/latest')
-                const data = await res.json()
-                if (data && data.temperature !== undefined) {
-                    setSensorData({
-                        temperature: data.temperature,
-                        humidity: data.humidity
-                    })
-                }
-            } catch (error) {
-                console.error("Failed to fetch latest sensor data:", error)
-            }
-        }
-
-        fetchSensorData()
-        const interval = setInterval(fetchSensorData, 60000) // Update every minute
-        return () => clearInterval(interval)
-    }, [])
-
+export default function LandingPage() {
     return (
-        <div className="min-h-screen bg-background">
-            {/* Header */}
-            <header className="border-b border-border bg-card">
-                <div className="max-w-7xl mx-auto px-6 py-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                            <Leaf className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-semibold text-card-foreground">Smart Farm Dashboard</h1>
-                            <p className="text-sm text-muted-foreground">AI栽培管理システム</p>
-                        </div>
+        <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col items-center justify-center p-4">
+            <div className="max-w-4xl w-full space-y-12 text-center">
+
+                {/* Hero Section */}
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <div className="mx-auto p-4 bg-primary/10 rounded-full w-fit">
+                        <Leaf className="h-12 w-12 text-primary" />
                     </div>
-                </div>
-            </header>
-
-            {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-                {/* Plant Camera Section */}
-                <PlantCamera />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <WeatherCard />
-                    <GrowthStageCard />
+                    <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-slate-900">
+                        AI Batake App
+                    </h1>
+                    <p className="text-xl text-slate-600 max-w-2xl mx-auto">
+                        AI-powered smart farming platform for monitoring, research, and guidance.
+                    </p>
                 </div>
 
-                {/* Metrics Section */}
-                <div className="grid grid-cols-2 gap-4">
-                    <MetricCard title="現在の気温" value={String(sensorData.temperature)} unit="°C" icon={Thermometer} status="normal" />
-                    <MetricCard title="現在の湿度" value={String(sensorData.humidity)} unit="%" icon={Droplets} status="normal" />
+                {/* Features Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+
+                    {/* Dashboard Card */}
+                    <Link href="/dashboard" className="group">
+                        <div className="h-full bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-primary/50 transition-all duration-300">
+                            <div className="mb-4 p-3 bg-blue-50 rounded-lg w-fit mx-auto group-hover:scale-110 transition-transform">
+                                <Activity className="h-8 w-8 text-blue-600" />
+                            </div>
+                            <h2 className="text-xl font-semibold mb-2 text-slate-900">Dashboard</h2>
+                            <p className="text-slate-500 text-sm">
+                                Real-time monitoring of environmental data and plant growth status.
+                            </p>
+                        </div>
+                    </Link>
+
+                    {/* Research Agent Card */}
+                    <Link href="/research_agent" className="group">
+                        <div className="h-full bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-primary/50 transition-all duration-300">
+                            <div className="mb-4 p-3 bg-purple-50 rounded-lg w-fit mx-auto group-hover:scale-110 transition-transform">
+                                <Microscope className="h-8 w-8 text-purple-600" />
+                            </div>
+                            <h2 className="text-xl font-semibold mb-2 text-slate-900">Research Agent</h2>
+                            <p className="text-slate-500 text-sm">
+                                AI-driven seed packet analysis and deep research for optimal growing conditions.
+                            </p>
+                        </div>
+                    </Link>
+
+                    {/* Seed Guide Card (Feature #5) */}
+                    <Link href="/seed_guide" className="group">
+                        <div className="h-full bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-primary/50 transition-all duration-300">
+                            <div className="mb-4 p-3 bg-green-50 rounded-lg w-fit mx-auto group-hover:scale-110 transition-transform">
+                                <Sprout className="h-8 w-8 text-green-600" />
+                            </div>
+                            <h2 className="text-xl font-semibold mb-2 text-slate-900">Seed Guide (Async)</h2>
+                            <p className="text-slate-500 text-sm">
+                                Upload a photo to generate a step-by-step planting guide using async AI jobs.
+                            </p>
+                            <div className="mt-4 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                New Feature
+                            </div>
+                        </div>
+                    </Link>
+
                 </div>
 
-                {/* Chart Section */}
-                <EnvironmentChart />
-
-                {/* AI Activity Log Section */}
-                <AIActivityLog />
-            </main>
-
-            {/* Footer */}
-            <footer className="border-t border-border bg-card mt-8">
-                <div className="max-w-7xl mx-auto px-6 py-4">
-                    <p className="text-sm text-muted-foreground text-center">© 2025 Smart Farm AI - ハッカソンデモ</p>
-                </div>
-            </footer>
+                <footer className="text-sm text-slate-400 pt-8">
+                    © 2025 Smart Farm AI Team
+                </footer>
+            </div>
         </div>
     )
 }
