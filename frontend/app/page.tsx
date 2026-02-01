@@ -1,10 +1,44 @@
-import Link from "next/link"
-import { Leaf, LayoutDashboard, FlaskConical, ArrowRight } from "lucide-react"
+"use client"
 
-export default function Home() {
+import { useEffect, useState } from "react"
+import { Thermometer, Droplets, Leaf } from "lucide-react"
+import { PlantCamera } from "@/components/plant-camera"
+import { MetricCard } from "@/components/metric-card"
+import { EnvironmentChart } from "@/components/environment-chart"
+import { AIActivityLog } from "@/components/ai-activity-log"
+import { WeatherCard } from "@/components/weather-card"
+import { GrowthStageCard } from "@/components/growth-stage-card"
+
+export default function Dashboard() {
+    const [sensorData, setSensorData] = useState<{ temperature: number | string; humidity: number | string }>({
+        temperature: "--",
+        humidity: "--"
+    })
+
+    useEffect(() => {
+        const fetchSensorData = async () => {
+            try {
+                const res = await fetch('http://localhost:8081/api/sensors/latest')
+                const data = await res.json()
+                if (data && data.temperature !== undefined) {
+                    setSensorData({
+                        temperature: data.temperature,
+                        humidity: data.humidity
+                    })
+                }
+            } catch (error) {
+                console.error("Failed to fetch latest sensor data:", error)
+            }
+        }
+
+        fetchSensorData()
+        const interval = setInterval(fetchSensorData, 60000) // Update every minute
+        return () => clearInterval(interval)
+    }, [])
+
     return (
         <div className="min-h-screen bg-background">
-            {/* Header (Same as Dashboard) */}
+            {/* Header */}
             <header className="border-b border-border bg-card">
                 <div className="max-w-7xl mx-auto px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -12,61 +46,40 @@ export default function Home() {
                             <Leaf className="h-6 w-6 text-primary" />
                         </div>
                         <div>
-                            <h1 className="text-xl font-semibold text-card-foreground">Smart Farm Portal</h1>
-                            <p className="text-sm text-muted-foreground">AI栽培管理システムへようこそ</p>
+                            <h1 className="text-xl font-semibold text-card-foreground">Smart Farm Dashboard</h1>
+                            <p className="text-sm text-muted-foreground">AI栽培管理システム</p>
                         </div>
                     </div>
                 </div>
             </header>
 
             {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-6 py-12 space-y-8">
-                <div className="text-center space-y-4">
-                    <h2 className="text-3xl font-bold tracking-tight">Select a Dashboard</h2>
-                    <p className="text-muted-foreground max-w-2xl mx-auto">
-                        アクセスしたいダッシュボードを選択してください。
-                    </p>
+            <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+                {/* Plant Camera Section */}
+                <PlantCamera />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <WeatherCard />
+                    <GrowthStageCard />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                    {/* Main Dashboard Link */}
-                    <Link href="/dashboard" className="group relative overflow-hidden rounded-xl border border-border bg-card p-6 transition-all hover:shadow-lg hover:border-accent/50">
-                        <div className="flex items-start justify-between">
-                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                                <LayoutDashboard className="h-8 w-8 text-primary" />
-                            </div>
-                            <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                        </div>
-                        <div className="mt-4 space-y-2">
-                            <h3 className="text-xl font-semibold">Main Dashboard</h3>
-                            <p className="text-sm text-muted-foreground">
-                                現在の環境データ、カメラ画像、AIログを確認できます。
-                            </p>
-                        </div>
-                    </Link>
-
-                    {/* Research Agent Link */}
-                    <Link href="/research_agent" className="group relative overflow-hidden rounded-xl border border-border bg-card p-6 transition-all hover:shadow-lg hover:border-accent/50">
-                        <div className="flex items-start justify-between">
-                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                                <FlaskConical className="h-8 w-8 text-primary" />
-                            </div>
-                            <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                        </div>
-                        <div className="mt-4 space-y-2">
-                            <h3 className="text-xl font-semibold">Research Agent</h3>
-                            <p className="text-sm text-muted-foreground">
-                                新しい種の登録、Deep Researchのステータス管理を行えます。
-                            </p>
-                        </div>
-                    </Link>
+                {/* Metrics Section */}
+                <div className="grid grid-cols-2 gap-4">
+                    <MetricCard title="現在の気温" value={String(sensorData.temperature)} unit="°C" icon={Thermometer} status="normal" />
+                    <MetricCard title="現在の湿度" value={String(sensorData.humidity)} unit="%" icon={Droplets} status="normal" />
                 </div>
+
+                {/* Chart Section */}
+                <EnvironmentChart />
+
+                {/* AI Activity Log Section */}
+                <AIActivityLog />
             </main>
 
             {/* Footer */}
-            <footer className="border-t border-border bg-card mt-auto fixed bottom-0 w-full">
+            <footer className="border-t border-border bg-card mt-8">
                 <div className="max-w-7xl mx-auto px-6 py-4">
-                    <p className="text-sm text-muted-foreground text-center">© 2025 Smart Farm AI</p>
+                    <p className="text-sm text-muted-foreground text-center">© 2025 Smart Farm AI - ハッカソンデモ</p>
                 </div>
             </footer>
         </div>

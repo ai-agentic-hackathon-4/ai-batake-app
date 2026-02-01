@@ -1,5 +1,0 @@
-nohup: ignoring input
-Traceback (most recent call last):
-  File "/home/monae/monacham/ai-batake-app/backend/main.py", line 1, in <module>
-    from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
-ModuleNotFoundError: No module named 'fastapi'
