@@ -23,7 +23,7 @@ class TestInitVegetableStatus:
         mock_db.collection.return_value = mock_collection
         mock_collection.document.return_value = mock_doc_ref
         
-        result = init_vegetable_status("トマト")
+        result = init_vegetable_status("Tomato")
         
         assert result == "test-doc-id"
         mock_db.collection.assert_called_once_with("vegetables")
@@ -31,7 +31,7 @@ class TestInitVegetableStatus:
         
         # Verify the data passed to set()
         call_args = mock_doc_ref.set.call_args[0][0]
-        assert call_args["name"] == "トマト"
+        assert call_args["name"] == "Tomato"
         assert call_args["status"] == "processing"
     
     @patch('db.db', None)
@@ -39,7 +39,7 @@ class TestInitVegetableStatus:
         """Test initialization when db is None (offline mode)"""
         from db import init_vegetable_status
         
-        result = init_vegetable_status("トマト")
+        result = init_vegetable_status("Tomato")
         
         assert result == "mock-id-processing"
     
@@ -50,7 +50,7 @@ class TestInitVegetableStatus:
         
         mock_db.collection.side_effect = Exception("Database error")
         
-        result = init_vegetable_status("トマト")
+        result = init_vegetable_status("Tomato")
         
         assert result == "error-id"
 
@@ -115,9 +115,9 @@ class TestGetAllVegetables:
         from db import get_all_vegetables
         
         mock_doc1 = Mock()
-        mock_doc1.to_dict.return_value = {"name": "トマト", "status": "completed"}
+        mock_doc1.to_dict.return_value = {"name": "Tomato", "status": "completed"}
         mock_doc2 = Mock()
-        mock_doc2.to_dict.return_value = {"name": "きゅうり", "status": "processing"}
+        mock_doc2.to_dict.return_value = {"name": "Cucumber", "status": "processing"}
         
         mock_collection = Mock()
         mock_collection.stream.return_value = [mock_doc1, mock_doc2]
@@ -127,8 +127,8 @@ class TestGetAllVegetables:
         result = get_all_vegetables()
         
         assert len(result) == 2
-        assert result[0]["name"] == "トマト"
-        assert result[1]["name"] == "きゅうり"
+        assert result[0]["name"] == "Tomato"
+        assert result[1]["name"] == "Cucumber"
     
     @patch('db.db', None)
     def test_get_all_vegetables_no_db(self):
@@ -149,7 +149,7 @@ class TestGetLatestVegetable:
         from db import get_latest_vegetable
         
         mock_doc = Mock()
-        mock_doc.to_dict.return_value = {"name": "トマト", "status": "completed"}
+        mock_doc.to_dict.return_value = {"name": "Tomato", "status": "completed"}
         
         mock_query = Mock()
         mock_query.limit.return_value.stream.return_value = [mock_doc]
@@ -161,7 +161,7 @@ class TestGetLatestVegetable:
         
         result = get_latest_vegetable()
         
-        assert result["name"] == "トマト"
+        assert result["name"] == "Tomato"
     
     @patch('db.db')
     def test_get_latest_vegetable_empty(self, mock_db):

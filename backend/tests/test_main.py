@@ -1,14 +1,16 @@
 """Tests for FastAPI endpoints in main.py"""
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 import sys
 import os
 
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from main import app
+# Mock Firestore before importing main
+with patch('google.cloud.firestore.AsyncClient'):
+    from main import app
 
 
 @pytest.fixture
@@ -23,21 +25,21 @@ class TestWeatherEndpoint:
     @patch('main.get_weather_from_agent')
     def test_weather_success(self, mock_weather, client):
         """Test successful weather request"""
-        mock_weather.return_value = "晴れです"
+        mock_weather.return_value = "Weather is sunny"
         
-        response = client.post("/api/weather", json={"region": "東京"})
+        response = client.post("/api/weather", json={"region": "Tokyo"})
         
         assert response.status_code == 200
         assert "message" in response.json()
-        assert response.json()["message"] == "晴れです"
-        mock_weather.assert_called_once_with("東京")
+        assert response.json()["message"] == "Weather is sunny"
+        mock_weather.assert_called_once_with("Tokyo")
     
     @patch('main.get_weather_from_agent')
     def test_weather_error(self, mock_weather, client):
         """Test weather request error handling"""
         mock_weather.side_effect = Exception("API Error")
         
-        response = client.post("/api/weather", json={"region": "東京"})
+        response = client.post("/api/weather", json={"region": "Tokyo"})
         
         assert response.status_code == 500
         assert "detail" in response.json()
@@ -93,12 +95,12 @@ class TestVegetableEndpoints:
     @patch('main.get_latest_vegetable')
     def test_get_latest_vegetable_success(self, mock_vegetable, client):
         """Test successful latest vegetable retrieval"""
-        mock_vegetable.return_value = {"name": "トマト", "status": "completed"}
+        mock_vegetable.return_value = {"name": "Tomato", "status": "completed"}
         
         response = client.get("/api/vegetables/latest")
         
         assert response.status_code == 200
-        assert response.json()["name"] == "トマト"
+        assert response.json()["name"] == "Tomato"
     
     @patch('main.get_latest_vegetable')
     def test_get_latest_vegetable_empty(self, mock_vegetable, client):
@@ -114,8 +116,8 @@ class TestVegetableEndpoints:
     def test_list_vegetables_success(self, mock_vegetables, client):
         """Test successful vegetables list retrieval"""
         mock_vegetables.return_value = [
-            {"name": "トマト", "status": "completed"},
-            {"name": "きゅうり", "status": "processing"}
+            {"name": "Tomato", "status": "completed"},
+            {"name": "Cucumber", "status": "processing"}
         ]
         
         response = client.get("/api/vegetables")
@@ -131,7 +133,7 @@ class TestRegisterSeedEndpoint:
     @patch('main.init_vegetable_status')
     def test_register_seed_success(self, mock_init, mock_analyze, client):
         """Test successful seed registration"""
-        mock_analyze.return_value = '{"name": "トマト", "visible_instructions": "test"}'
+        mock_analyze.return_value = '{"name": "Tomato", "visible_instructions": "test"}'
         mock_init.return_value = "test-doc-id"
         
         # Create a fake image file
