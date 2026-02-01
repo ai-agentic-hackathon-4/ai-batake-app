@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Leaf, Plus, CloudUpload, Clock, X } from "lucide-react";
-import styles from "./research.module.css";
+import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical } from "lucide-react";
 
 interface Vegetable {
     id: string;
@@ -16,7 +15,6 @@ export default function ResearchDashboard() {
     const [vegetables, setVegetables] = useState<Vegetable[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedVeg, setSelectedVeg] = useState<Vegetable | null>(null);
-    const [systemStatus, setSystemStatus] = useState<"idle" | "executing">("idle");
     const [uploading, setUploading] = useState(false);
     const [fileName, setFileName] = useState("Click to browse or drag file here");
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -27,12 +25,6 @@ export default function ResearchDashboard() {
         const interval = setInterval(fetchVegetables, 5000);
         return () => clearInterval(interval);
     }, []);
-
-    // Update system status based on vegetable status
-    useEffect(() => {
-        const isProcessing = vegetables.some((v) => v.status === "processing");
-        setSystemStatus(isProcessing ? "executing" : "idle");
-    }, [vegetables]);
 
     const fetchVegetables = async () => {
         try {
@@ -89,64 +81,91 @@ export default function ResearchDashboard() {
     const closeModal = () => setIsModalOpen(false);
     const closeDetailModal = () => setSelectedVeg(null);
 
-    return (
-        <div className="min-h-screen bg-[#0a0a0a] text-white font-sans relative overflow-x-hidden">
-            {/* Background Gradients (inline styles for simplicity matching CSS) */}
-            <div
-                className="fixed inset-0 pointer-events-none"
-                style={{
-                    background: `
-            radial-gradient(circle at 10% 20%, rgba(0, 255, 157, 0.1) 0%, transparent 20%),
-            radial-gradient(circle at 90% 80%, rgba(0, 210, 255, 0.1) 0%, transparent 20%)
-          `,
-                }}
-            />
+    const isSystemExecuting = vegetables.some((v) => v.status === "processing");
 
-            <header className={styles.header}>
-                <div className={styles.logo}>
-                    <Leaf className="w-6 h-6" />
-                    AI Batake
-                </div>
-                <div className={`${styles.status_badge} ${systemStatus === "executing" ? styles.executing : ""}`}>
-                    <div className={styles.status_dot}></div>
-                    <span>{systemStatus === "executing" ? "Executing Deep Research..." : "System Idle"}</span>
+    return (
+        <div className="min-h-screen bg-background">
+            {/* Header */}
+            <header className="border-b border-border bg-card">
+                <div className="max-w-7xl mx-auto px-6 py-4">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-primary/10">
+                                <Leaf className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-semibold text-card-foreground">Research Agent</h1>
+                                <p className="text-sm text-muted-foreground">AI Deep Research Dashboard</p>
+                            </div>
+                        </div>
+                        <div className={`px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 border ${isSystemExecuting
+                                ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                : "bg-primary/10 text-primary border-primary/20"
+                            }`}>
+                            <div className={`w-2 h-2 rounded-full ${isSystemExecuting ? "bg-blue-500 animate-pulse" : "bg-primary"}`}></div>
+                            {isSystemExecuting ? "Executing Deep Research..." : "System Idle"}
+                        </div>
+                    </div>
                 </div>
             </header>
 
-            <main className={styles.main_content}>
-                <div className={styles.section_header}>
-                    <h1 className={styles.section_title}>Vegetable Research</h1>
-                    <button className={styles.btn_primary} onClick={openModal}>
-                        <Plus className="w-5 h-5" />
+            <main className="max-w-7xl mx-auto px-6 py-8">
+                <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-2xl font-semibold tracking-tight">Vegetable Research</h2>
+                    <button
+                        onClick={openModal}
+                        className="inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 gap-2"
+                    >
+                        <Plus className="w-4 h-4" />
                         New Seed
                     </button>
                 </div>
 
-                <div className={styles.vegetable_grid}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {vegetables.map((veg) => {
                         const isProcessing = veg.status === "processing";
-                        let statusClass = "";
-                        if (veg.status === "processing") statusClass = styles.status_processing;
-                        if (veg.status === "completed") statusClass = styles.status_completed;
-                        if (veg.status === "failed") statusClass = styles.status_failed;
+                        const isFailed = veg.status === "failed";
+                        const isCompleted = veg.status === "completed";
 
                         return (
-                            <div key={veg.id} className={styles.card} onClick={() => veg.status !== "processing" && setSelectedVeg(veg)}>
-                                <div className={styles.card_header}>
+                            <div
+                                key={veg.id}
+                                className={`group relative rounded-xl border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md cursor-pointer ${!isProcessing ? "hover:border-primary/50" : ""
+                                    }`}
+                                onClick={() => !isProcessing && setSelectedVeg(veg)}
+                            >
+                                <div className="flex justify-between items-start mb-4">
                                     <div>
-                                        <div className={styles.veg_name}>{veg.name}</div>
-                                        <div className={styles.veg_id}>ID: {veg.id.substring(0, 8)}...</div>
+                                        <h3 className="font-semibold text-lg leading-none tracking-tight">{veg.name}</h3>
+                                        <p className="text-sm text-muted-foreground mt-1">ID: {veg.id.substring(0, 8)}...</p>
                                     </div>
-                                    <span className={`${styles.card_status} ${statusClass}`}>{veg.status}</span>
+                                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide border ${isProcessing
+                                            ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+                                            : isFailed
+                                                ? "bg-destructive/10 text-destructive border-destructive/20"
+                                                : "bg-primary/10 text-primary border-primary/20"
+                                        }`}>
+                                        {veg.status}
+                                    </span>
                                 </div>
-                                <div className="text-[#a0a0a0] text-sm flex gap-4 mb-4 items-center">
+
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                                     <Clock className="w-4 h-4" />
                                     <span>{new Date(veg.created_at).toLocaleTimeString()}</span>
                                 </div>
-                                <div className={styles.progress_bar}>
+
+                                <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
                                     <div
-                                        className={`${styles.progress_fill} ${isProcessing ? styles.processing : ""}`}
-                                        style={{ width: isProcessing ? "60%" : "100%" }}
+                                        className={`h-full transition-all duration-500 ${isProcessing
+                                                ? "w-[60%] bg-blue-500/80 animate-[shimmer_2s_infinite]"
+                                                : isFailed
+                                                    ? "w-full bg-destructive"
+                                                    : "w-full bg-primary"
+                                            }`}
+                                        style={isProcessing ? {
+                                            backgroundImage: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%)',
+                                            backgroundSize: '200% 100%'
+                                        } : {}}
                                     ></div>
                                 </div>
                             </div>
@@ -157,45 +176,54 @@ export default function ResearchDashboard() {
 
             {/* Registration Modal */}
             {isModalOpen && (
-                <div className={`${styles.modal_overlay} ${styles.active}`}>
-                    <div className={`${styles.modal_content} ${styles.glass}`}>
-                        <button className={styles.close_btn} onClick={closeModal}>
-                            <X className="w-6 h-6" />
+                <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-lg sm:p-8 relative animate-in fade-in zoom-in-95 duration-200">
+                        <button
+                            onClick={closeModal}
+                            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        >
+                            <X className="w-4 h-4" />
+                            <span className="sr-only">Close</span>
                         </button>
-                        <h2 className={styles.section_title} style={{ marginBottom: "0.5rem", fontSize: "1.5rem" }}>
-                            Register New Seed
-                        </h2>
-                        <p style={{ color: "#a0a0a0", marginBottom: "2rem" }}>
-                            Upload an image of the seed packet to begin AI analysis.
-                        </p>
 
-                        <form onSubmit={handleSubmit}>
-                            <div className={styles.form_group}>
-                                <label className={styles.form_label}>Seed Packet Image</label>
+                        <div className="flex flex-col space-y-1.5 text-center sm:text-left mb-6">
+                            <h2 className="text-lg font-semibold leading-none tracking-tight">Register New Seed</h2>
+                            <p className="text-sm text-muted-foreground">
+                                Upload an image of the seed packet to begin AI analysis.
+                            </p>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                    Seed Packet Image
+                                </label>
                                 <div
-                                    className={styles.file_drop_zone}
+                                    className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-accent/50 hover:border-accent transition-colors cursor-pointer"
                                     onClick={() => fileInputRef.current?.click()}
                                 >
-                                    <CloudUpload
-                                        className="mx-auto mb-4 text-[#00ff9d]"
-                                        size={48}
-                                    />
-                                    <p>{fileName}</p>
+                                    <CloudUpload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                                    <p className="text-sm text-muted-foreground font-medium">{fileName}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Supports: JPG, PNG</p>
                                     <input
                                         type="file"
                                         ref={fileInputRef}
                                         accept="image/*"
-                                        style={{ display: "none" }}
+                                        className="hidden"
                                         onChange={handleFileChange}
                                     />
                                 </div>
                             </div>
 
-                            <button type="submit" className={styles.btn_primary} style={{ width: "100%", justifyContent: "center" }} disabled={uploading}>
+                            <button
+                                type="submit"
+                                disabled={uploading}
+                                className="inline-flex w-full items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-10 px-4 py-2"
+                            >
                                 {uploading ? (
-                                    <div className={styles.loader}></div>
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                                 ) : (
-                                    <span>Register & Analyze</span>
+                                    "Register & Analyze"
                                 )}
                             </button>
                         </form>
@@ -205,40 +233,64 @@ export default function ResearchDashboard() {
 
             {/* Detail Modal */}
             {selectedVeg && (
-                <div className={`${styles.modal_overlay} ${styles.active}`}>
-                    <div className={`${styles.modal_content} ${styles.glass}`} style={{ maxWidth: "800px" }}>
-                        <button className={styles.close_btn} onClick={closeDetailModal}>
-                            <X className="w-6 h-6" />
+                <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="w-full max-w-3xl rounded-xl border border-border bg-card p-6 shadow-lg sm:p-8 relative flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
+                        <button
+                            onClick={closeDetailModal}
+                            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 z-10"
+                        >
+                            <X className="w-4 h-4" />
+                            <span className="sr-only">Close</span>
                         </button>
-                        <h2 className={styles.section_title} style={{ marginBottom: "1.5rem", fontSize: "1.5rem" }}>
-                            {selectedVeg.name}
-                        </h2>
-                        <div className={styles.detail_content}>
+
+                        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border">
+                            <div className="p-2 rounded-lg bg-primary/10">
+                                <FlaskConical className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-semibold">{selectedVeg.name}</h2>
+                                <p className="text-sm text-muted-foreground">Analysis Results</p>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto pr-2 space-y-6">
                             {selectedVeg.instructions ? (
                                 <>
                                     {selectedVeg.instructions.volumetric_water_content && (
-                                        <div className={styles.detail_item}>
-                                            <div className={styles.detail_label}>Volumetric Water Content (%)</div>
-                                            <div>{selectedVeg.instructions.volumetric_water_content}</div>
+                                        <div className="rounded-lg border border-border p-4 bg-card/50">
+                                            <h3 className="text-sm font-medium text-blue-500 uppercase tracking-wider mb-1">Volumetric Water Content</h3>
+                                            <p className="text-2xl font-bold">{selectedVeg.instructions.volumetric_water_content}</p>
                                         </div>
                                     )}
-                                    {Object.entries(selectedVeg.instructions).map(([key, value]) => {
-                                        if (key === "original_analysis" || key === "name" || key === "volumetric_water_content") return null;
-                                        return (
-                                            <div key={key} className={styles.detail_item}>
-                                                <div className={styles.detail_label}>{key.replace(/_/g, " ")}</div>
-                                                <div>{String(value)}</div>
-                                            </div>
-                                        );
-                                    })}
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {Object.entries(selectedVeg.instructions).map(([key, value]) => {
+                                            if (key === "original_analysis" || key === "name" || key === "volumetric_water_content") return null;
+                                            return (
+                                                <div key={key} className="p-4 rounded-lg bg-secondary/20 border border-border/50">
+                                                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{key.replace(/_/g, " ")}</h3>
+                                                    <div className="text-sm font-medium break-all">{String(value)}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </>
                             ) : (
-                                <p>No detailed data available.</p>
+                                <div className="text-center py-12 text-muted-foreground">
+                                    <p>No detailed data available.</p>
+                                </div>
                             )}
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* Footer */}
+            <footer className="border-t border-border bg-card mt-auto">
+                <div className="max-w-7xl mx-auto px-6 py-4">
+                    <p className="text-sm text-muted-foreground text-center">© 2025 Smart Farm AI - ハッカソンデモ</p>
+                </div>
+            </footer>
         </div>
     );
 }
