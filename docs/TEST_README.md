@@ -53,7 +53,7 @@ npm test
 
 ## テストマトリクス
 
-詳細なテストケース一覧は [docs/TEST_MATRIX.md](../docs/TEST_MATRIX.md) を参照してください。
+詳細なテストケース一覧は [TEST_MATRIX.md](TEST_MATRIX.md) を参照してください。
 
 ## 総合結果
 
