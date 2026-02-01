@@ -6,7 +6,13 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // Serve static files from the 'public' directory
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files from the 'public' directory at '/dashboard'
+app.use('/dashboard', express.static(path.join(__dirname, 'public')));
+
+// Root path response (optional, or 404)
+app.get('/', (req, res) => {
+    res.send('Welcome to AI Batake. Please visit <a href="/dashboard">/dashboard</a> to access the application.');
+});
 
 // Proxy API requests to the Python backend running on localhost:8081
 app.use('/api', createProxyMiddleware({
