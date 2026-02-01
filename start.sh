@@ -25,4 +25,3 @@ cd frontend
 # but calling npx next start directly is clearer.
 # Next.js 13.4.1+ should pick up PORT, but being explicit is safer.
 npx next start -p ${PORT:-8080} -H 0.0.0.0
-

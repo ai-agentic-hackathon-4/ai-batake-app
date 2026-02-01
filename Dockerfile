@@ -10,8 +10,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy backend files and install Python dependencies
-COPY backend ./backend
+COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
+COPY backend ./backend
 
 # Copy frontend files and install Node.js dependencies
 COPY frontend ./frontend

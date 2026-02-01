@@ -3,7 +3,8 @@ uvicorn
 requests
 google-auth
 google-cloud-logging
-
-google-cloud-firestore
 python-multipart
+google-cloud-aiplatform>=1.38.0
+google-cloud-firestore
 google-cloud-storage
+python-dotenv
