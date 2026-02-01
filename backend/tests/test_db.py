@@ -116,11 +116,16 @@ class TestGetAllVegetables:
         
         mock_doc1 = Mock()
         mock_doc1.to_dict.return_value = {"name": "Tomato", "status": "completed"}
+        mock_doc1.id = "doc1"
         mock_doc2 = Mock()
         mock_doc2.to_dict.return_value = {"name": "Cucumber", "status": "processing"}
+        mock_doc2.id = "doc2"
+        
+        mock_query = Mock()
+        mock_query.stream.return_value = [mock_doc1, mock_doc2]
         
         mock_collection = Mock()
-        mock_collection.stream.return_value = [mock_doc1, mock_doc2]
+        mock_collection.order_by.return_value = mock_query
         
         mock_db.collection.return_value = mock_collection
         

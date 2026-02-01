@@ -161,12 +161,16 @@ class TestRegisterSeedEndpoint:
 class TestSeedGuideJobEndpoints:
     """Tests for /api/seed-guide/jobs endpoints"""
     
-    @pytest.mark.asyncio
     @patch('main.db')
-    async def test_create_seed_guide_job_success(self, mock_db, client):
+    def test_create_seed_guide_job_success(self, mock_db, client):
         """Test successful seed guide job creation"""
+        from unittest.mock import AsyncMock
+        
+        # Mock the async Firestore client
         mock_collection = Mock()
-        mock_doc_ref = Mock()
+        mock_doc_ref = AsyncMock()
+        mock_doc_ref.set = AsyncMock()
+        
         mock_db.collection.return_value = mock_collection
         mock_collection.document.return_value = mock_doc_ref
         
@@ -177,18 +181,19 @@ class TestSeedGuideJobEndpoints:
         assert response.status_code == 200
         assert "job_id" in response.json()
     
-    @pytest.mark.asyncio
     @patch('main.db')
-    async def test_get_seed_guide_job_not_found(self, mock_db, client):
+    def test_get_seed_guide_job_not_found(self, mock_db, client):
         """Test getting non-existent job"""
+        from unittest.mock import AsyncMock
+        
         mock_collection = Mock()
-        mock_doc_ref = Mock()
+        mock_doc_ref = AsyncMock()
         mock_doc = Mock()
         mock_doc.exists = False
         
         mock_db.collection.return_value = mock_collection
         mock_collection.document.return_value = mock_doc_ref
-        mock_doc_ref.get.return_value = mock_doc
+        mock_doc_ref.get = AsyncMock(return_value=mock_doc)
         
         response = client.get("/api/seed-guide/jobs/non-existent-id")
         
