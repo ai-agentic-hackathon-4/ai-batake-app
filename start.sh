@@ -3,7 +3,7 @@
 # Start the Python Backend in the background
 # We run it on port 8081 as configured in our design
 echo "Starting Backend on port 8081..."
-uvicorn backend.main:app --host 127.0.0.1 --port 8081 &
+uvicorn backend.main:app --host 0.0.0.0 --port 8081 &
 BACKEND_PID=$!
 
 # Wait for backend to initialize (optional but helpful for logs)

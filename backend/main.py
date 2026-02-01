@@ -49,7 +49,7 @@ app.add_middleware(
 
 # Firestore Client (Async)
 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
-db = firestore.AsyncClient(project=project_id)
+db = firestore.AsyncClient(project=project_id, database="ai-agentic-hackathon-4-db")
 COLLECTION_NAME = "seed_guide_jobs"
 
 class WeatherRequest(BaseModel):

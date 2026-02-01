@@ -45,7 +45,7 @@ export default function SeedGuidePage() {
 
         pollingRef.current = window.setInterval(async () => {
             try {
-                const response = await fetch(`http://localhost:8081/api/seed-guide/jobs/${id}`);
+                const response = await fetch(`/api/seed-guide/jobs/${id}`);
 
                 if (!response.ok) {
                     if (response.status === 404) {
@@ -100,7 +100,7 @@ export default function SeedGuidePage() {
         formData.append('file', selectedFile);
 
         try {
-            const response = await fetch('http://localhost:8081/api/seed-guide/jobs', {
+            const response = await fetch('/api/seed-guide/jobs', {
                 method: 'POST',
                 body: formData,
             });
