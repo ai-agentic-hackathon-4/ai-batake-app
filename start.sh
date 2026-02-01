@@ -15,13 +15,9 @@ if ! kill -0 $BACKEND_PID > /dev/null 2>&1; then
     exit 1
 fi
 
-# Start the Node Frontend
-# It will listen on the PORT environment variable (default 8080 provided by Cloud Run)
-echo "Starting Frontend on port ${PORT:-8080}..."
+# Run Next.js to serve the Main Dashboard at / and 
+# Static Research Dashboard at /dashboard (from public folder)
+echo "Starting Next.js Frontend on port ${PORT:-3000}..."
 cd frontend
-
-# Use npx next start to ensure we pass the correct port and host
-# We use -- to pass arguments to the underlying next command if using npm start,
-# but calling npx next start directly is clearer.
-# Next.js 13.4.1+ should pick up PORT, but being explicit is safer.
-npx next start -p ${PORT:-8080} -H 0.0.0.0
+# Start Next.js on port 3000
+npx next start -p ${PORT:-3000} -H 0.0.0.0
