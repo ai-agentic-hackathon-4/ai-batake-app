@@ -12,7 +12,7 @@ export function PlantCamera() {
     useEffect(() => {
         const fetchImage = async () => {
             try {
-                const response = await fetch('http://localhost:8081/api/plant-camera/latest')
+                const response = await fetch('/api/plant-camera/latest')
                 if (!response.ok) return
                 const data = await response.json()
                 if (data.image) {

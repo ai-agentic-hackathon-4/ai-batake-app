@@ -14,7 +14,7 @@ export function EnvironmentChart() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const res = await fetch(`http://localhost:8081/api/sensor-history?hours=${timeRange}`)
+                const res = await fetch(`/api/sensor-history?hours=${timeRange}`)
                 const json = await res.json()
                 if (json.data) {
                     const formattedData = json.data.map((item: any) => ({

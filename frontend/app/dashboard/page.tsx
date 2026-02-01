@@ -18,7 +18,7 @@ export default function Dashboard() {
     useEffect(() => {
         const fetchSensorData = async () => {
             try {
-                const res = await fetch('http://localhost:8081/api/sensors/latest')
+                const res = await fetch('/api/sensors/latest')
                 const data = await res.json()
                 if (data && data.temperature !== undefined) {
                     setSensorData({
