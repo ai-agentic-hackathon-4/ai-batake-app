@@ -108,22 +108,48 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
              return {"name": vegetable_name, "error": f"Start failed: {response.status_code} - {response.text}"}
              
         interaction_data = response.json()
-        interaction_name = interaction_data.get("name") 
+        logging.info(f"Debug: Full Interaction Data: {json.dumps(interaction_data, ensure_ascii=False)}")
+        interaction_name = interaction_data.get("name")
+        if not interaction_name:
+            # Fallback: resource name might be constructed from ID
+            interaction_id = interaction_data.get("id")
+            if interaction_id:
+                # The API typically returns "interactions/<ID>" or just an ID we can use
+                # Based on doc, let's assume 'interactions/{id}' if name is missing
+                interaction_name = f"interactions/{interaction_id}"
+                logging.info(f"Debug: Constructed interaction_name from ID: {interaction_name}")
+
         
         logging.info(f"Research started: {interaction_name}")
         
         # 2. Poll (GET)
         poll_url = f"https://generativelanguage.googleapis.com/v1beta/{interaction_name}{query_param}"
+        logging.info(f"Debug: Poll URL constructed: {poll_url}")
         
-        max_retries = 120
+        if not interaction_name:
+             logging.error("Interaction Name is None or Empty!")
+             return {"name": vegetable_name, "error": "Interaction Name missing"}
+        
+        max_retries = 180
         final_text = ""
         
-        for _ in range(max_retries):
+        start_time = time.time()
+        for i in range(max_retries):
+            current_time = time.time()
+            elapsed = current_time - start_time
+            logging.info(f"Polling iteration {i+1}/{max_retries}. Elapsed: {elapsed:.2f}s")
+
             poll_resp = requests.get(poll_url, headers=headers)
             if poll_resp.status_code != 200:
-                logging.warning(f"Poll failed: {poll_resp.status_code}")
-                # Don't break immediately on temp error, but interaction 404 might be bad.
-                time.sleep(5)
+                logging.warning(f"Poll failed: {poll_resp.status_code} - {poll_resp.text}")
+                
+                # Stop on 404 (Interaction not found)
+                if poll_resp.status_code == 404:
+                     logging.error(f"Interaction not found (404). Aborting poll for {interaction_name}")
+                     return {"name": vegetable_name, "error": f"Research failed: Interaction not found (404)"}
+
+                # Don't break immediately on temp error (500 etc)
+                time.sleep(10)
                 continue
                 
             data = poll_resp.json()
@@ -135,12 +161,18 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
                 outputs = data.get("outputs", [])
                 if outputs:
                     final_text = outputs[-1].get("text", "")
+                    logging.info(f"Research completed. Output length: {len(final_text)}")
+                else:
+                    logging.warning("Research completed but no outputs found.")
                 break
             elif status == "failed":
-                return {"name": vegetable_name, "error": f"Research failed: {data.get('error')}"}
+                error_msg = data.get('error')
+                logging.error(f"Research failed. detailed error: {json.dumps(data, ensure_ascii=False)}")
+                return {"name": vegetable_name, "error": f"Research failed: {error_msg}"}
                 
             time.sleep(10)
         else:
+            logging.error(f"Research timed out after {max_retries} retries ({max_retries * 10}s). Last status: {status}")
             return {"name": vegetable_name, "error": "Research Timeout"}
 
         # 3. Extraction (REST)
