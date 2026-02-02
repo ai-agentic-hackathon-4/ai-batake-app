@@ -124,9 +124,92 @@ docker build -t ai-batake-app .
 - **Build Process**: Docker builds frontend first, then starts both services via `start.sh`
 
 ## Testing
-- Backend API tests: `backend/test_api.py`
-- No frontend test infrastructure currently configured
-- Always test Cloud integration features with proper credentials
+
+### Backend Testing (Python/pytest)
+
+**Test Framework**: pytest with comprehensive test coverage
+
+**Test Structure**:
+- `backend/tests/test_db.py` - Database operations (Firestore)
+- `backend/tests/test_agent.py` - AI agent integration and communication
+- `backend/tests/test_main.py` - FastAPI endpoint testing
+- `backend/tests/test_seed_service.py` - Seed image analysis service
+- `backend/tests/test_utils.py` - Utility functions
+
+**Running Tests**:
+```bash
+cd backend
+pip install -r requirements.txt
+pytest
+```
+
+**Configuration**:
+- `backend/pytest.ini` - pytest configuration file
+- Mock external dependencies (Firestore, Google Cloud APIs)
+- Test both success and error scenarios
+- Always check if `db` is None for offline testing
+
+**Test Coverage**: 42 tests covering:
+- Database operations (11 tests) - init, update, query operations
+- Agent functionality (10 tests) - authentication, session management, queries
+- API endpoints (13 tests) - all REST endpoints with success/error cases
+- Seed service (4 tests) - image analysis and guide generation
+- Utilities (4 tests) - basic Python operations
+
+### Frontend Testing (TypeScript/Jest)
+
+**Test Framework**: Jest with React Testing Library
+
+**Test Structure**:
+- `frontend/__tests__/lib/utils.test.ts` - Utility functions (cn helper)
+- `frontend/__tests__/components/metric-card.test.tsx` - MetricCard component
+- `frontend/__tests__/components/weather-card.test.tsx` - WeatherCard component
+- `frontend/__tests__/components/growth-stage-card.test.tsx` - GrowthStageCard component
+
+**Running Tests**:
+```bash
+cd frontend
+npm install --legacy-peer-deps
+npm test
+```
+
+**Watch Mode**:
+```bash
+npm run test:watch
+```
+
+**Configuration**:
+- `frontend/jest.config.js` - Jest configuration
+- `frontend/jest.setup.js` - Test setup file
+- Use `@testing-library/react` for component testing
+- Use `@testing-library/jest-dom` for DOM assertions
+
+**Test Coverage**: 30 tests covering:
+- Utility functions (7 tests) - class name merging, conditional classes
+- UI Components (23 tests) - rendering, props, styling, interactions
+
+### Test Documentation
+
+**Comprehensive Test Matrix**: See `docs/TEST_MATRIX.md` for:
+- Complete list of all test cases with IDs
+- Test categorization (normal/error scenarios)
+- Expected behaviors
+- Implementation status
+
+**Test Summary**: See `docs/TEST_README.md` for:
+- Quick reference guide
+- Test execution instructions
+- Overall test statistics (72 total tests, 100% pass rate)
+
+### Testing Best Practices
+
+1. **Always run tests before committing code changes**
+2. **Mock external dependencies** (Firestore, Google Cloud APIs)
+3. **Test both success and error paths**
+4. **Use descriptive test names** that explain what is being tested
+5. **Follow existing test patterns** when adding new tests
+6. **Maintain 100% test pass rate** - do not commit failing tests
+7. **Update TEST_MATRIX.md** when adding new test cases
 
 ## Important Notes
 - The application requires Google Cloud credentials to function properly
