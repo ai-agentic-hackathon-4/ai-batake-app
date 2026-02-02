@@ -41,7 +41,10 @@ def update_vegetable_status(doc_id: str, status: str, data: dict = None):
 
     try:
         doc_ref = db.collection("vegetables").document(doc_id)
-        update_data = {"status": status}
+        update_data = {
+            "status": status,
+            "updated_at": datetime.now()
+        }
         if data:
             update_data["instructions"] = data
             
@@ -151,7 +154,10 @@ def update_edge_agent_config(research_data: dict):
 
         # Overwrite the instruction field directly with the support prompt
         doc_ref = db.collection("configurations").document("edge_agent")
-        doc_ref.set({"instruction": support_prompt}, merge=True)
+        doc_ref.set({
+            "instruction": support_prompt,
+            "updated_at": datetime.now()
+        }, merge=True)
         logging.info("Updated edge_agent configuration with new research data (overwrite).")
         
     except Exception as e:

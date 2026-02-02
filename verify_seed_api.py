@@ -4,7 +4,7 @@ import io
 import time
 import sys
 
-URL = "http://localhost:8080/api/seed-guide"
+URL = "http://localhost:8082/api/register-seed"
 
 def create_dummy_image():
     # Create a small blank image
@@ -36,10 +36,11 @@ def test_api():
         if response.status_code == 200:
             print("SUCCESS: API returned 200")
             json_resp = response.json()
-            if "steps" in json_resp:
-                print(f"Steps count: {len(json_resp['steps'])}")
+            if "document_id" in json_resp:
+                print(f"Document ID: {json_resp['document_id']}")
+                print(f"Vegetable: {json_resp.get('vegetable')}")
             else:
-                print("WARNING: 'steps' key parsing failed.")
+                print("WARNING: 'document_id' key missing.")
         else:
             print("FAILURE: API did not return 200")
 

@@ -3,24 +3,17 @@ import time
 import sys
 import os
 
-BASE_URL = "http://localhost:8080"
+BASE_URL = "http://localhost:8082"
 
 def get_test_image():
-    # Attempt to find any jpg/png in the project to use as test
-    # Hardcoding a known path or searching common dirs
-    possible_paths = [
-        "/home/nakahara/Documents/dev/ai-agentic-hackathon-4/ai-batake-app/backend/test_image.jpg",
-        "test_image.jpg"
-    ]
-    
-    for path in possible_paths:
-        if os.path.exists(path):
-            return open(path, "rb")
-            
-    # If no file found, try to create a dummy file without PIL
-    # A minimal valid JPG header is enough to pass multipart check, though Gemini might reject it content-wise.
-    # But for 404 debugging, any bytes work.
-    return b'fake_image_bytes_for_testing_endpoint'
+    from PIL import Image
+    import io
+    # Create a small blank image
+    img = Image.new('RGB', (100, 100), color = 'green')
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='JPEG')
+    img_byte_arr.seek(0)
+    return img_byte_arr
 
 def verify_async_flow():
     print(f"Testing Async API at {BASE_URL}...")
