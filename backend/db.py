@@ -137,8 +137,11 @@ def update_edge_agent_config(research_data: dict):
     if db is None: return
 
     try:
-        support_prompt = research_data.get("complete_support_prompt", "")
-        # Fallback if complete_support_prompt is missing (e.g. older data or error)
+        support_prompt = research_data.get("summary_prompt")
+        if not support_prompt:
+             support_prompt = research_data.get("complete_support_prompt", "")
+
+        # Fallback if both are missing
         if not support_prompt:
              # Try constructing it from other fields
              name = research_data.get("name", "Unknown Plant")

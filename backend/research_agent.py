@@ -197,8 +197,8 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
         # 3. Extraction (REST)
         extraction_prompt = f"""
         以下の調査レポートに基づいて、野菜「{vegetable_name}」の育て方情報を抽出してJSON形式でまとめてください。
-        特にsummary_promptには最適な気温、湿度、土壌水分量、水やり頻度、日照条件について数値を含めて記載してください。
-        
+        特にsummary_promptには最適な気温、湿度、土壌水分量、水やり頻度、日照条件について数値を含めてこれだけで野菜を育てることができるほど詳しく記載してください。
+
         ---レポート---
         {final_text}
         -------------

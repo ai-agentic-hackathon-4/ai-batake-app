@@ -34,7 +34,11 @@ except ImportError:
 try:
     from .seed_service import analyze_seed_and_generate_guide
 except ImportError:
-    pass
+    try:
+        from seed_service import analyze_seed_and_generate_guide
+    except ImportError as e:
+        logging.warning(f"Failed to import seed_service: {e}")
+        pass
 
 app = FastAPI()
 
