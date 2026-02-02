@@ -27,6 +27,25 @@ def get_auth_headers():
         logging.warning(f"Failed to get ADC credentials: {e}")
         return {"Content-Type": "application/json"}, ""
 
+def request_with_retry(method, url, **kwargs):
+    max_retries = 5
+    backoff_factor = 2
+    for i in range(max_retries):
+        try:
+            response = requests.request(method, url, **kwargs)
+            if response.status_code == 429:
+                sleep_time = backoff_factor ** i
+                logging.warning(f"429 Too Many Requests. Retrying in {sleep_time}s...")
+                time.sleep(sleep_time)
+                continue
+            return response
+        except requests.exceptions.RequestException as e:
+            logging.warning(f"Request failed: {e}. Retrying...")
+            time.sleep(backoff_factor ** i)
+    
+    # Final attempt
+    return requests.request(method, url, **kwargs)
+
 def analyze_seed_packet(image_bytes: bytes) -> str:
     """
     Analyzes the seed packet image using Gemini 3 Flash via REST API.
@@ -61,7 +80,7 @@ def analyze_seed_packet(image_bytes: bytes) -> str:
         
         headers = {"Content-Type": "application/json"}
         
-        response = requests.post(url, headers=headers, json=payload)
+        response = request_with_retry("POST", url, headers=headers, json=payload)
         response.raise_for_status()
         
         result_json = response.json()
@@ -101,7 +120,7 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
         }
         
         logging.info(f"Starting Deep Research (REST) for: {vegetable_name}")
-        response = requests.post(start_url, headers=headers, json=payload)
+        response = request_with_retry("POST", start_url, headers=headers, json=payload)
         
         if response.status_code != 200:
              logging.error(f"Deep Research start failed: {response.text}")
@@ -139,7 +158,7 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
             elapsed = current_time - start_time
             logging.info(f"Polling iteration {i+1}/{max_retries}. Elapsed: {elapsed:.2f}s")
 
-            poll_resp = requests.get(poll_url, headers=headers)
+            poll_resp = request_with_retry("GET", poll_url, headers=headers)
             if poll_resp.status_code != 200:
                 logging.warning(f"Poll failed: {poll_resp.status_code} - {poll_resp.text}")
                 
@@ -196,13 +215,13 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
         }}
         """
         
-        gen_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent{query_param}"
+        gen_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent{query_param}"
         gen_payload = {
             "contents": [{"parts": [{"text": extraction_prompt}]}],
             "generation_config": {"response_mime_type": "application/json"}
         }
         
-        gen_resp = requests.post(gen_url, headers=headers, json=gen_payload)
+        gen_resp = request_with_retry("POST", gen_url, headers=headers, json=gen_payload)
         gen_resp.raise_for_status()
         
         gen_data = gen_resp.json()
