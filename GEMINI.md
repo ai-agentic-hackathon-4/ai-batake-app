@@ -62,8 +62,22 @@ This is an AI-powered smart farming platform that provides:
 - **Backend Modules**: Keep related functionality in separate Python modules in `backend/`
 
 ### Testing
-- **Backend**: FastAPI TestClient for API endpoint testing
-- Test files should be prefixed with `test_` or `verify_`
+- **Backend**:
+  - **Framework**: FastAPI TestClient for API endpoint testing
+  - **Test Files**: Files should be prefixed with `test_` (e.g., `test_api.py`) or `verify_` (e.g., `verify_async_jobs.py`)
+  - **Location**: Test files are placed in `backend/` directory alongside the modules they test
+  - **Verification Scripts**: 
+    - `verify_async_jobs.py` - Tests async job flow (POST job creation, polling, completion)
+    - `verify_seed_api.py` - Tests seed guide API endpoints
+  - **Running Tests**:
+    ```bash
+    cd backend
+    python test_api.py <image_path>           # Run API tests with test image
+    python verify_async_jobs.py               # Verify async job processing
+    python verify_seed_api.py                 # Verify seed API endpoints
+    ```
+- **Frontend**: ESLint for static code analysis
+  - Run with `npm run lint` in the `frontend/` directory
 
 ### Formatting
 - **Frontend**: Use consistent indentation (4 spaces for TypeScript)
