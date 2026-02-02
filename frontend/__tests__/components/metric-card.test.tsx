@@ -23,7 +23,7 @@ describe('MetricCard Component', () => {
   })
 
   test('renders with normal status by default', () => {
-    const { container } = render(
+    render(
       <MetricCard
         title="Temperature"
         value="25"
@@ -37,7 +37,7 @@ describe('MetricCard Component', () => {
   })
 
   test('renders with warning status', () => {
-    const { container } = render(
+    render(
       <MetricCard
         title="Temperature"
         value="35"
@@ -52,7 +52,7 @@ describe('MetricCard Component', () => {
   })
 
   test('renders with critical status', () => {
-    const { container } = render(
+    render(
       <MetricCard
         title="Temperature"
         value="40"

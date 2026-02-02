@@ -1,7 +1,7 @@
 """Tests for FastAPI endpoints in main.py"""
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
+from unittest.mock import Mock, patch, AsyncMock
 import sys
 import os
 

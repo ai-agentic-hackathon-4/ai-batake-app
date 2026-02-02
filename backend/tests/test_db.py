@@ -1,6 +1,5 @@
 """Tests for database functions in db.py"""
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import sys
 import os
 
