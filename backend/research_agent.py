@@ -115,7 +115,7 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
         # 2. Poll (GET)
         poll_url = f"https://generativelanguage.googleapis.com/v1beta/{interaction_name}{query_param}"
         
-        max_retries = 60
+        max_retries = 120
         final_text = ""
         
         for _ in range(max_retries):
