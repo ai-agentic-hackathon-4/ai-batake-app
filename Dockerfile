@@ -17,7 +17,7 @@ COPY backend ./backend
 # Copy frontend files and install Node.js dependencies
 COPY frontend ./frontend
 WORKDIR /app/frontend
-RUN npm install
+RUN npm install --legacy-peer-deps
 RUN npm run build
 WORKDIR /app
 
