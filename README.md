@@ -202,6 +202,10 @@ sequenceDiagram
     FE->>BE: GET /api/vegetables (ポーリング)
     BE-->>FE: 最新ステータス
     FE->>U: 結果表示
+    
+    U->>FE: 「Apply to Agent」をクリック
+    FE->>BE: POST /api/vegetables/{id}/select
+    BE->>DB: エージェント設定更新 (edge_agent)
 ```
 
 ### 栽培ガイド生成フロー (非同期ジョブ)
@@ -275,6 +279,7 @@ npm test
 | GET | `/api/sensor-history` | センサー履歴取得 |
 | GET | `/api/vegetables/latest` | 最新野菜データ取得 |
 | GET | `/api/vegetables` | 全野菜リスト取得 |
+| POST | `/api/vegetables/{doc_id}/select` | 育成情報の選択・エージェント適用 |
 | POST | `/api/register-seed` | 種袋登録・解析開始 |
 | GET | `/api/plant-camera/latest` | 最新植物画像取得 |
 | POST | `/api/seed-guide/jobs` | 栽培ガイドジョブ作成 |

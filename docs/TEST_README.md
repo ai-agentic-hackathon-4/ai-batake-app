@@ -19,6 +19,7 @@ pytest
 - `tests/test_main.py` - FastAPI エンドポイントのテスト
 - `tests/test_seed_service.py` - 種画像解析サービスのテスト
 - `tests/test_utils.py` - ユーティリティ関数のテスト
+- `tests/test_select_feature.py` - 指示選択機能のテスト
 
 ### テスト結果
 

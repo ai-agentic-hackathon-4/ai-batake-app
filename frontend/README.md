@@ -240,6 +240,7 @@ async rewrites() {
 | Dashboard | POST | `/api/weather` | 天気情報 |
 | Research Agent | GET | `/api/vegetables` | 野菜リスト |
 | Research Agent | POST | `/api/register-seed` | 種袋登録 |
+| Research Agent | POST | `/api/vegetables/{id}/select` | 指示選択・適用 |
 | Seed Guide | POST | `/api/seed-guide/jobs` | ジョブ作成 |
 | Seed Guide | GET | `/api/seed-guide/jobs/{id}` | ジョブステータス |
 

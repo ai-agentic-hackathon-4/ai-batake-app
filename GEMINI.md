@@ -6,6 +6,7 @@ AI Batake App は、AIを活用したスマート農業プラットフォーム�
 This is an AI-powered smart farming platform that provides:
 - Real-time environmental monitoring (temperature, humidity, soil moisture)
 - AI-driven seed packet analysis and deep research for optimal growing conditions
+- **Manual instruction selection** to apply specific research results to the edge agent
 - Step-by-step planting guide generation using async AI jobs
 
 ## 2. Tech Stack & Versions
