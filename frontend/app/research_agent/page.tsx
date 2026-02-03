@@ -264,19 +264,19 @@ export default function ResearchDashboard() {
                                                         method: "POST",
                                                     });
                                                     if (res.ok) {
-                                                        alert("Edge Agent has been updated with these instructions!");
+                                                        alert("エージェントに指示を適用しました！");
                                                     } else {
-                                                        alert("Failed to update Edge Agent.");
+                                                        alert("エージェントの更新に失敗しました。");
                                                     }
                                                 } catch (e) {
                                                     console.error(e);
-                                                    alert("Error updating Edge Agent");
+                                                    alert("エラーが発生しました。");
                                                 }
                                             }}
                                             className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white shadow hover:bg-green-700 h-9 px-4 py-2 gap-2"
                                         >
                                             <CloudUpload className="w-4 h-4" />
-                                            Apply to Agent
+                                            エージェントに適用
                                         </button>
                                     </div>
 
