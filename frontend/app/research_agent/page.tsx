@@ -99,8 +99,8 @@ export default function ResearchDashboard() {
                             </div>
                         </div>
                         <div className={`px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 border ${isSystemExecuting
-                                ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                                : "bg-primary/10 text-primary border-primary/20"
+                            ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                            : "bg-primary/10 text-primary border-primary/20"
                             }`}>
                             <div className={`w-2 h-2 rounded-full ${isSystemExecuting ? "bg-blue-500 animate-pulse" : "bg-primary"}`}></div>
                             {isSystemExecuting ? "Executing Deep Research..." : "System Idle"}
@@ -140,10 +140,10 @@ export default function ResearchDashboard() {
                                         <p className="text-sm text-muted-foreground mt-1">ID: {veg.id.substring(0, 8)}...</p>
                                     </div>
                                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide border ${isProcessing
-                                            ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
-                                            : isFailed
-                                                ? "bg-destructive/10 text-destructive border-destructive/20"
-                                                : "bg-primary/10 text-primary border-primary/20"
+                                        ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+                                        : isFailed
+                                            ? "bg-destructive/10 text-destructive border-destructive/20"
+                                            : "bg-primary/10 text-primary border-primary/20"
                                         }`}>
                                         {veg.status}
                                     </span>
@@ -157,10 +157,10 @@ export default function ResearchDashboard() {
                                 <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
                                     <div
                                         className={`h-full transition-all duration-500 ${isProcessing
-                                                ? "w-[60%] bg-blue-500/80 animate-[shimmer_2s_infinite]"
-                                                : isFailed
-                                                    ? "w-full bg-destructive"
-                                                    : "w-full bg-primary"
+                                            ? "w-[60%] bg-blue-500/80 animate-[shimmer_2s_infinite]"
+                                            : isFailed
+                                                ? "w-full bg-destructive"
+                                                : "w-full bg-primary"
                                             }`}
                                         style={isProcessing ? {
                                             backgroundImage: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%)',
@@ -256,6 +256,30 @@ export default function ResearchDashboard() {
                         <div className="flex-1 overflow-y-auto pr-2 space-y-6">
                             {selectedVeg.instructions ? (
                                 <>
+                                    <div className="flex justify-end mb-4">
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    const res = await fetch(`/api/vegetables/${selectedVeg.id}/select`, {
+                                                        method: "POST",
+                                                    });
+                                                    if (res.ok) {
+                                                        alert("Edge Agent has been updated with these instructions!");
+                                                    } else {
+                                                        alert("Failed to update Edge Agent.");
+                                                    }
+                                                } catch (e) {
+                                                    console.error(e);
+                                                    alert("Error updating Edge Agent");
+                                                }
+                                            }}
+                                            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white shadow hover:bg-green-700 h-9 px-4 py-2 gap-2"
+                                        >
+                                            <CloudUpload className="w-4 h-4" />
+                                            Apply to Agent
+                                        </button>
+                                    </div>
+
                                     {selectedVeg.instructions.volumetric_water_content && (
                                         <div className="rounded-lg border border-border p-4 bg-card/50">
                                             <h3 className="text-sm font-medium text-blue-500 uppercase tracking-wider mb-1">Volumetric Water Content</h3>

@@ -163,6 +163,40 @@ def update_edge_agent_config(research_data: dict):
     except Exception as e:
         logging.error(f"Error updating edge_agent config: {e}")
 
+def select_vegetable_instruction(doc_id: str) -> bool:
+    """
+    Selects a vegetable's instruction and applies it to the edge agent config.
+    Returns True if successful, False otherwise.
+    """
+    if db is None: return False
+
+    try:
+        doc_ref = db.collection("vegetables").document(doc_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            logging.error(f"Vegetable doc {doc_id} not found.")
+            return False
+            
+        data = doc.to_dict()
+        instructions = data.get("instructions")
+        
+        if not instructions:
+            logging.error(f"Vegetable doc {doc_id} has no instructions.")
+            return False
+            
+        # Add name to instructions if not present, for fallback in update_edge_agent_config
+        if "name" not in instructions:
+            instructions["name"] = data.get("name", "Unknown")
+            
+        update_edge_agent_config(instructions)
+        logging.info(f"Selected vegetable {doc_id} and updated agent config.")
+        return True
+        
+    except Exception as e:
+        logging.error(f"Error selecting vegetable instruction: {e}")
+        return False
+
 def get_recent_sensor_logs(limit: int = 5):
     """
     Fetches the recent sensor logs from Firestore.

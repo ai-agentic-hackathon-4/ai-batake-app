@@ -114,8 +114,8 @@ def process_research(doc_id: str, vegetable_name: str, analysis_data: dict):
         # Update DB to completed
         update_vegetable_status(doc_id, "completed", research_result)
         
-        # Update Edge Agent Configuration
-        update_edge_agent_config(research_result)
+        # Update Edge Agent Configuration -> DISABLED per user request (manual selection only)
+        # update_edge_agent_config(research_result)
         
         logging.info(f"[Background] Research completed for {vegetable_name}")
         
@@ -165,6 +165,24 @@ async def register_seed(background_tasks: BackgroundTasks, file: UploadFile = Fi
     except Exception as e:
         logging.error(f"Error in register_seed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/vegetables/{doc_id}/select")
+async def select_vegetable_endpoint(doc_id: str):
+    """
+    Selects the specified vegetable's research result as the active instruction for the Edge Agent.
+    """
+    try:
+        # Import here to ensure it uses the latest db.py
+        # Note: In production better to fix circular imports or structure, but this works for now given usage
+        from backend.db import select_vegetable_instruction as select_func
+    except ImportError:
+        from db import select_vegetable_instruction as select_func
+
+    success = select_func(doc_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Failed to select vegetable (not found or no instruction).")
+    
+    return {"status": "success", "message": f"Edge Agent updated with instructions from {doc_id}"}
 
 @app.get("/api/vegetables")
 async def list_vegetables():
