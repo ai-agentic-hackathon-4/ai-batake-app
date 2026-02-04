@@ -1,14 +1,20 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Bot, Droplets, AlertTriangle, Eye, Sun, Wind, type LucideIcon, Info } from "lucide-react"
+import { Bot, Droplets, AlertTriangle, Eye, Sun, Wind, type LucideIcon, Info, ChevronDown, ChevronUp } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
-interface Activity {
-    id: string | number
-    time: string
+interface LogItem {
+    id: string
     action: string
     type: "action" | "warning" | "alert" | "info"
     icon: LucideIcon
+}
+
+interface LogGroup {
+    id: string | number
+    time: string
+    items: LogItem[]
 }
 
 const typeStyles = {
@@ -26,7 +32,8 @@ const typeLabels = {
 }
 
 export function AIActivityLog() {
-    const [activities, setActivities] = useState<Activity[]>([])
+    const [groups, setGroups] = useState<LogGroup[]>([])
+    const [isExpanded, setIsExpanded] = useState(false)
 
     useEffect(() => {
         const fetchLogs = async () => {
@@ -35,59 +42,61 @@ export function AIActivityLog() {
                 const data = await res.json()
 
                 if (data && data.logs) {
-                    const formattedLogs: Activity[] = data.logs.map((log: any) => {
+                    const formattedGroups: LogGroup[] = data.logs.map((log: any) => {
                         const logData = log.data || {}
+                        const items: LogItem[] = []
 
-                        // Determine type/icon
-                        let type: Activity['type'] = 'info'
-                        let icon = Bot
+                        // 1. Process Operations
+                        if (logData.operation) {
+                            Object.entries(logData.operation).forEach(([device, op]: [string, any]) => {
+                                const action = op.action || ""
 
-                        // Check distinct error log format first (if any)
-                        // But mostly we have agent periodic logs
+                                let type: LogItem['type'] = 'info'
+                                let icon = Bot
 
-                        // Analyze content for type/icon
-                        // Combine comment and logs for keyword search
-                        const fullText = (logData.comment || "") + (logData.logs?.join(" ") || "") + (JSON.stringify(logData.operation || ""));
+                                if (device.includes("エアコン") || device.includes("ファン") || device.includes("空調")) icon = Wind
+                                else if (device.includes("ライト") || device.includes("照明") || device.includes("LED")) icon = Sun
+                                else if (device.includes("ポンプ") || device.includes("水")) icon = Droplets
+                                else if (device.includes("カメラ")) icon = Eye
+                                else icon = Bot
 
-                        if (fullText.includes("異常") || fullText.includes("エラー") || fullText.includes("Error")) {
-                            type = 'alert'
-                            icon = AlertTriangle
-                        } else if (fullText.includes("警告") || fullText.includes("Warning") || fullText.includes("乾燥")) {
-                            type = 'warning'
-                            icon = AlertTriangle
-                        } else if (logData.operation && Object.keys(logData.operation).length > 0) {
-                            // If there are operations, mark as action
-                            const ops = logData.operation;
-                            let hasRealAction = false;
-                            for (const key in ops) {
-                                if (ops[key].action && !ops[key].action.includes("現状維持") && !ops[key].action.includes("OFF")) {
-                                    hasRealAction = true;
+                                // IMPORTANT: Only show "Active" operations (ON/OFF) or status changes
+                                if (action.includes("ON") || action.includes("起動") || action.includes("変更")) {
+                                    type = 'action'
+                                } else if (action.includes("OFF") || action.includes("停止")) {
+                                    type = 'action'
+                                } else if (action.includes("現状維持")) {
+                                    type = 'info'
                                 }
-                            }
-                            if (hasRealAction) {
-                                type = 'action'
-                                icon = Bot
-                            }
+
+                                items.push({
+                                    id: (log.id || "gen") + "-" + device,
+                                    action: `[${device}] ${action}`,
+                                    type: type,
+                                    icon: icon
+                                })
+                            })
                         }
 
-                        // Icon refinement
-                        if (fullText.includes("水")) icon = Droplets
-                        if (fullText.includes("光") || fullText.includes("ライト") || fullText.includes("照明")) icon = Sun
-                        if (fullText.includes("風") || fullText.includes("ファン") || fullText.includes("エアコン")) icon = Wind
-                        if (fullText.includes("画像") || fullText.includes("カメラ") || fullText.includes("芽")) icon = Eye
-
-
-                        // Action Text: Use comment or summary of operations
-                        let actionText = logData.comment || "定期モニタリング完了"
-
-                        // If there is a specific operation, mention it?
-                        // But comment is usually good.
-                        // Let's truncate comment if too long for the list
-                        if (actionText.length > 40) {
-                            actionText = actionText.substring(0, 40) + "..."
+                        // 2. Process Comments (Only Alerts/Warnings)
+                        const comment = logData.comment || ""
+                        if (comment.includes("異常") || comment.includes("エラー")) {
+                            items.push({
+                                id: (log.id || "gen") + "-alert",
+                                action: comment,
+                                type: 'alert',
+                                icon: AlertTriangle
+                            })
+                        } else if (comment.includes("警告") || comment.includes("注意")) {
+                            items.push({
+                                id: (log.id || "gen") + "-warn",
+                                action: comment,
+                                type: 'warning',
+                                icon: AlertTriangle
+                            })
                         }
 
-                        // Format time
+                        // Format Time
                         let timeStr = "--:--"
                         if (log.timestamp) {
                             try {
@@ -101,12 +110,11 @@ export function AIActivityLog() {
                         return {
                             id: log.id || Math.random(),
                             time: timeStr,
-                            action: actionText,
-                            type: type,
-                            icon: icon
+                            items: items
                         }
-                    })
-                    setActivities(formattedLogs)
+                    }).filter((group: LogGroup) => group.items.length > 0)
+
+                    setGroups(formattedGroups)
                 }
             } catch (error) {
                 console.error("Failed to fetch agent logs:", error)
@@ -114,39 +122,89 @@ export function AIActivityLog() {
         }
 
         fetchLogs()
-        const interval = setInterval(fetchLogs, 30000) // Refresh every 30s
+        const interval = setInterval(fetchLogs, 30000)
         return () => clearInterval(interval)
     }, [])
 
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-center gap-2 pb-4">
+        <Card className="flex flex-col h-full">
+            <CardHeader className="flex flex-row items-center gap-2 pb-4 shrink-0">
                 <Bot className="h-5 w-5 text-primary" />
                 <CardTitle className="text-lg font-medium">AIアクティビティログ</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-                {activities.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-4">
-                        ログはありません
-                    </div>
-                ) : (
-                    activities.map((activity) => (
-                        <div
-                            key={activity.id}
-                            className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
-                        >
-                            <div className={`p-2 rounded-full ${typeStyles[activity.type]}`}>
-                                <activity.icon className="h-4 w-4" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-card-foreground">{activity.action}</p>
-                                <p className="text-xs text-muted-foreground mt-0.5">{activity.time}</p>
-                            </div>
-                            <Badge variant="outline" className={`shrink-0 text-xs ${typeStyles[activity.type]}`}>
-                                {typeLabels[activity.type]}
-                            </Badge>
+            <CardContent className="flex-1 relative">
+                <div
+                    className={`space-y-4 overflow-hidden transition-all duration-300 pl-2 pt-2 ${isExpanded ? "" : "max-h-[400px]"
+                        }`}
+                >
+                    {groups.length === 0 ? (
+                        <div className="text-center text-muted-foreground py-4">
+                            ログはありません
                         </div>
-                    ))
+                    ) : (
+                        groups.map((group) => (
+                            <div key={group.id} className="relative pl-4 border-l-2 border-muted pb-4 last:pb-0 last:border-0">
+                                {/* Time Badge / Marker */}
+                                <div className="absolute -left-[9px] top-0 bg-background p-0.5">
+                                    <div className="h-4 w-4 rounded-full border-2 border-primary bg-background" />
+                                </div>
+                                <div className="mb-2 -mt-1">
+                                    <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                        {group.time}
+                                    </span>
+                                </div>
+
+                                {/* Items Group */}
+                                <div className="space-y-2">
+                                    {group.items.map((item) => (
+                                        <div
+                                            key={item.id}
+                                            className="flex items-center gap-3 p-2.5 rounded-lg bg-secondary/30 hover:bg-secondary/60 transition-colors"
+                                        >
+                                            <div className={`p-1.5 rounded-full shrink-0 ${typeStyles[item.type]}`}>
+                                                <item.icon className="h-3.5 w-3.5" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm text-card-foreground leading-tight">{item.action}</p>
+                                            </div>
+                                            <Badge variant="outline" className={`shrink-0 text-[10px] px-1.5 py-0 h-5 ${typeStyles[item.type]}`}>
+                                                {typeLabels[item.type]}
+                                            </Badge>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                {/* Gradient Overlay & Button */}
+                {!isExpanded && groups.length > 0 && (
+                    <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background via-background/80 to-transparent flex items-end justify-center pb-0 pointer-events-none">
+                    </div>
+                )}
+
+                {groups.length > 3 && (
+                    <div className={`flex justify-center mt-4 ${!isExpanded ? "absolute bottom-2 left-0 right-0 z-10" : ""}`}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className="bg-card hover:bg-secondary shadow-sm"
+                        >
+                            {isExpanded ? (
+                                <>
+                                    <ChevronUp className="mr-2 h-4 w-4" />
+                                    閉じる
+                                </>
+                            ) : (
+                                <>
+                                    <ChevronDown className="mr-2 h-4 w-4" />
+                                    さらに表示
+                                </>
+                            )}
+                        </Button>
+                    </div>
                 )}
             </CardContent>
         </Card>
