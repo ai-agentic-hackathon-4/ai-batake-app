@@ -31,7 +31,7 @@
 
 3. **低コスト**
    - Cloud Scheduler: $0.10/月
-   - Gemini API: ~$1-2/月
+   - Vertex AI Gemini 3 Pro: ~$1-2/月
    - 追加のCompute費用: ほぼなし
 
 4. **高い信頼性**
@@ -85,9 +85,9 @@
 │                                                                   │
 │  Step 3: AI日記生成 (10-15秒)                                    │
 │  ├─ プロンプト構築                                              │
-│  ├─ Gemini API 呼び出し                                         │
+│  ├─ Vertex AI Gemini 3 Pro 呼び出し                            │
 │  ├─ レスポンスパース（JSON抽出）                                │
-│  └─ エラーハンドリング（リトライ・フォールバック）              │
+│  └─ エラーハンドリング（429対応の指数バックオフリトライ）      │
 │                                                                   │
 │  Step 4: 保存 (1秒)                                              │
 │  └─ Firestore growing_diaries コレクションに保存               │
@@ -95,6 +95,36 @@
 │  合計所要時間: 約20-30秒                                         │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### Vertex AI Gemini 3 Proの利点
+
+このアプローチでは **Vertex AI Gemini 3 Pro** を使用します：
+
+1. **エンタープライズグレードの信頼性**
+   - Google Cloud統合によるSLA保証
+   - 自動スケーリングとロードバランシング
+   - リージョナルデプロイメント対応
+
+2. **統一されたアクセス管理**
+   - Google Cloud IAMによる権限管理
+   - サービスアカウントベースの認証
+   - API Keyではなくアクセストークン認証
+
+3. **高度なクォータ管理**
+   - プロジェクト単位でのクォータ管理
+   - Cloud Consoleから簡単に確認・増加可能
+   - レート制限の可視化
+
+4. **コスト最適化**
+   - 使用量に応じた課金
+   - 無料枠の活用
+   - 詳細な使用状況トラッキング
+
+5. **429エラー対策の重要性**
+   - レート制限は避けられない場合がある
+   - 指数バックオフリトライで自動復旧
+   - ランダムジッターでリクエスト分散
+   - 最大5回のリトライで高い成功率
 
 ---
 
@@ -133,7 +163,7 @@ ai-batake-app/
 
 2. **Cloud Run用サービスアカウント**（既存）
    - `roles/datastore.user` - Firestore読み書き
-   - （Gemini APIキーは環境変数で管理）
+   - `roles/aiplatform.user` - Vertex AI API利用（Gemini 3 Pro）
 
 ---
 
@@ -242,7 +272,7 @@ gcloud scheduler jobs describe daily-diary-generator \
 このモジュールは以下の機能を提供します：
 1. エージェントログとセンサーデータの収集
 2. 統計情報の計算
-3. Gemini APIを使用した日記生成
+3. Vertex AI Gemini 3 Proを使用した日記生成
 4. Firestoreへの保存
 """
 
@@ -250,10 +280,13 @@ import os
 import logging
 import json
 import time
-import requests
+import random
 from datetime import datetime, timedelta, date as date_type
 from typing import Dict, List, Any, Optional
 from google.cloud import firestore
+import google.auth
+from google.auth.transport.requests import Request
+import requests
 
 # Import from existing modules
 try:
@@ -262,11 +295,24 @@ except ImportError:
     from db import db
 
 # Configuration
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("SEED_GUIDE_GEMINI_KEY")
-GEMINI_MODEL = "gemini-2.0-flash-exp"
-GEMINI_ENDPOINT = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "ai-agentic-hackathon-4")
+LOCATION = "us-central1"
+GEMINI_MODEL = "gemini-3-pro-preview"  # Vertex AI Gemini 3 Pro
+VERTEX_AI_ENDPOINT = f"https://{LOCATION}-aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/{LOCATION}/publishers/google/models/{GEMINI_MODEL}:generateContent"
 
 logger = logging.getLogger(__name__)
+
+
+def get_vertex_ai_access_token():
+    """
+    Vertex AI用のアクセストークンを取得
+    
+    Returns:
+        アクセストークン文字列
+    """
+    credentials, _ = google.auth.default()
+    credentials.refresh(Request())
+    return credentials.token
 
 
 # ============================================================
@@ -616,17 +662,17 @@ async def generate_diary_with_ai(
     statistics: Dict,
     events: List[Dict],
     vegetable_info: Optional[Dict],
-    max_retries: int = 3
+    max_retries: int = 5
 ) -> Dict[str, str]:
     """
-    Gemini APIを使用して日記を生成（リトライ機能付き）
+    Vertex AI Gemini 3 Proを使用して日記を生成（429対応の指数バックオフリトライ付き）
     
     Args:
         date_str: 日付文字列
         statistics: 統計情報
         events: イベントリスト
         vegetable_info: 野菜情報
-        max_retries: 最大リトライ回数
+        max_retries: 最大リトライ回数（デフォルト5回）
     
     Returns:
         生成された日記の辞書
@@ -639,62 +685,63 @@ async def generate_diary_with_ai(
     Raises:
         RuntimeError: API呼び出し失敗時
     """
-    if not GEMINI_API_KEY:
-        raise RuntimeError("Gemini API key not configured")
-    
     # プロンプト構築
     prompt = build_diary_prompt(date_str, statistics, events, vegetable_info)
     
-    # APIリクエストペイロード
+    # APIリクエストペイロード（Vertex AI形式）
     payload = {
         "contents": [{
+            "role": "user",
             "parts": [{
                 "text": prompt
             }]
         }],
         "generationConfig": {
             "temperature": 0.7,
-            "topP": 0.9,
+            "topP": 0.95,
             "topK": 40,
-            "maxOutputTokens": 1500,
+            "maxOutputTokens": 2048,
             "candidateCount": 1
         },
         "safetySettings": [
             {
-                "category": "HARM_CATEGORY_HARASSMENT",
-                "threshold": "BLOCK_NONE"
-            },
-            {
                 "category": "HARM_CATEGORY_HATE_SPEECH",
-                "threshold": "BLOCK_NONE"
-            },
-            {
-                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                "threshold": "BLOCK_NONE"
+                "threshold": "BLOCK_ONLY_HIGH"
             },
             {
                 "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                "threshold": "BLOCK_NONE"
+                "threshold": "BLOCK_ONLY_HIGH"
+            },
+            {
+                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "threshold": "BLOCK_ONLY_HIGH"
+            },
+            {
+                "category": "HARM_CATEGORY_HARASSMENT",
+                "threshold": "BLOCK_ONLY_HIGH"
             }
         ]
     }
     
-    headers = {
-        "Content-Type": "application/json"
-    }
-    
-    url = f"{GEMINI_ENDPOINT}?key={GEMINI_API_KEY}"
-    
-    # リトライループ
+    # 指数バックオフリトライループ
+    base_delay = 2
     for attempt in range(max_retries):
         try:
-            logger.info(f"Calling Gemini API (attempt {attempt + 1}/{max_retries})...")
+            # アクセストークン取得（毎回更新して有効性を確保）
+            access_token = get_vertex_ai_access_token()
+            
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            logger.info(f"Calling Vertex AI Gemini 3 Pro (attempt {attempt + 1}/{max_retries})...")
             
             response = requests.post(
-                url,
+                VERTEX_AI_ENDPOINT,
                 headers=headers,
                 json=payload,
-                timeout=60
+                timeout=90
             )
             
             if response.status_code == 200:
@@ -714,30 +761,64 @@ async def generate_diary_with_ai(
                 raise RuntimeError("Unexpected API response format")
             
             elif response.status_code == 429:
-                # レート制限エラー: リトライ
-                wait_time = (2 ** attempt) * 2  # Exponential backoff
-                logger.warning(f"Rate limit hit, waiting {wait_time}s before retry...")
+                # レート制限エラー: 指数バックオフでリトライ
+                # 計算式: (base_delay * 2^attempt) + ランダムジッター
+                jitter = random.uniform(0, 1)
+                wait_time = (base_delay * (2 ** attempt)) + jitter
+                
+                logger.warning(
+                    f"Rate limit (429) hit. Waiting {wait_time:.2f}s before retry "
+                    f"(attempt {attempt + 1}/{max_retries})..."
+                )
+                
+                time.sleep(wait_time)
+                continue
+            
+            elif response.status_code >= 500:
+                # サーバーエラー: リトライ
+                jitter = random.uniform(0, 1)
+                wait_time = (base_delay * (2 ** attempt)) + jitter
+                
+                logger.warning(
+                    f"Server error ({response.status_code}). Waiting {wait_time:.2f}s before retry "
+                    f"(attempt {attempt + 1}/{max_retries})..."
+                )
+                
                 time.sleep(wait_time)
                 continue
             
             else:
-                raise RuntimeError(f"API error: {response.status_code} - {response.text}")
+                # その他のエラー（400, 403など）: リトライしない
+                error_msg = f"API error: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
         
         except requests.exceptions.Timeout:
             logger.warning(f"Request timeout (attempt {attempt + 1}/{max_retries})")
             if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)
+                jitter = random.uniform(0, 1)
+                wait_time = (base_delay * (2 ** attempt)) + jitter
+                time.sleep(wait_time)
                 continue
-            raise RuntimeError("API request timeout after retries")
-        
-        except Exception as e:
-            if attempt == max_retries - 1:
-                logger.error(f"Failed to generate diary after {max_retries} attempts: {e}")
+            else:
+                logger.error("API request timeout after all retries")
                 # フォールバック: テンプレートベース
                 return generate_fallback_diary(date_str, statistics, events)
-            time.sleep(2 ** attempt)
+        
+        except Exception as e:
+            logger.error(f"Unexpected error during API call: {e}", exc_info=True)
+            if attempt == max_retries - 1:
+                logger.error(f"Failed to generate diary after {max_retries} attempts")
+                # フォールバック: テンプレートベース
+                return generate_fallback_diary(date_str, statistics, events)
+            
+            jitter = random.uniform(0, 1)
+            wait_time = (base_delay * (2 ** attempt)) + jitter
+            time.sleep(wait_time)
     
-    raise RuntimeError("Unexpected: reached end of retry loop")
+    # 全リトライ失敗: フォールバック
+    logger.error("All retry attempts exhausted, using fallback")
+    return generate_fallback_diary(date_str, statistics, events)
 
 
 def parse_diary_response(text: str) -> Dict[str, str]:
@@ -1265,9 +1346,13 @@ resource.type="cloud_run_revision"
 severity="ERROR"
 textPayload:"Diary generation failed"
 
-# Gemini API呼び出し
+# Vertex AI Gemini 3 Pro呼び出し
 resource.type="cloud_run_revision"
-textPayload:"Calling Gemini API"
+textPayload:"Calling Vertex AI Gemini 3 Pro"
+
+# 429レート制限エラー
+resource.type="cloud_run_revision"
+textPayload:"Rate limit (429) hit"
 ```
 
 ### Cloud Monitoringメトリクス
@@ -1355,7 +1440,7 @@ gcloud run services add-iam-policy-binding ai-batake-app \
     --region=us-central1
 ```
 
-### 問題3: Gemini API タイムアウト
+### 問題3: Vertex AI Gemini API タイムアウト
 
 **症状**: 日記生成が途中で失敗
 
@@ -1365,11 +1450,44 @@ ERROR: API request timeout after retries
 ```
 
 **解決策**:
-- リトライ回数を増やす（`max_retries`パラメータ）
-- タイムアウト時間を延長（60秒 → 90秒）
+- リトライ回数を増やす（`max_retries=5`がデフォルト）
+- タイムアウト時間を延長（90秒 → 120秒）
 - フォールバック日記生成が正しく動作するか確認
+- Vertex AI APIのクォータ確認
 
-### 問題4: データが取得できない
+### 問題4: 429 レート制限エラー
+
+**症状**: 429エラーが頻発
+
+**ログ例**:
+```
+WARNING: Rate limit (429) hit. Waiting 4.5s before retry (attempt 2/5)...
+```
+
+**確認項目**:
+- Vertex AI APIのクォータ設定を確認
+- 同時実行数が多すぎないか確認
+- リトライ設定が適切か確認
+
+**解決策**:
+```bash
+# Vertex AIのクォータを確認
+gcloud services list --enabled | grep aiplatform
+
+# クォータの増加リクエスト（必要に応じて）
+# Google Cloud Console > IAM & Admin > Quotas
+```
+
+指数バックオフ（base_delay=2秒、max_retries=5）により：
+- 1回目リトライ: 2-3秒待機
+- 2回目リトライ: 4-5秒待機
+- 3回目リトライ: 8-9秒待機
+- 4回目リトライ: 16-17秒待機
+- 5回目リトライ: 32-33秒待機
+
+合計最大約65秒のリトライ期間があります。
+
+### 問題5: データが取得できない
 
 **症状**: センサーログまたはエージェントログが0件
 
