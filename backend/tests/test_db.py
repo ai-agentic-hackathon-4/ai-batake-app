@@ -192,3 +192,61 @@ class TestGetLatestVegetable:
         result = get_latest_vegetable()
         
         assert result is None
+
+
+class TestGetAgentExecutionLogs:
+    """Tests for get_agent_execution_logs function"""
+    
+    @patch('db.db')
+    def test_get_agent_execution_logs_success(self, mock_db):
+        """Test successful retrieval of agent logs"""
+        from db import get_agent_execution_logs, firestore
+        
+        # Mock documents
+        mock_doc1 = Mock()
+        mock_doc1.to_dict.return_value = {"action": "Watering", "timestamp": "2024-01-01T12:00:00"}
+        mock_doc1.id = "log1"
+        
+        mock_doc2 = Mock()
+        mock_doc2.to_dict.return_value = {"action": "Monitoring", "timestamp": "2024-01-01T13:00:00"}
+        mock_doc2.id = "log2"
+        
+        # Mock query chain
+        mock_query = Mock()
+        mock_query.limit.return_value.stream.return_value = [mock_doc1, mock_doc2]
+        
+        mock_collection = Mock()
+        mock_collection.order_by.return_value = mock_query
+        
+        mock_db.collection.return_value = mock_collection
+        
+        result = get_agent_execution_logs(limit=10)
+        
+        # Verify collection and order
+        mock_db.collection.assert_called_once_with("agent_execution_logs")
+        mock_collection.order_by.assert_called_once_with("timestamp", direction=firestore.Query.DESCENDING)
+        mock_query.limit.assert_called_once_with(10)
+        
+        assert len(result) == 2
+        assert result[0]["id"] == "log1"
+        assert result[1]["id"] == "log2"
+        
+    @patch('db.db')
+    def test_get_agent_execution_logs_error(self, mock_db):
+        """Test error handling when fetching logs"""
+        from db import get_agent_execution_logs
+        
+        mock_db.collection.side_effect = Exception("Firestore error")
+        
+        result = get_agent_execution_logs()
+        
+        assert result == []
+        
+    @patch('db.db', None)
+    def test_get_agent_execution_logs_no_db(self):
+        """Test retrieval when db is None"""
+        from db import get_agent_execution_logs
+        
+        result = get_agent_execution_logs()
+        
+        assert result == []

@@ -256,8 +256,40 @@ def get_sensor_history(hours: int = 24):
             
         return logs
         
+
     except Exception as e:
         logging.error(f"Error fetching sensor history from Firestore: {e}")
+        return []
+
+def get_agent_execution_logs(limit: int = 20):
+    """
+    Fetches the recent agent execution logs from Firestore.
+    """
+    if db is None:
+        logging.warning("Firestore is not available.")
+        return []
+
+    try:
+        collection_name = "agent_execution_logs"
+        # Order by unix_timestamp descending (assuming standard logging format)
+        # If unix_timestamp doesn't exist, we might need to rely on 'timestamp' string or similar.
+        # Let's try ordering by timestamp (ISO string) or unix_timestamp if available.
+        # Based on user request, the collection is "agent_execution_logs".
+        
+        # Checking typical patterns, often logs have 'timestamp'.
+        # Let's assume there is a 'timestamp' field.
+        docs = db.collection(collection_name).order_by("timestamp", direction=firestore.Query.DESCENDING).limit(limit).stream()
+        
+        logs = []
+        for doc in docs:
+            log_data = doc.to_dict()
+            log_data['id'] = doc.id
+            logs.append(log_data)
+            
+        return logs
+        
+    except Exception as e:
+        logging.error(f"Error fetching agent logs from Firestore: {e}")
         return []
 
 if __name__ == "__main__":
