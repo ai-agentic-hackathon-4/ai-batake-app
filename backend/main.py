@@ -28,7 +28,9 @@ except ImportError:
     )
 
 # Setup structured logging
-logger = setup_logger(level=os.environ.get("LOG_LEVEL", "DEBUG").upper() == "DEBUG" and 10 or 20)
+import logging
+log_level = logging.DEBUG if os.environ.get("LOG_LEVEL", "DEBUG").upper() == "DEBUG" else logging.INFO
+logger = setup_logger(level=log_level)
 
 load_dotenv()
 
@@ -81,7 +83,10 @@ class SessionTrackingMiddleware(BaseHTTPMiddleware):
         query = str(request.query_params) if request.query_params else ""
         
         info(f"REQUEST START: {method} {path}" + (f"?{query}" if query else ""))
-        debug(f"Request headers: {dict(request.headers)}")
+        # Filter out sensitive headers before logging
+        safe_headers = {k: v for k, v in request.headers.items() 
+                       if k.lower() not in ('authorization', 'cookie', 'x-api-key', 'api-key')}
+        debug(f"Request headers: {safe_headers}")
         
         import time
         start_time = time.time()

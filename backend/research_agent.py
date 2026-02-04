@@ -144,7 +144,9 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
              return {"name": vegetable_name, "error": f"Start failed: {response.status_code} - {response.text}"}
              
         interaction_data = response.json()
-        debug(f"Interaction data received: {json.dumps(interaction_data, ensure_ascii=False)[:500]}...")
+        # Limit debug output for large responses
+        interaction_str = json.dumps(interaction_data, ensure_ascii=False)
+        debug(f"Interaction data received: {interaction_str[:500] if len(interaction_str) > 500 else interaction_str}...")
         interaction_name = interaction_data.get("name")
         if not interaction_name:
             # Fallback: resource name might be constructed from ID

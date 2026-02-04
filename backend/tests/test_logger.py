@@ -44,12 +44,16 @@ class TestSessionManagement:
         set_request_id(test_id)
         assert get_request_id() == test_id
     
-    def test_default_session_id(self):
-        """Test default session ID when not set (in new context)"""
-        # Note: This tests the default value, but due to context variables
-        # it may inherit from previous tests. The default is 'no-session'.
-        # For a clean test, we'd need to run in isolation.
-        pass  # Skipping as context vars persist
+    def test_default_session_id_value(self):
+        """Test that session ID defaults are reasonable strings"""
+        # The default is 'no-session' for session_id and 'no-request' for request_id
+        # We test that the functions return strings
+        session = get_session_id()
+        request = get_request_id()
+        assert isinstance(session, str)
+        assert isinstance(request, str)
+        assert len(session) > 0
+        assert len(request) > 0
 
 
 class TestLoggerSetup:
