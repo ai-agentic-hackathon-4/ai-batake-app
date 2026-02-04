@@ -19,14 +19,14 @@ load_dotenv()
 # Imports
 try:
     # Try importing from feature/#3 db functions
-    from .db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs
+    from .db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs
     # Also old ones just in case
     from .db import save_growing_instructions 
     from .research_agent import analyze_seed_packet, perform_deep_research
     from .agent import get_weather_from_agent
 except ImportError:
     # When running directly as a script
-    from db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, save_growing_instructions
+    from db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, save_growing_instructions, get_agent_execution_logs
     from research_agent import analyze_seed_packet, perform_deep_research
     from agent import get_weather_from_agent
 
@@ -93,6 +93,15 @@ async def get_latest_vegetable_endpoint():
             return data
         else:
             return {} 
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/agent-logs")
+async def get_agent_logs_endpoint():
+    try:
+        logs = get_agent_execution_logs(limit=20)
+        return {"logs": logs}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

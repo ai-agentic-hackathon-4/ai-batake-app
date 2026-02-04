@@ -1,59 +1,15 @@
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Bot, Droplets, AlertTriangle, Eye, Sun, Wind, type LucideIcon } from "lucide-react"
+import { Bot, Droplets, AlertTriangle, Eye, Sun, Wind, type LucideIcon, Info } from "lucide-react"
 
 interface Activity {
-    id: number
+    id: string | number
     time: string
     action: string
     type: "action" | "warning" | "alert" | "info"
     icon: LucideIcon
 }
-
-const activities: Activity[] = [
-    {
-        id: 1,
-        time: "18:00",
-        action: "葉の異常を画像から検出",
-        type: "alert",
-        icon: Eye,
-    },
-    {
-        id: 2,
-        time: "16:45",
-        action: "換気システムを起動",
-        type: "action",
-        icon: Wind,
-    },
-    {
-        id: 3,
-        time: "14:10",
-        action: "乾燥状態を検出",
-        type: "warning",
-        icon: AlertTriangle,
-    },
-    {
-        id: 4,
-        time: "12:30",
-        action: "遮光カーテンを調整",
-        type: "action",
-        icon: Sun,
-    },
-    {
-        id: 5,
-        time: "10:32",
-        action: "水やりを実行",
-        type: "action",
-        icon: Droplets,
-    },
-    {
-        id: 6,
-        time: "08:00",
-        action: "朝の環境チェック完了",
-        type: "info",
-        icon: Bot,
-    },
-]
 
 const typeStyles = {
     action: "bg-primary/10 text-primary border-primary/20",
@@ -70,6 +26,98 @@ const typeLabels = {
 }
 
 export function AIActivityLog() {
+    const [activities, setActivities] = useState<Activity[]>([])
+
+    useEffect(() => {
+        const fetchLogs = async () => {
+            try {
+                const res = await fetch('/api/agent-logs')
+                const data = await res.json()
+
+                if (data && data.logs) {
+                    const formattedLogs: Activity[] = data.logs.map((log: any) => {
+                        const logData = log.data || {}
+
+                        // Determine type/icon
+                        let type: Activity['type'] = 'info'
+                        let icon = Bot
+
+                        // Check distinct error log format first (if any)
+                        // But mostly we have agent periodic logs
+
+                        // Analyze content for type/icon
+                        // Combine comment and logs for keyword search
+                        const fullText = (logData.comment || "") + (logData.logs?.join(" ") || "") + (JSON.stringify(logData.operation || ""));
+
+                        if (fullText.includes("異常") || fullText.includes("エラー") || fullText.includes("Error")) {
+                            type = 'alert'
+                            icon = AlertTriangle
+                        } else if (fullText.includes("警告") || fullText.includes("Warning") || fullText.includes("乾燥")) {
+                            type = 'warning'
+                            icon = AlertTriangle
+                        } else if (logData.operation && Object.keys(logData.operation).length > 0) {
+                            // If there are operations, mark as action
+                            const ops = logData.operation;
+                            let hasRealAction = false;
+                            for (const key in ops) {
+                                if (ops[key].action && !ops[key].action.includes("現状維持") && !ops[key].action.includes("OFF")) {
+                                    hasRealAction = true;
+                                }
+                            }
+                            if (hasRealAction) {
+                                type = 'action'
+                                icon = Bot
+                            }
+                        }
+
+                        // Icon refinement
+                        if (fullText.includes("水")) icon = Droplets
+                        if (fullText.includes("光") || fullText.includes("ライト") || fullText.includes("照明")) icon = Sun
+                        if (fullText.includes("風") || fullText.includes("ファン") || fullText.includes("エアコン")) icon = Wind
+                        if (fullText.includes("画像") || fullText.includes("カメラ") || fullText.includes("芽")) icon = Eye
+
+
+                        // Action Text: Use comment or summary of operations
+                        let actionText = logData.comment || "定期モニタリング完了"
+
+                        // If there is a specific operation, mention it?
+                        // But comment is usually good.
+                        // Let's truncate comment if too long for the list
+                        if (actionText.length > 40) {
+                            actionText = actionText.substring(0, 40) + "..."
+                        }
+
+                        // Format time
+                        let timeStr = "--:--"
+                        if (log.timestamp) {
+                            try {
+                                const date = new Date(log.timestamp)
+                                timeStr = date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+                            } catch (e) {
+                                timeStr = String(log.timestamp)
+                            }
+                        }
+
+                        return {
+                            id: log.id || Math.random(),
+                            time: timeStr,
+                            action: actionText,
+                            type: type,
+                            icon: icon
+                        }
+                    })
+                    setActivities(formattedLogs)
+                }
+            } catch (error) {
+                console.error("Failed to fetch agent logs:", error)
+            }
+        }
+
+        fetchLogs()
+        const interval = setInterval(fetchLogs, 30000) // Refresh every 30s
+        return () => clearInterval(interval)
+    }, [])
+
     return (
         <Card>
             <CardHeader className="flex flex-row items-center gap-2 pb-4">
@@ -77,23 +125,29 @@ export function AIActivityLog() {
                 <CardTitle className="text-lg font-medium">AIアクティビティログ</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-                {activities.map((activity) => (
-                    <div
-                        key={activity.id}
-                        className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
-                    >
-                        <div className={`p-2 rounded-full ${typeStyles[activity.type as keyof typeof typeStyles]}`}>
-                            <activity.icon className="h-4 w-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-card-foreground">{activity.action}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">{activity.time}</p>
-                        </div>
-                        <Badge variant="outline" className={`shrink-0 text-xs ${typeStyles[activity.type as keyof typeof typeStyles]}`}>
-                            {typeLabels[activity.type as keyof typeof typeLabels]}
-                        </Badge>
+                {activities.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-4">
+                        ログはありません
                     </div>
-                ))}
+                ) : (
+                    activities.map((activity) => (
+                        <div
+                            key={activity.id}
+                            className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
+                        >
+                            <div className={`p-2 rounded-full ${typeStyles[activity.type]}`}>
+                                <activity.icon className="h-4 w-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-card-foreground">{activity.action}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">{activity.time}</p>
+                            </div>
+                            <Badge variant="outline" className={`shrink-0 text-xs ${typeStyles[activity.type]}`}>
+                                {typeLabels[activity.type]}
+                            </Badge>
+                        </div>
+                    ))
+                )}
             </CardContent>
         </Card>
     )
