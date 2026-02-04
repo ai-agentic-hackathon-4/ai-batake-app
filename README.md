@@ -10,6 +10,7 @@ AI Batake Appは、家庭菜園や農業を支援するためのAIプラット�
 - **種袋画像解析**: AIによる種袋画像の自動分析と栽培情報の抽出
 - **Deep Research**: Gemini AIを活用した詳細な栽培条件の調査
 - **栽培ガイド生成**: ステップバイステップの栽培手順と画像の自動生成
+- **AIアクティビティログ**: エージェントの自律動作内容をタイムラインで表示
 
 ## 🛠️ 技術スタック
 
@@ -284,6 +285,7 @@ npm test
 | GET | `/api/plant-camera/latest` | 最新植物画像取得 |
 | POST | `/api/seed-guide/jobs` | 栽培ガイドジョブ作成 |
 | GET | `/api/seed-guide/jobs/{job_id}` | ジョブステータス取得 |
+| GET | `/api/agent-logs` | エージェント実行ログ取得 |
 
 ## 📄 ライセンス
 

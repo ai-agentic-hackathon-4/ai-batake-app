@@ -194,3 +194,31 @@ class TestSeedGuideJobEndpoints:
         response = client.get("/api/seed-guide/jobs/non-existent-id")
         
         assert response.status_code == 404
+
+
+class TestAgentLogsEndpoint:
+    """Tests for /api/agent-logs endpoint"""
+    
+    @patch('main.get_agent_execution_logs')
+    def test_get_agent_logs_success(self, mock_get_logs, client):
+        """Test successful agent logs retrieval"""
+        mock_data = [
+            {"id": "1", "action": "test", "timestamp": "2024-01-01"}
+        ]
+        mock_get_logs.return_value = mock_data
+        
+        response = client.get("/api/agent-logs")
+        
+        assert response.status_code == 200
+        assert response.json() == {"logs": mock_data}
+        mock_get_logs.assert_called_once_with(limit=20)
+        
+    @patch('main.get_agent_execution_logs')
+    def test_get_agent_logs_error(self, mock_get_logs, client):
+        """Test error handling in agent logs endpoint"""
+        mock_get_logs.side_effect = Exception("Internal Error")
+        
+        response = client.get("/api/agent-logs")
+        
+        assert response.status_code == 500
+        assert "detail" in response.json()
