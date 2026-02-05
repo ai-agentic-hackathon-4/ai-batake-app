@@ -29,22 +29,16 @@ except ImportError:
 
 def get_auth_headers():
     """Get authentication headers for Gemini API."""
-    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("SEED_GUIDE_GEMINI_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY")
     if api_key:
+        logging.info("Using GEMINI_API_KEY for authentication")
         return {"Content-Type": "application/json"}, f"?key={api_key}"
     
-    # Try ADC (Application Default Credentials)
-    try:
-        creds, project = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
-        auth_req = google.auth.transport.requests.Request()
-        creds.refresh(auth_req)
-        return {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {creds.token}"
-        }, ""
-    except Exception as e:
-        logging.warning(f"Failed to get ADC credentials: {e}")
-        return {"Content-Type": "application/json"}, ""
+    # Try ADC (Application Default Credentials) - REMOVED as per user request (API Key forced)
+    # logging.info("Trying ADC for authentication")
+    # ...
+    logging.warning("ADC authentication disabled. Please set GEMINI_API_KEY.")
+    return {"Content-Type": "application/json"}, ""
 
 
 def request_with_retry(method: str, url: str, **kwargs) -> requests.Response:
@@ -378,7 +372,7 @@ def parse_diary_response(text: str) -> Dict[str, str]:
         }
 
 
-async def generate_diary_with_ai(
+def generate_diary_with_ai(
     date_str: str,
     statistics: Dict,
     events: List[Dict],
@@ -396,21 +390,23 @@ async def generate_diary_with_ai(
     Returns:
         Dictionary with AI-generated diary content.
     """
-    headers, query_param = get_auth_headers()
-    
-    if not query_param and "Authorization" not in headers:
-        logging.error("No API key or credentials available for Gemini API")
+    # API Key Handling (Explicit as requested)
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        logging.error("No GEMINI_API_KEY found in environment variables")
         return {
-            "summary": "AIサービスが利用できません。",
+            "summary": "AIサービスが利用できません (API Key Missing)。",
             "observations": "データ収集は正常に完了しました。",
             "recommendations": "手動で観察記録を追加してください。"
         }
     
+    headers = {"Content-Type": "application/json"}
+    
     # Build prompt
     prompt = build_diary_prompt(date_str, statistics, events, vegetable_info)
     
-    # Gemini API call
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent{query_param}"
+    # Gemini API call with explicit key parameter
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={api_key}"
     
     payload = {
         "contents": [{
@@ -450,7 +446,7 @@ async def generate_diary_with_ai(
         }
 
 
-async def collect_daily_data(target_date: date) -> Dict[str, Any]:
+def collect_daily_data(target_date: date) -> Dict[str, Any]:
     """
     Collect all data needed for diary generation.
     
@@ -469,7 +465,7 @@ async def collect_daily_data(target_date: date) -> Dict[str, Any]:
     }
 
 
-async def init_diary_status(diary_id: str):
+def init_diary_status(diary_id: str):
     """Initialize diary generation status in Firestore."""
     if db is None:
         return
@@ -483,7 +479,7 @@ async def init_diary_status(diary_id: str):
         logging.error(f"Error initializing diary status: {e}")
 
 
-async def save_diary(diary_id: str, data: Dict):
+def save_diary(diary_id: str, data: Dict):
     """Save the generated diary to Firestore."""
     if db is None:
         logging.warning("DB not available, cannot save diary")
@@ -496,7 +492,7 @@ async def save_diary(diary_id: str, data: Dict):
         logging.error(f"Error saving diary: {e}")
 
 
-async def mark_diary_failed(diary_id: str, error: str):
+def mark_diary_failed(diary_id: str, error: str):
     """Mark diary generation as failed."""
     if db is None:
         return
@@ -511,7 +507,7 @@ async def mark_diary_failed(diary_id: str, error: str):
         logging.error(f"Error marking diary failed: {e}")
 
 
-async def process_daily_diary(target_date_str: str):
+def process_daily_diary(target_date_str: str):
     """
     Main diary generation process.
     
@@ -526,11 +522,11 @@ async def process_daily_diary(target_date_str: str):
         
         # Initialize status
         logging.info(f"Starting diary generation for {target_date_str}...")
-        await init_diary_status(diary_id)
+        init_diary_status(diary_id)
         
         # 1. Collect data
         logging.info(f"Collecting data for {target_date_str}...")
-        daily_data = await collect_daily_data(target_date)
+        daily_data = collect_daily_data(target_date)
         
         # 2. Calculate statistics
         statistics = calculate_statistics(daily_data["sensor_data"])
@@ -540,7 +536,7 @@ async def process_daily_diary(target_date_str: str):
         
         # 3. Generate AI diary
         logging.info(f"Generating diary with AI for {target_date_str}...")
-        ai_content = await generate_diary_with_ai(
+        ai_content = generate_diary_with_ai(
             target_date_str,
             statistics,
             events,
@@ -566,13 +562,13 @@ async def process_daily_diary(target_date_str: str):
             "agent_actions_count": len(daily_data["agent_logs"])
         }
         
-        await save_diary(diary_id, diary_data)
+        save_diary(diary_id, diary_data)
         
         logging.info(f"Diary generated successfully for {target_date_str} in {generation_time_ms}ms")
         
     except Exception as e:
         logging.error(f"Failed to generate diary for {target_date_str}: {e}")
-        await mark_diary_failed(diary_id, str(e))
+        mark_diary_failed(diary_id, str(e))
 
 
 def get_all_diaries(limit: int = 30, offset: int = 0) -> List[Dict]:
