@@ -355,101 +355,155 @@ async def get_latest_plant_image():
 
 # --- feature/#5 Endpoints (Async Firestore Jobs) ---
 
-async def process_seed_guide(doc_id: str, image_bytes: bytes):
-    """Background task to process seed guide generation."""
-    # Set session ID for background task tracing (from dev)
-    task_session_id = f"job-{doc_id[:8]}"
+async def process_seed_guide(job_id: str, image_source: str):
+    """Background task to process seed guide generation (Feature #5)."""
+    # Set session ID for background task tracing
+    task_session_id = f"job-{job_id[:8]}"
     set_session_id(task_session_id)
     set_request_id(generate_request_id())
     
-    info(f"Starting seed guide generation job: {doc_id}")
+    info(f"Starting seed guide generation job: {job_id}")
+    doc_ref = db.collection(COLLECTION_NAME).document(job_id)
     
-    # Import locally to ensure access to latest db functions if needed
-    try:
-        from backend.db import update_seed_guide_status as update_func
-    except ImportError:
-        from db import update_seed_guide_status as update_func
-
-    # Update status to PROCESSING
-    update_func(doc_id, "PROCESSING", "Starting analysis...")
+    await doc_ref.update({
+        "status": "PROCESSING",
+        "message": "Starting analysis..."
+    })
     
     async def progress_callback(msg: str):
-        debug(f"[Guide {doc_id}] {msg}")
-        update_func(doc_id, "PROCESSING", msg)
+        debug(f"[Job {job_id}] Progress: {msg}")
+        await doc_ref.update({"message": msg})
+
+    # Download image if source is a path/URL
+    image_bytes = None
+    try:
+        if isinstance(image_source, str) and image_source.startswith("gs://"):
+            # Download from GCS
+            bucket_name = "ai-agentic-hackathon-4-bk"
+            blob_name = image_source.replace(f"gs://{bucket_name}/", "")
+            
+            debug(f"Downloading input image from GCS: {blob_name}")
+            storage_client = storage.Client()
+            bucket = storage_client.bucket(bucket_name)
+            blob = bucket.blob(blob_name)
+            image_bytes = blob.download_as_bytes()
+        elif isinstance(image_source, bytes):
+             image_bytes = image_source
+        else:
+             # Fallback: assume it is a blob name if string
+             bucket_name = "ai-agentic-hackathon-4-bk"
+             debug(f"Downloading input image from GCS (blob): {image_source}")
+             storage_client = storage.Client()
+             bucket = storage_client.bucket(bucket_name)
+             blob = bucket.blob(image_source)
+             image_bytes = blob.download_as_bytes()
+             
+    except Exception as e:
+        error(f"Failed to download input image: {e}")
+        await doc_ref.update({"status": "FAILED", "message": "Failed to retrieve input image"})
+        return
 
     try:
         # Check if analyze_seed_and_generate_guide is available
         if 'analyze_seed_and_generate_guide' in globals():
-            debug(f"Calling analyze_seed_and_generate_guide for job {doc_id}")
+            debug(f"Calling analyze_seed_and_generate_guide for job {job_id}")
             steps = await analyze_seed_and_generate_guide(image_bytes, progress_callback)
             
-            # Update to COMPLETED with result using DB function
-            info(f"Seed guide job {doc_id} completed with {len(steps)} steps")
-            update_func(doc_id, "COMPLETED", "Complete!", steps)
+            # Post-process steps: Upload generated images to GCS
+            info(f"Uploading {len(steps)} generated images to GCS...")
+            storage_client = storage.Client()
+            bucket = storage_client.bucket("ai-agentic-hackathon-4-bk")
             
+            for i, step in enumerate(steps):
+                if step.get("image_base64"):
+                    try:
+                        b64_data = step["image_base64"]
+                        img_data = base64.b64decode(b64_data)
+                        timestamp = int(time.time())
+                        blob_name = f"seed-guides/output/{job_id}_{timestamp}_{i}.jpg"
+                        blob = bucket.blob(blob_name)
+                        blob.upload_from_string(img_data, content_type="image/jpeg")
+                        
+                        # Replace base64 with URL
+                        step["image_url"] = f"https://storage.googleapis.com/ai-agentic-hackathon-4-bk/{blob_name}"
+                        del step["image_base64"]
+                    except Exception as img_e:
+                        warning(f"Failed to upload output image {i}: {img_e}")
+
+            info(f"Seed guide job {job_id} completed with {len(steps)} steps")
+            # Update to COMPLETED with result using DB function or manual update
+            # Since we are unifying, let's use the local logic or db func if available, 
+            # but maintain the structure relevant to the unified flow.
+            # Using manual update here to match earlier fix structure which works well.
+            await doc_ref.update({
+                "status": "COMPLETED",
+                "result": steps,
+                "message": "Complete!"
+            })
         else:
-            warning(f"analyze_seed_and_generate_guide not available for job {doc_id}")
-            update_func(doc_id, "FAILED", "Analysis service not available")
+            warning(f"analyze_seed_and_generate_guide not available for job {job_id}")
+            await doc_ref.update({
+                "status": "FAILED",
+                "message": "Analysis service not available"
+            })
 
     except Exception as e:
-        error(f"Seed guide job {doc_id} failed: {str(e)}", exc_info=True)
-        update_func(doc_id, "FAILED", str(e))
+        error(f"Seed guide job {job_id} failed: {str(e)}", exc_info=True)
+        await doc_ref.update({
+             "status": "FAILED",
+             "message": str(e)
+        })
 
 @app.post("/api/seed-guide/generate")
 async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """Starts an async seed guide generation, persisting immediately to Saved Guides."""
     try:
-        content = await file.read()
-        info(f"Received seed guide request, file: {file.filename}, size: {len(content)} bytes")
+        # Upload to GCS (streaming)
+        job_id = str(uuid.uuid4())
+        info(f"Creating seed guide job: {job_id}, file: {file.filename}")
         
-        # Upload to GCS
+        bucket_name = "ai-agentic-hackathon-4-bk"
         try:
             storage_client = storage.Client()
-            bucket_name = "ai-agentic-hackathon-4-bk"
             bucket = storage_client.bucket(bucket_name)
             
-            # Generate a unique filename
             timestamp = int(time.time())
             safe_filename = file.filename.replace(" ", "_").replace("/", "_")
-            blob_name = f"seed-guides/{timestamp}_{safe_filename}"
+            blob_name = f"seed-guides/input/{timestamp}_{safe_filename}"
             blob = bucket.blob(blob_name)
             
-            info(f"Uploading image to GCS: {blob_name}")
-            blob.upload_from_string(content, content_type=file.content_type)
+            info(f"Uploading input image to GCS: {blob_name}")
+            blob.upload_from_file(file.file, content_type=file.content_type)
             
-            # Construct public URL (assuming bucket is readable or using authenticated access later)
-            # For now, we store the gs link or https link. 
             image_url = f"https://storage.googleapis.com/{bucket_name}/{blob_name}"
             
         except Exception as e:
-            error(f"Failed to upload to GCS: {e}")
-            # Fallback (don't fail the whole request, just skip image persistence if GCS fails?)
-            # But we need persistence. Let's raise or simple fallback.
-            image_url = None
+            error(f"Failed to upload input to GCS: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to upload image: {e}")
 
-        # Prepare initial data
-        # removing "original_image" base64 to avoid Firestore 1MB limit
-        initial_data = {
-            "title": "New Seed Guide", 
-            "status": "PENDING",
-            "message": "Queued for analysis...",
-            "image_url": image_url, 
-            "steps": []
-        }
-        
         # Create persistent document immediately
-        try:
-            from backend.db import save_seed_guide as save_func
-        except ImportError:
-            from db import save_seed_guide as save_func
-            
-        doc_id = await asyncio.to_thread(save_func, initial_data)
-        info(f"Created persistent seed guide record: {doc_id}")
+        # Use simple dictionary set if possible, or use db func if needed, 
+        # but to ensure consistency with job_id and no base64 overhead:
+        doc_ref = db.collection(COLLECTION_NAME).document(job_id)
         
-        # Start background task
-        background_tasks.add_task(process_seed_guide, doc_id, content)
+        # Or use save_func if we want to stick to the pattern, but save_func might expect strict schema?
+        # Let's write directly to avoid overhead/imports issues seen before.
+        await doc_ref.set({
+            "job_id": job_id, # store as job_id or just id in doc
+            "title": "New Seed Guide",
+            "status": "PENDING",
+            "message": "Job created, waiting for worker...",
+            "input_image_url": image_url,
+            "result": None,
+            "steps": [], # Initialize empty steps for frontend
+            "created_at": firestore.SERVER_TIMESTAMP
+        })
         
-        return {"job_id": doc_id, "status": "PENDING"}
+        # Pass blob_name (str) instead of content (bytes)
+        background_tasks.add_task(process_seed_guide, job_id, blob_name)
+        debug(f"Background task queued for job {job_id}")
+        
+        return {"job_id": job_id, "status": "PENDING"}
         
     except Exception as e:
         error(f"Failed to start generation: {str(e)}", exc_info=True)
