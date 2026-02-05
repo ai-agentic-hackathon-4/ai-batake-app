@@ -54,7 +54,7 @@ export function PlantCamera() {
                 <div className="relative aspect-video bg-muted/30 flex items-center justify-center overflow-hidden">
                     {/* Show loader if fetching API or if image is downloading */}
                     {(isLoading || (imageUrl && !imageLoaded)) && (
-                        <div className="flex flex-col items-center gap-3 z-10">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
                             <div className="relative">
                                 <Loader2 className="h-10 w-10 text-primary animate-spin" />
                                 <div className="absolute inset-0 h-10 w-10 border-4 border-primary/20 rounded-full"></div>
