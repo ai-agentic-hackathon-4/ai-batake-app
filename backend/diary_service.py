@@ -261,7 +261,7 @@ def extract_key_events(agent_logs: List[Dict], max_events: int = 10) -> List[Dic
                 "type": "warning",
                 "action": comment
             })
-        elif comment and "action" not in [e.get("action") for e in events[-3:] if e]:
+        elif comment and comment not in [e.get("action") for e in events[-3:] if e]:
             # Include other comments as info events (avoid duplicates)
             events.append({
                 "time": timestamp,

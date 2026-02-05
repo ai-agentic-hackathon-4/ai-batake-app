@@ -396,7 +396,7 @@ async def generate_daily_diary_endpoint(background_tasks: BackgroundTasks):
     try:
         from datetime import datetime, timedelta
         
-        # Generate for yesterday (since this runs at 23:50)
+        # Generate for today (this runs at 23:50, so we capture all of today's data)
         target_date = (datetime.now() - timedelta(hours=1)).date()
         
         background_tasks.add_task(process_daily_diary, target_date.isoformat())
