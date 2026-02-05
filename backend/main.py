@@ -446,7 +446,6 @@ async def get_seed_guide_job(job_id: str):
         error(f"Failed to fetch job {job_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-
 # --- Diary Endpoints ---
 
 class DiaryGenerateRequest(BaseModel):
