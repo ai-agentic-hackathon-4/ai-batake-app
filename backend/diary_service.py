@@ -29,9 +29,9 @@ except ImportError:
 
 def get_auth_headers():
     """Get authentication headers for Gemini API."""
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("SEED_GUIDE_GEMINI_KEY")
     if api_key:
-        logging.info("Using GEMINI_API_KEY for authentication")
+        logging.info("Using SEED_GUIDE_GEMINI_KEY for authentication")
         return {"Content-Type": "application/json"}, f"?key={api_key}"
     
     # Try ADC (Application Default Credentials) - REMOVED as per user request (API Key forced)
@@ -406,7 +406,7 @@ def generate_diary_with_ai(
     prompt = build_diary_prompt(date_str, statistics, events, vegetable_info)
     
     # Gemini API call with explicit key parameter
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={api_key}"
+    url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-3-flash-preview:generateContent?key={api_key}"
     
     payload = {
         "contents": [{
