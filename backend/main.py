@@ -59,6 +59,26 @@ except ImportError:
         warning(f"Failed to import seed_service: {e}")
         pass
 
+# Imports for Diary Service
+try:
+    from .diary_service import (
+        process_daily_diary,
+        get_all_diaries,
+        get_diary_by_date
+    )
+except ImportError:
+    try:
+        from diary_service import (
+            process_daily_diary,
+            get_all_diaries,
+            get_diary_by_date
+        )
+    except ImportError as e:
+        logging.warning(f"Failed to import diary_service: {e}")
+        process_daily_diary = None
+        get_all_diaries = None
+        get_diary_by_date = None
+
 app = FastAPI()
 
 
@@ -425,6 +445,134 @@ async def get_seed_guide_job(job_id: str):
     except Exception as e:
         error(f"Failed to fetch job {job_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+# --- Diary Endpoints ---
+
+class DiaryGenerateRequest(BaseModel):
+    date: str  # ISO format date string (YYYY-MM-DD)
+
+@app.get("/api/diary/list")
+async def list_diaries(limit: int = 30, offset: int = 0):
+    """
+    Get list of all completed growing diaries.
+    
+    Args:
+        limit: Maximum number of diaries to return (default 30).
+        offset: Number of diaries to skip for pagination.
+    
+    Returns:
+        Dictionary with list of diaries.
+    """
+    if get_all_diaries is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        diaries = get_all_diaries(limit=limit, offset=offset)
+        return {"diaries": diaries}
+    except Exception as e:
+        logging.error(f"Error listing diaries: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/diary/{date}")
+async def get_diary(date: str):
+    """
+    Get a specific diary by date.
+    
+    Args:
+        date: Date in ISO format (YYYY-MM-DD).
+    
+    Returns:
+        Diary data for the specified date.
+    """
+    if get_diary_by_date is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        diary = get_diary_by_date(date)
+        
+        if diary is None:
+            raise HTTPException(status_code=404, detail="Diary not found")
+        
+        return diary
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error fetching diary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/diary/generate-daily")
+async def generate_daily_diary_endpoint(background_tasks: BackgroundTasks):
+    """
+    Trigger daily diary generation.
+    This endpoint is designed to be called by Cloud Scheduler at 23:50 JST.
+    Generates a diary for the previous day's data.
+    
+    Returns:
+        Status message with the target date.
+    """
+    if process_daily_diary is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        from datetime import datetime, timedelta
+        
+        # Generate for today (this runs at 23:50, so we capture all of today's data)
+        target_date = (datetime.now() - timedelta(hours=1)).date()
+        
+        background_tasks.add_task(process_daily_diary, target_date.isoformat())
+        
+        return {
+            "status": "accepted",
+            "date": target_date.isoformat(),
+            "message": "Diary generation started"
+        }
+    except Exception as e:
+        logging.error(f"Error starting diary generation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/diary/generate-manual")
+async def generate_manual_diary_endpoint(
+    background_tasks: BackgroundTasks,
+    request: DiaryGenerateRequest
+):
+    """
+    Manually trigger diary generation for a specific date.
+    Useful for testing or regenerating failed diaries.
+    
+    Args:
+        request: DiaryGenerateRequest with target date.
+    
+    Returns:
+        Status message with the target date.
+    """
+    if process_daily_diary is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        from datetime import date as date_module
+        
+        # Validate date format
+        try:
+            target_date = date_module.fromisoformat(request.date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        
+        background_tasks.add_task(process_daily_diary, request.date)
+        
+        return {
+            "status": "accepted",
+            "date": request.date,
+            "message": "Manual diary generation started"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error starting manual diary generation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.on_event("startup")
