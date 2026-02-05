@@ -402,13 +402,38 @@ async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: 
         content = await file.read()
         info(f"Received seed guide request, file: {file.filename}, size: {len(content)} bytes")
         
+        # Upload to GCS
+        try:
+            storage_client = storage.Client()
+            bucket_name = "ai-agentic-hackathon-4-bk"
+            bucket = storage_client.bucket(bucket_name)
+            
+            # Generate a unique filename
+            timestamp = int(time.time())
+            safe_filename = file.filename.replace(" ", "_").replace("/", "_")
+            blob_name = f"seed-guides/{timestamp}_{safe_filename}"
+            blob = bucket.blob(blob_name)
+            
+            info(f"Uploading image to GCS: {blob_name}")
+            blob.upload_from_string(content, content_type=file.content_type)
+            
+            # Construct public URL (assuming bucket is readable or using authenticated access later)
+            # For now, we store the gs link or https link. 
+            image_url = f"https://storage.googleapis.com/{bucket_name}/{blob_name}"
+            
+        except Exception as e:
+            error(f"Failed to upload to GCS: {e}")
+            # Fallback (don't fail the whole request, just skip image persistence if GCS fails?)
+            # But we need persistence. Let's raise or simple fallback.
+            image_url = None
+
         # Prepare initial data
-        image_b64 = base64.b64encode(content).decode('utf-8')
+        # removing "original_image" base64 to avoid Firestore 1MB limit
         initial_data = {
-            "title": "New Seed Guide", # Placeholder, updated later?
+            "title": "New Seed Guide", 
             "status": "PENDING",
             "message": "Queued for analysis...",
-            "original_image": image_b64,
+            "image_url": image_url, 
             "steps": []
         }
         
