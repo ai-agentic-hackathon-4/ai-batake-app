@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Leaf, Sprout, Microscope, Activity } from "lucide-react"
+import { Leaf, Sprout, Microscope, Activity, BookOpen } from "lucide-react"
 
 export default function LandingPage() {
     return (
@@ -20,7 +20,7 @@ export default function LandingPage() {
                 </div>
 
                 {/* Features Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
 
                     {/* Dashboard Card */}
                     <Link href="/dashboard" className="group">
@@ -59,6 +59,22 @@ export default function LandingPage() {
                                 Upload a photo to generate a step-by-step planting guide using async AI jobs.
                             </p>
                             <div className="mt-4 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                New Feature
+                            </div>
+                        </div>
+                    </Link>
+
+                    {/* Growing Diary Card */}
+                    <Link href="/diary" className="group">
+                        <div className="h-full bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-primary/50 transition-all duration-300">
+                            <div className="mb-4 p-3 bg-amber-50 rounded-lg w-fit mx-auto group-hover:scale-110 transition-transform">
+                                <BookOpen className="h-8 w-8 text-amber-600" />
+                            </div>
+                            <h2 className="text-xl font-semibold mb-2 text-slate-900">育成日記</h2>
+                            <p className="text-slate-500 text-sm">
+                                AI-generated daily diary from sensor data and agent logs for tracking plant growth.
+                            </p>
+                            <div className="mt-4 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
                                 New Feature
                             </div>
                         </div>
