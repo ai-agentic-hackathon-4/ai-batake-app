@@ -1,22 +1,30 @@
 #!/usr/bin/env python3
 from google.cloud import firestore
-import logging
 from datetime import datetime
 
 import google.auth.exceptions
+
+# Import our structured logging module
+try:
+    from .logger import get_logger, info, debug, warning, error
+except ImportError:
+    from logger import get_logger, info, debug, warning, error
+
+# Initialize logger
+logger = get_logger()
 
 # Initialize Firestore
 # Note: Requires GOOGLE_CLOUD_PROJECT environment variable or ADC.
 try:
     # db = google.cloud.firestore.Client()
     db = firestore.Client(project="ai-agentic-hackathon-4", database="ai-agentic-hackathon-4-db")
-    logging.info("Firestore client initialized successfully.")
+    info("Firestore client initialized successfully.")
 except google.auth.exceptions.DefaultCredentialsError:
-    logging.warning("Firestore credentials not found. Running in offline mode (DB Disabled).")
-    logging.warning("To enable DB, set GOOGLE_APPLICATION_CREDENTIALS or run 'gcloud auth application-default login'.")
+    warning("Firestore credentials not found. Running in offline mode (DB Disabled).")
+    warning("To enable DB, set GOOGLE_APPLICATION_CREDENTIALS or run 'gcloud auth application-default login'.")
     db = None
 except Exception as e:
-    logging.error(f"Failed to initialize Firestore client: {e}")
+    error(f"Failed to initialize Firestore client: {e}", exc_info=True)
     db = None
 
 def init_vegetable_status(vegetable_name: str) -> str:
@@ -30,9 +38,10 @@ def init_vegetable_status(vegetable_name: str) -> str:
             "created_at": datetime.now(),
             "status": "processing"
         })
+        debug(f"Initialized vegetable status for {vegetable_name} with ID: {doc_ref.id}")
         return doc_ref.id
     except Exception as e:
-        logging.error(f"Error initializing status: {e}")
+        error(f"Error initializing status for {vegetable_name}: {e}", exc_info=True)
         return "error-id"
 
 def update_vegetable_status(doc_id: str, status: str, data: dict = None):
@@ -49,15 +58,16 @@ def update_vegetable_status(doc_id: str, status: str, data: dict = None):
             update_data["instructions"] = data
             
         doc_ref.update(update_data)
-        logging.info(f"Updated doc {doc_id} to status {status}")
+        info(f"Updated doc {doc_id} to status {status}")
     except Exception as e:
-        logging.error(f"Error updating status: {e}")
+        error(f"Error updating status for doc {doc_id}: {e}", exc_info=True)
 
 def get_all_vegetables():
     """Retrieves all vegetables sorted by creation date."""
     if db is None: return []
 
     try:
+        debug("Fetching all vegetables from Firestore")
         docs = db.collection("vegetables").order_by("created_at", direction=firestore.Query.DESCENDING).stream()
         results = []
         for doc in docs:
@@ -66,9 +76,10 @@ def get_all_vegetables():
             if 'created_at' in d and isinstance(d['created_at'], datetime):
                 d['created_at'] = d['created_at'].isoformat()
             results.append(d)
+        debug(f"Retrieved {len(results)} vegetables")
         return results
     except Exception as e:
-        logging.error(f"Error listing vegetables: {e}")
+        error(f"Error listing vegetables: {e}", exc_info=True)
         return []
 
 def save_growing_instructions(vegetable_name: str, data: dict) -> str:
@@ -83,7 +94,7 @@ def save_growing_instructions(vegetable_name: str, data: dict) -> str:
         The ID of the saved document.
     """
     if db is None:
-        logging.warning("Firestore is not available. Skipping save.")
+        warning("Firestore is not available. Skipping save.")
         return "mock-id-firestore-unavailable"
 
     collection_name = "vegetables"
@@ -103,11 +114,11 @@ def save_growing_instructions(vegetable_name: str, data: dict) -> str:
         }
         
         doc_ref.set(save_data)
-        logging.info(f"Saved instructions for {vegetable_name} with ID: {doc_ref.id}")
+        info(f"Saved instructions for {vegetable_name} with ID: {doc_ref.id}")
         return doc_ref.id
         
     except Exception as e:
-        logging.error(f"Error saving to Firestore: {e}")
+        error(f"Error saving instructions for {vegetable_name} to Firestore: {e}", exc_info=True)
         raise e
 
 def get_latest_vegetable():
@@ -115,21 +126,25 @@ def get_latest_vegetable():
     Fetches the latest vegetable document from Firestore.
     """
     if db is None:
-        logging.warning("Firestore is not available.")
+        warning("Firestore is not available.")
         return None
 
     try:
         collection_name = "vegetables"
+        debug("Fetching latest vegetable from Firestore")
         # Order by created_at descending and limit to 1
         docs = db.collection(collection_name).order_by("created_at", direction=google.cloud.firestore.Query.DESCENDING).limit(1).stream()
         
         for doc in docs:
-            return doc.to_dict()
+            result = doc.to_dict()
+            debug(f"Latest vegetable found: {result.get('name')}")
+            return result
             
+        debug("No vegetables found in Firestore")
         return None
         
     except Exception as e:
-        logging.error(f"Error fetching from Firestore: {e}")
+        error(f"Error fetching latest vegetable from Firestore: {e}", exc_info=True)
         return None
 
 def update_edge_agent_config(research_data: dict):
@@ -158,10 +173,10 @@ def update_edge_agent_config(research_data: dict):
             "instruction": support_prompt,
             "updated_at": datetime.now()
         }, merge=True)
-        logging.info("Updated edge_agent configuration with new research data (overwrite).")
+        info(f"Updated edge_agent configuration with new research data for: {research_data.get('name', 'Unknown')}")
         
     except Exception as e:
-        logging.error(f"Error updating edge_agent config: {e}")
+        error(f"Error updating edge_agent config: {e}", exc_info=True)
 
 def select_vegetable_instruction(doc_id: str) -> bool:
     """
@@ -171,18 +186,19 @@ def select_vegetable_instruction(doc_id: str) -> bool:
     if db is None: return False
 
     try:
+        debug(f"Selecting vegetable instruction for doc: {doc_id}")
         doc_ref = db.collection("vegetables").document(doc_id)
         doc = doc_ref.get()
         
         if not doc.exists:
-            logging.error(f"Vegetable doc {doc_id} not found.")
+            error(f"Vegetable doc {doc_id} not found.")
             return False
             
         data = doc.to_dict()
         instructions = data.get("instructions")
         
         if not instructions:
-            logging.error(f"Vegetable doc {doc_id} has no instructions.")
+            error(f"Vegetable doc {doc_id} has no instructions.")
             return False
             
         # Add name to instructions if not present, for fallback in update_edge_agent_config
@@ -190,11 +206,11 @@ def select_vegetable_instruction(doc_id: str) -> bool:
             instructions["name"] = data.get("name", "Unknown")
             
         update_edge_agent_config(instructions)
-        logging.info(f"Selected vegetable {doc_id} and updated agent config.")
+        info(f"Selected vegetable {doc_id} ({data.get('name')}) and updated agent config.")
         return True
         
     except Exception as e:
-        logging.error(f"Error selecting vegetable instruction: {e}")
+        error(f"Error selecting vegetable instruction for {doc_id}: {e}", exc_info=True)
         return False
 
 def get_recent_sensor_logs(limit: int = 5):
@@ -202,11 +218,12 @@ def get_recent_sensor_logs(limit: int = 5):
     Fetches the recent sensor logs from Firestore.
     """
     if db is None:
-        logging.warning("Firestore is not available.")
+        warning("Firestore is not available.")
         return []
 
     try:
         collection_name = "sensor_logs"
+        debug(f"Fetching recent {limit} sensor logs")
         # Order by timestamp descending
         # Note: direction should be accessible via firestore.Query.DESCENDING or similar depending on import
         # We imported 'from google.cloud import firestore', so firestore.Query.DESCENDING is correct.
@@ -217,11 +234,12 @@ def get_recent_sensor_logs(limit: int = 5):
             log_data = doc.to_dict()
             log_data['id'] = doc.id
             logs.append(log_data)
-            
+        
+        debug(f"Retrieved {len(logs)} sensor logs")
         return logs
         
     except Exception as e:
-        logging.error(f"Error fetching sensor logs from Firestore: {e}")
+        error(f"Error fetching sensor logs from Firestore: {e}", exc_info=True)
         return []
 
 def get_sensor_history(hours: int = 24):
@@ -230,7 +248,7 @@ def get_sensor_history(hours: int = 24):
     Returns list sorted by timestamp ascending.
     """
     if db is None:
-        logging.warning("Firestore is not available.")
+        warning("Firestore is not available.")
         return []
 
     try:
@@ -240,6 +258,8 @@ def get_sensor_history(hours: int = 24):
         # Calculate cutoff timestamp
         now = time.time()
         cutoff_time = now - (hours * 3600)
+        
+        debug(f"Fetching sensor history for past {hours} hours (cutoff: {cutoff_time})")
         
         # Query: specific range and order
         # Note: In Firestore, if you have a range filter on a field, you must order by that field first.
@@ -253,12 +273,13 @@ def get_sensor_history(hours: int = 24):
             log_data = doc.to_dict()
             log_data['id'] = doc.id
             logs.append(log_data)
-            
+        
+        debug(f"Retrieved {len(logs)} sensor history records")
         return logs
         
 
     except Exception as e:
-        logging.error(f"Error fetching sensor history from Firestore: {e}")
+        error(f"Error fetching sensor history from Firestore: {e}", exc_info=True)
         return []
 
 def get_agent_execution_logs(limit: int = 20):
@@ -266,11 +287,12 @@ def get_agent_execution_logs(limit: int = 20):
     Fetches the recent agent execution logs from Firestore.
     """
     if db is None:
-        logging.warning("Firestore is not available.")
+        warning("Firestore is not available.")
         return []
 
     try:
         collection_name = "agent_execution_logs"
+        debug(f"Fetching recent {limit} agent execution logs")
         # Order by unix_timestamp descending (assuming standard logging format)
         # If unix_timestamp doesn't exist, we might need to rely on 'timestamp' string or similar.
         # Let's try ordering by timestamp (ISO string) or unix_timestamp if available.
@@ -285,11 +307,12 @@ def get_agent_execution_logs(limit: int = 20):
             log_data = doc.to_dict()
             log_data['id'] = doc.id
             logs.append(log_data)
-            
+        
+        debug(f"Retrieved {len(logs)} agent execution logs")
         return logs
         
     except Exception as e:
-        logging.error(f"Error fetching agent logs from Firestore: {e}")
+        error(f"Error fetching agent logs from Firestore: {e}", exc_info=True)
         return []
 
 if __name__ == "__main__":

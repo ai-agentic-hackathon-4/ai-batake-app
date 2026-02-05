@@ -5,6 +5,15 @@ import requests
 import google.auth
 from google.auth.transport.requests import Request
 
+# Import our structured logging module
+try:
+    from .logger import get_logger, info, debug, warning, error
+except ImportError:
+    from logger import get_logger, info, debug, warning, error
+
+# Initialize logger
+logger = get_logger()
+
 # Configuration
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "ai-agentic-hackathon-4")
 LOCATION =  "us-central1"
@@ -22,11 +31,13 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         image_bytes: The image content.
         progress_callback: Optional async function(message: str) to report progress.
     """
+    info(f"Starting seed analysis and guide generation ({len(image_bytes)} bytes)")
     if progress_callback: await progress_callback("🌱 AI is analyzing the seed image (Gemini 3 Pro)...")
 
     # API Key Authentication
     api_key = os.environ.get("SEED_GUIDE_GEMINI_KEY")
     if not api_key:
+        error("SEED_GUIDE_GEMINI_KEY environment variable not set")
         raise RuntimeError("SEED_GUIDE_GEMINI_KEY environment variable not set")
         
     # Headers: API Key mode does not use Bearer Token usually, but requires Content-Type
@@ -49,13 +60,13 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
                 elif response.status_code == 429:
                     # 429 Resource Exhausted
                     delay = (base_delay * (2 ** attempt)) + random.uniform(0, 1)
-                    print(f"API 429 (Resource Exhausted). Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
+                    warning(f"API 429 (Resource Exhausted). Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
                     time.sleep(delay)
                     continue
                 elif response.status_code >= 500:
                     # Server Error - also retry
                     delay = (base_delay * (2 ** attempt)) + random.uniform(0, 1)
-                    print(f"API {response.status_code}. Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
+                    warning(f"API {response.status_code}. Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
                     time.sleep(delay)
                     continue
                 else:
@@ -64,9 +75,10 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
             except requests.exceptions.RequestException as e:
                 # Network error - retry
                 delay = (base_delay * (2 ** attempt)) + random.uniform(0, 1)
-                print(f"Network Error: {e}. Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
+                warning(f"Network Error: {e}. Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
                 time.sleep(delay)
         
+        error(f"Max retries ({max_retries}) exceeded.")
         raise RuntimeError(f"Max retries ({max_retries}) exceeded.")
 
     # 1. Analyze with Gemini 3 Pro (gemini-3-pro-preview)
@@ -128,13 +140,13 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
     # Endpoint: https://aiplatform.googleapis.com/v1/publishers/google/models/{model_id}:generateContent?key={API_KEY}
     url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{model_id}:generateContent?key={api_key}"
     
-    print(f"Requesting Gemini 3 Pro Analysis (API Key): {url.split('?')[0]}?key=***")
+    debug(f"Requesting Gemini 3 Pro Analysis: {url.split('?')[0]}?key=***")
     
     try:
         response = call_api_with_backoff(url, payload, headers)
         
         if response.status_code != 200:
-            print(f"Global Endpoint failed: {response.text}")
+            error(f"Gemini 3 Pro Analysis failed: {response.text[:500]}...")
             raise RuntimeError(f"Gemini 3 Pro Analysis failed: {response.status_code} {response.text}")
             
         resp_json = response.json()
@@ -147,12 +159,14 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
             if text.startswith("```json"): text = text[7:]
             if text.endswith("```"): text = text[:-3]
             steps = json.loads(text.strip())
+            info(f"Seed analysis completed: {len(steps)} steps identified")
             
         except (KeyError, IndexError, json.JSONDecodeError) as e:
+            error(f"Failed to parse Gemini 3 Pro response: {e}")
             raise RuntimeError(f"Failed to parse Gemini 3 Pro response: {e}")
             
     except Exception as e:
-        print(f"Analysis failed: {e}")
+        error(f"Seed analysis failed: {e}", exc_info=True)
         raise e
 
     if progress_callback: await progress_callback(f"🎨 Generating illustrations for {len(steps)} steps (Nanobanana Pro)...")
@@ -175,7 +189,7 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         # Small start jitter to avoid hitting rate limit exactly simultaneously
         time.sleep(random.uniform(0, 1.0))
         
-        print(f"Generating Image with Nanobanana Pro ({img_model_id}) for: {step['image_prompt']}")
+        debug(f"Generating Image for step: {step['step_title']}")
         
         # Append style keywords to ensure consistency
         img_prompt = f"Generate an image of {step['image_prompt']}, {UNIFIED_STYLE}"
@@ -188,7 +202,7 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
             img_response = call_api_with_backoff(img_url, img_payload, headers, max_retries=10)
             
             if img_response.status_code != 200:
-                print(f"Nanobanana Pro Generation failed: {img_response.status_code} - {img_response.text}")
+                warning(f"Image generation failed for '{step['step_title']}': {img_response.status_code}")
                 return {
                     "title": step['step_title'],
                     "description": step['description'],
@@ -206,13 +220,14 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
                             break
                     
                     if b64_data:
+                        debug(f"Image generated successfully for step: {step['step_title']}")
                         return {
                             "title": step['step_title'],
                             "description": step['description'],
                             "image_base64": b64_data
                         }
                     else:
-                        print(f"No inline image data in Nanobanana response: {img_resp_json}")
+                        warning(f"No inline image data for step: {step['step_title']}")
                         return {
                             "title": step['step_title'],
                             "description": step['description'],
@@ -220,7 +235,7 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
                             "error": "No image data returned"
                         }
                 except Exception as e:
-                    print(f"Failed to parse Nanobanana response: {e}")
+                    error(f"Failed to parse image response for '{step['step_title']}': {e}")
                     return {
                         "title": step['step_title'],
                         "description": step['description'],
@@ -229,7 +244,7 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
                     }
 
         except Exception as e:
-            print(f"Image request failed: {e}")
+            error(f"Image request failed for '{step['step_title']}': {e}")
             return {
                 "title": step['step_title'],
                 "description": step['description'],
@@ -239,10 +254,13 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
 
     # Run in parallel using ThreadPoolExecutor
     # max_workers=5 (matches max_retries essentially, allowing full parallelism for typical 5-6 steps)
-    print("Starting Parallel Image Generation...")
+    info(f"Starting parallel image generation for {len(steps)} steps...")
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
         # map preserves the order of results corresponding to 'steps'
         final_steps = list(executor.map(process_step, steps))
+    
+    successful_images = sum(1 for step in final_steps if step.get('image_base64'))
+    info(f"Guide generation complete: {len(final_steps)} steps, {successful_images} images generated")
     
     if progress_callback: await progress_callback("✨ Guide generation complete!")
             
