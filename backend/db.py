@@ -292,6 +292,106 @@ def get_agent_execution_logs(limit: int = 20):
         logging.error(f"Error fetching agent logs from Firestore: {e}")
         return []
 
+def save_seed_guide(data: dict, doc_id: str = None) -> str:
+    """
+    Saves or updates a seed guide to the 'saved_guides' collection.
+    
+    Args:
+        data: Dictionary containing guide data.
+        doc_id: Optional ID to update existing document.
+        
+    Returns:
+        The ID of the saved document.
+    """
+    if db is None:
+        logging.warning("Firestore is not available. Skipping save.")
+        return "mock-id-firestore-unavailable"
+
+    collection_name = "saved_guides"
+    
+    try:
+        if doc_id:
+            doc_ref = db.collection(collection_name).document(doc_id)
+            save_data = data.copy()
+            # Don't overwrite created_at if updating
+            save_data["updated_at"] = datetime.now()
+            doc_ref.set(save_data, merge=True)
+            logging.info(f"Updated seed guide with ID: {doc_id}")
+            return doc_id
+        else:
+            doc_ref = db.collection(collection_name).document()
+            save_data = data.copy()
+            save_data["created_at"] = datetime.now()
+            save_data["updated_at"] = datetime.now()
+            doc_ref.set(save_data)
+            logging.info(f"Created seed guide with ID: {doc_ref.id}")
+            return doc_ref.id
+        
+    except Exception as e:
+        logging.error(f"Error saving seed guide to Firestore: {e}")
+        raise e
+
+def update_seed_guide_status(doc_id: str, status: str, message: str = None, result: list = None):
+    """Updates the status of a seed guide."""
+    if db is None: return
+
+    try:
+        doc_ref = db.collection("saved_guides").document(doc_id)
+        update_data = {
+            "status": status,
+            "updated_at": datetime.now()
+        }
+        if message:
+            update_data["message"] = message
+        if result:
+            update_data["steps"] = result
+            
+        doc_ref.update(update_data)
+        logging.info(f"Updated guide {doc_id} status to {status}")
+    except Exception as e:
+        logging.error(f"Error updating guide status: {e}")
+
+def get_all_seed_guides():
+    """Retrieves all saved seed guides sorted by creation date."""
+    if db is None: return []
+
+    try:
+        docs = db.collection("saved_guides").order_by("created_at", direction=firestore.Query.DESCENDING).stream()
+        results = []
+        for doc in docs:
+            d = doc.to_dict()
+            d['id'] = doc.id
+            if 'created_at' in d and isinstance(d['created_at'], datetime):
+                d['created_at'] = d['created_at'].isoformat()
+            if 'updated_at' in d and isinstance(d['updated_at'], datetime):
+                d['updated_at'] = d['updated_at'].isoformat()
+            results.append(d)
+        return results
+    except Exception as e:
+        logging.error(f"Error listing seed guides: {e}")
+        return []
+
+def get_seed_guide(doc_id: str):
+    """Retrieves a specific seed guide by ID."""
+    if db is None: return None
+
+    try:
+        doc = db.collection("saved_guides").document(doc_id).get()
+        if not doc.exists:
+            return None
+            
+        data = doc.to_dict()
+        data['id'] = doc.id
+        if 'created_at' in data and isinstance(data['created_at'], datetime):
+            data['created_at'] = data['created_at'].isoformat()
+        if 'updated_at' in data and isinstance(data['updated_at'], datetime):
+            data['updated_at'] = data['updated_at'].isoformat()
+        return data
+    except Exception as e:
+        logging.error(f"Error getting seed guide {doc_id}: {e}")
+        return None
+
+
 if __name__ == "__main__":
     if db:
         print("Testing Firestore Connection...")
