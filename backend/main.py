@@ -8,6 +8,7 @@ import os
 import time
 import base64
 import json
+import asyncio
 from google.cloud import storage
 from google.cloud import firestore
 from dotenv import load_dotenv
@@ -38,14 +39,12 @@ load_dotenv()
 # Imports
 try:
     # Try importing from feature/#3 db functions
-    from .db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs
-    # Also old ones just in case
-    from .db import save_growing_instructions 
+    from .db import init_vegetable_status, update_vegetable_status, get_all_vegetables, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs
     from .research_agent import analyze_seed_packet, perform_deep_research
     from .agent import get_weather_from_agent
 except ImportError:
     # When running directly as a script
-    from db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, save_growing_instructions, get_agent_execution_logs
+    from db import init_vegetable_status, update_vegetable_status, get_all_vegetables, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs
     from research_agent import analyze_seed_packet, perform_deep_research
     from agent import get_weather_from_agent
 
@@ -450,9 +449,9 @@ async def process_seed_guide(job_id: str, image_source: str):
             "message": str(e)
         })
 
-@app.post("/api/seed-guide/jobs")
-async def create_seed_guide_job(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    """Starts an async job using feature/#5 architecture."""
+@app.post("/api/seed-guide/generate")
+async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """Starts an async seed guide generation, persisting immediately to Saved Guides."""
     try:
         # Upload to GCS (streaming)
         job_id = str(uuid.uuid4())
@@ -494,10 +493,13 @@ async def create_seed_guide_job(background_tasks: BackgroundTasks, file: UploadF
         background_tasks.add_task(process_seed_guide, job_id, blob_name)
         debug(f"Background task queued for job {job_id}")
         
-        return {"job_id": job_id}
+        return {"job_id": job_id, "status": "PENDING"}
+        
     except Exception as e:
-        error(f"Failed to create seed guide job: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to start job: {str(e)}")
+        error(f"Failed to start generation: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to start generation: {str(e)}")
+
+# Legacy job endpoints removed/deprecated in favor of unified flow
 
 @app.get("/api/seed-guide/jobs/{job_id}")
 async def get_seed_guide_job(job_id: str):
@@ -520,6 +522,57 @@ async def get_seed_guide_job(job_id: str):
         error(f"Failed to fetch job {job_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+class SaveGuideRequest(BaseModel):
+    title: str
+    description: Optional[str] = None
+    steps: list
+    original_image: Optional[str] = None # Base64 string of the original image
+
+@app.post("/api/seed-guide/save")
+async def save_seed_guide_endpoint(request: SaveGuideRequest):
+    """Saves a generated seed guide."""
+    try:
+        # Import here to ensure it uses the latest db.py
+        try:
+            from backend.db import save_seed_guide as save_func
+        except ImportError:
+            from db import save_seed_guide as save_func
+            
+        doc_id = await asyncio.to_thread(save_func, request.dict())
+        return {"status": "success", "id": doc_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save guide: {str(e)}")
+
+@app.get("/api/seed-guide/saved")
+async def list_saved_guides():
+    """Returns a list of saved seed guides."""
+    try:
+        try:
+            from backend.db import get_all_seed_guides as list_func
+        except ImportError:
+            from db import get_all_seed_guides as list_func
+            
+        return await asyncio.to_thread(list_func)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list guides: {str(e)}")
+
+@app.get("/api/seed-guide/saved/{doc_id}")
+async def get_saved_guide(doc_id: str):
+    """Returns a specific saved seed guide."""
+    try:
+        try:
+            from backend.db import get_seed_guide as get_func
+        except ImportError:
+            from db import get_seed_guide as get_func
+            
+        data = await asyncio.to_thread(get_func, doc_id)
+        if not data:
+            raise HTTPException(status_code=404, detail="Guide not found")
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get guide: {str(e)}")
 # --- Diary Endpoints ---
 
 class DiaryGenerateRequest(BaseModel):
