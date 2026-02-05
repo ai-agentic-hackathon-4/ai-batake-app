@@ -1,5 +1,4 @@
 import os
-import logging
 import json
 import time
 import requests
@@ -8,14 +7,25 @@ import base64
 import google.auth
 import google.auth.transport.requests
 
+# Import our structured logging module
+try:
+    from .logger import get_logger, info, debug, warning, error
+except ImportError:
+    from logger import get_logger, info, debug, warning, error
+
+# Initialize logger
+logger = get_logger()
+
 # Helper for Auth
 def get_auth_headers():
     api_key = os.environ.get("GEMINI_API_KEY")
     if api_key:
+        debug("Using GEMINI_API_KEY for authentication")
         return {"Content-Type": "application/json"}, f"?key={api_key}"
     
     # Try ADC
     try:
+        debug("Trying ADC for authentication")
         creds, project = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
         auth_req = google.auth.transport.requests.Request()
         creds.refresh(auth_req)
@@ -24,7 +34,7 @@ def get_auth_headers():
             "Authorization": f"Bearer {creds.token}"
         }, ""
     except Exception as e:
-        logging.warning(f"Failed to get ADC credentials: {e}")
+        warning(f"Failed to get ADC credentials: {e}")
         return {"Content-Type": "application/json"}, ""
 
 def request_with_retry(method, url, **kwargs):
@@ -35,21 +45,23 @@ def request_with_retry(method, url, **kwargs):
             response = requests.request(method, url, **kwargs)
             if response.status_code == 429:
                 sleep_time = backoff_factor ** i
-                logging.warning(f"429 Too Many Requests. Retrying in {sleep_time}s...")
+                warning(f"429 Too Many Requests. Retrying in {sleep_time}s... (attempt {i+1}/{max_retries})")
                 time.sleep(sleep_time)
                 continue
             return response
         except requests.exceptions.RequestException as e:
-            logging.warning(f"Request failed: {e}. Retrying...")
+            warning(f"Request failed: {e}. Retrying... (attempt {i+1}/{max_retries})")
             time.sleep(backoff_factor ** i)
     
     # Final attempt
+    debug(f"Final retry attempt for {method} {url}")
     return requests.request(method, url, **kwargs)
 
 def analyze_seed_packet(image_bytes: bytes) -> str:
     """
     Analyzes the seed packet image using Gemini 3 Flash via REST API.
     """
+    info(f"Analyzing seed packet image ({len(image_bytes)} bytes)")
     headers, query_param = get_auth_headers()
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent{query_param}"
@@ -57,6 +69,7 @@ def analyze_seed_packet(image_bytes: bytes) -> str:
     try:
         # Encode image to base64
         b64_image = base64.b64encode(image_bytes).decode('utf-8')
+        debug(f"Image encoded to base64 ({len(b64_image)} chars)")
         
         prompt_text = """
         この画像の種の袋を分析してください。
@@ -80,6 +93,7 @@ def analyze_seed_packet(image_bytes: bytes) -> str:
         
         headers = {"Content-Type": "application/json"}
         
+        debug("Sending request to Gemini 3 Flash for seed packet analysis")
         response = request_with_retry("POST", url, headers=headers, json=payload)
         response.raise_for_status()
         
@@ -89,19 +103,22 @@ def analyze_seed_packet(image_bytes: bytes) -> str:
         # Structure: candidates[0].content.parts[0].text
         try:
             text = result_json['candidates'][0]['content']['parts'][0]['text']
+            info(f"Seed packet analysis completed successfully")
+            debug(f"Analysis result preview: {text[:200]}...")
             return text
         except (KeyError, IndexError):
-             logging.error(f"Unexpected response format: {result_json}")
+             error(f"Unexpected response format: {result_json}")
              return '{"name": "Error", "visible_instructions": "Response parsing failed"}'
 
     except Exception as e:
-        logging.error(f"Error in analyze_seed_packet: {e}")
+        error(f"Error in analyze_seed_packet: {e}", exc_info=True)
         return '{"name": "不明な野菜", "visible_instructions": "API Error"}'
 
 def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
     """
     Performs deep research using REST API for Deep Research Agent.
     """
+    info(f"Starting deep research for: {vegetable_name}")
     headers, query_param = get_auth_headers()
 
     research_topic = f"「{vegetable_name}」の育て方について、家庭菜園や農業の専門的な情報を詳しく調べてください。特に最適な気温、湿度、土壌水分量、水やり頻度、日照条件について数値を含めて調査してください。"
@@ -119,15 +136,17 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
             "background": True
         }
         
-        logging.info(f"Starting Deep Research (REST) for: {vegetable_name}")
+        debug(f"Starting Deep Research interaction for: {vegetable_name}")
         response = request_with_retry("POST", start_url, headers=headers, json=payload)
         
         if response.status_code != 200:
-             logging.error(f"Deep Research start failed: {response.text}")
+             error(f"Deep Research start failed: {response.text}")
              return {"name": vegetable_name, "error": f"Start failed: {response.status_code} - {response.text}"}
              
         interaction_data = response.json()
-        logging.info(f"Debug: Full Interaction Data: {json.dumps(interaction_data, ensure_ascii=False)}")
+        # Limit debug output for large responses
+        interaction_str = json.dumps(interaction_data, ensure_ascii=False)
+        debug(f"Interaction data received: {interaction_str[:500] if len(interaction_str) > 500 else interaction_str}...")
         interaction_name = interaction_data.get("name")
         if not interaction_name:
             # Fallback: resource name might be constructed from ID
@@ -136,35 +155,39 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
                 # The API typically returns "interactions/<ID>" or just an ID we can use
                 # Based on doc, let's assume 'interactions/{id}' if name is missing
                 interaction_name = f"interactions/{interaction_id}"
-                logging.info(f"Debug: Constructed interaction_name from ID: {interaction_name}")
+                debug(f"Constructed interaction_name from ID: {interaction_name}")
 
         
-        logging.info(f"Research started: {interaction_name}")
+        info(f"Research started: {interaction_name}")
         
         # 2. Poll (GET)
         poll_url = f"https://generativelanguage.googleapis.com/v1beta/{interaction_name}{query_param}"
-        logging.info(f"Debug: Poll URL constructed: {poll_url}")
+        debug(f"Poll URL: {poll_url.split('?')[0]}...")
         
         if not interaction_name:
-             logging.error("Interaction Name is None or Empty!")
+             error("Interaction Name is None or Empty!")
              return {"name": vegetable_name, "error": "Interaction Name missing"}
         
         max_retries = 180
         final_text = ""
+        status = "unknown"
         
         start_time = time.time()
         for i in range(max_retries):
             current_time = time.time()
             elapsed = current_time - start_time
-            logging.info(f"Polling iteration {i+1}/{max_retries}. Elapsed: {elapsed:.2f}s")
+            
+            # Log progress every 10 iterations to reduce log spam
+            if i % 10 == 0:
+                debug(f"Polling iteration {i+1}/{max_retries}. Elapsed: {elapsed:.2f}s")
 
             poll_resp = request_with_retry("GET", poll_url, headers=headers)
             if poll_resp.status_code != 200:
-                logging.warning(f"Poll failed: {poll_resp.status_code} - {poll_resp.text}")
+                warning(f"Poll failed: {poll_resp.status_code} - {poll_resp.text[:200]}...")
                 
                 # Stop on 404 (Interaction not found)
                 if poll_resp.status_code == 404:
-                     logging.error(f"Interaction not found (404). Aborting poll for {interaction_name}")
+                     error(f"Interaction not found (404). Aborting poll for {interaction_name}")
                      return {"name": vegetable_name, "error": f"Research failed: Interaction not found (404)"}
 
                 # Don't break immediately on temp error (500 etc)
@@ -174,27 +197,26 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
             data = poll_resp.json()
             status = data.get("status")
             
-            logging.info(f"Polling status: {status}")
-            
             if status == "completed":
                 outputs = data.get("outputs", [])
                 if outputs:
                     final_text = outputs[-1].get("text", "")
-                    logging.info(f"Research completed. Output length: {len(final_text)}")
+                    info(f"Research completed for {vegetable_name}. Output length: {len(final_text)}")
                 else:
-                    logging.warning("Research completed but no outputs found.")
+                    warning("Research completed but no outputs found.")
                 break
             elif status == "failed":
                 error_msg = data.get('error')
-                logging.error(f"Research failed. detailed error: {json.dumps(data, ensure_ascii=False)}")
+                error(f"Research failed for {vegetable_name}. Error: {error_msg}")
                 return {"name": vegetable_name, "error": f"Research failed: {error_msg}"}
                 
             time.sleep(10)
         else:
-            logging.error(f"Research timed out after {max_retries} retries ({max_retries * 10}s). Last status: {status}")
+            error(f"Research timed out for {vegetable_name} after {max_retries} retries ({max_retries * 10}s). Last status: {status}")
             return {"name": vegetable_name, "error": "Research Timeout"}
 
         # 3. Extraction (REST)
+        info(f"Extracting structured data for {vegetable_name}")
         extraction_prompt = f"""
         以下の調査レポートに基づいて、野菜「{vegetable_name}」の育て方情報を抽出してJSON形式でまとめてください。
         特にsummary_promptには最適な気温、湿度、土壌水分量、水やり頻度、日照条件について数値を含めてこれだけで野菜を育てることができるほど詳しく記載してください。
@@ -228,10 +250,13 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
         gen_data = gen_resp.json()
         try:
             extracted_text = gen_data['candidates'][0]['content']['parts'][0]['text']
-            return json.loads(extracted_text)
+            result = json.loads(extracted_text)
+            info(f"Successfully extracted research data for {vegetable_name}")
+            return result
         except:
+             warning(f"Failed to parse extraction result for {vegetable_name}")
              return {"name": vegetable_name, "raw_research": final_text, "error": "Extraction Parsing Failed"}
 
     except Exception as e:
-        logging.error(f"Error in perform_deep_research (REST): {e}")
+        error(f"Error in perform_deep_research for {vegetable_name}: {e}", exc_info=True)
         return {"name": vegetable_name, "error": str(e)}
