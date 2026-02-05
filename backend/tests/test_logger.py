@@ -1,8 +1,6 @@
 """Tests for logger.py module"""
-import pytest
 import sys
 import os
-from unittest.mock import patch
 
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -82,43 +80,39 @@ class TestLoggerSetup:
 class TestLogFunctions:
     """Tests for log helper functions"""
     
-    def test_info_log(self, capfd):
-        """Test info logging"""
+    def test_info_log_does_not_raise(self):
+        """Test info logging executes without error"""
         set_session_id("test-session")
         set_request_id("test-request")
+        # Should not raise any exception
         info("Test info message")
-        # Just verify no exception is raised
     
-    def test_debug_log(self, capfd):
-        """Test debug logging"""
+    def test_debug_log_does_not_raise(self):
+        """Test debug logging executes without error"""
         set_session_id("debug-session")
         set_request_id("debug-request")
         debug("Test debug message")
-        # Just verify no exception is raised
     
-    def test_warning_log(self, capfd):
-        """Test warning logging"""
+    def test_warning_log_does_not_raise(self):
+        """Test warning logging executes without error"""
         set_session_id("warn-session")
         set_request_id("warn-request")
         warning("Test warning message")
-        # Just verify no exception is raised
     
-    def test_error_log(self, capfd):
-        """Test error logging"""
+    def test_error_log_does_not_raise(self):
+        """Test error logging executes without error"""
         set_session_id("error-session")
         set_request_id("error-request")
         error("Test error message")
-        # Just verify no exception is raised
     
-    def test_error_log_with_exc_info(self, capfd):
-        """Test error logging with exception info"""
+    def test_error_log_with_exc_info_does_not_raise(self):
+        """Test error logging with exc_info captures exception without raising"""
         set_session_id("exc-session")
         set_request_id("exc-request")
         try:
             raise ValueError("Test exception")
         except ValueError:
             error("Test error with exception", exc_info=True)
-        # Just verify no exception is raised
 
 
 class TestSessionTracking:

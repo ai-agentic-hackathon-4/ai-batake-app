@@ -7,11 +7,11 @@ import uuid
 import json
 import sys
 from contextvars import ContextVar
-from datetime import datetime
-from typing import Optional, Any
+from datetime import datetime, timezone
+from typing import Optional
 from functools import wraps
 
-# Context variable for session ID (thread-safe)
+# Context variables for session and request IDs (async/context-safe)
 _session_id: ContextVar[str] = ContextVar('session_id', default='no-session')
 _request_id: ContextVar[str] = ContextVar('request_id', default='no-request')
 
@@ -57,8 +57,6 @@ class StructuredFormatter(logging.Formatter):
         session_id = get_session_id()
         request_id = get_request_id()
         
-        from datetime import timezone
-        
         # Build structured log entry
         log_entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -92,7 +90,6 @@ class ReadableFormatter(logging.Formatter):
         session_id = get_session_id()
         request_id = get_request_id()
         
-        from datetime import timezone
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         
         # Format: [timestamp] [level] [session:request] module.function:line - message
@@ -201,41 +198,31 @@ def log_with_context(
 def debug(message: str, **kwargs) -> None:
     """Log debug message with context."""
     logger = get_logger()
-    session_id = get_session_id()
-    request_id = get_request_id()
-    logger.debug(f"[{session_id}:{request_id}] {message}", **kwargs)
+    logger.debug(message, **kwargs)
 
 
 def info(message: str, **kwargs) -> None:
     """Log info message with context."""
     logger = get_logger()
-    session_id = get_session_id()
-    request_id = get_request_id()
-    logger.info(f"[{session_id}:{request_id}] {message}", **kwargs)
+    logger.info(message, **kwargs)
 
 
 def warning(message: str, **kwargs) -> None:
     """Log warning message with context."""
     logger = get_logger()
-    session_id = get_session_id()
-    request_id = get_request_id()
-    logger.warning(f"[{session_id}:{request_id}] {message}", **kwargs)
+    logger.warning(message, **kwargs)
 
 
 def error(message: str, exc_info: bool = False, **kwargs) -> None:
     """Log error message with context."""
     logger = get_logger()
-    session_id = get_session_id()
-    request_id = get_request_id()
-    logger.error(f"[{session_id}:{request_id}] {message}", exc_info=exc_info, **kwargs)
+    logger.error(message, exc_info=exc_info, **kwargs)
 
 
 def critical(message: str, exc_info: bool = False, **kwargs) -> None:
     """Log critical message with context."""
     logger = get_logger()
-    session_id = get_session_id()
-    request_id = get_request_id()
-    logger.critical(f"[{session_id}:{request_id}] {message}", exc_info=exc_info, **kwargs)
+    logger.critical(message, exc_info=exc_info, **kwargs)
 
 
 def log_function_call(func):
@@ -245,7 +232,6 @@ def log_function_call(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        from datetime import timezone
         func_name = f"{func.__module__}.{func.__name__}"
         start_time = datetime.now(timezone.utc)
         
@@ -271,7 +257,6 @@ def log_async_function_call(func):
     """
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        from datetime import timezone
         func_name = f"{func.__module__}.{func.__name__}"
         start_time = datetime.now(timezone.utc)
         

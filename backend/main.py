@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Dict, Any, Optional
 import uuid
 import os
+import time
 import base64
 import json
 from google.cloud import storage
@@ -14,16 +15,16 @@ from dotenv import load_dotenv
 # Import our structured logging module
 try:
     from .logger import (
-        get_logger, setup_logger, 
+        setup_logger,
         generate_session_id, generate_request_id,
-        set_session_id, set_request_id, get_session_id, get_request_id,
+        set_session_id, set_request_id,
         info, debug, warning, error
     )
 except ImportError:
     from logger import (
-        get_logger, setup_logger,
+        setup_logger,
         generate_session_id, generate_request_id,
-        set_session_id, set_request_id, get_session_id, get_request_id,
+        set_session_id, set_request_id,
         info, debug, warning, error
     )
 
@@ -88,7 +89,6 @@ class SessionTrackingMiddleware(BaseHTTPMiddleware):
                        if k.lower() not in ('authorization', 'cookie', 'x-api-key', 'api-key')}
         debug(f"Request headers: {safe_headers}")
         
-        import time
         start_time = time.time()
         
         try:
@@ -331,8 +331,7 @@ async def get_latest_plant_image():
             "timestamp": latest_blob.time_created.isoformat()
         }
     except Exception as e:
-        import traceback
-        error(f"Error serving plant image: {traceback.format_exc()}", exc_info=True)
+        error(f"Error serving plant image: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- feature/#5 Endpoints (Async Firestore Jobs) ---
@@ -374,9 +373,7 @@ async def process_seed_guide(job_id: str, image_bytes: bytes):
                 "message": "Analysis service not available"
             })
     except Exception as e:
-        import traceback
         error(f"Seed guide job {job_id} failed: {str(e)}", exc_info=True)
-        traceback.print_exc()
         await doc_ref.update({
             "status": "FAILED",
             "message": str(e)
