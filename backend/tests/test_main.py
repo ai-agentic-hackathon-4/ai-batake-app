@@ -222,3 +222,59 @@ class TestAgentLogsEndpoint:
         
         assert response.status_code == 500
         assert "detail" in response.json()
+
+
+class TestCharacterMessageEndpoint:
+    """Tests for /api/character/message endpoint"""
+    
+    @patch('main.get_recent_sensor_logs')
+    @patch('main.get_latest_vegetable')
+    @patch('main.get_agent_execution_logs')
+    def test_character_message_success(self, mock_agent_logs, mock_vegetable, mock_sensor, client):
+        """Test successful character message generation"""
+        mock_sensor.return_value = [{"temperature": 25, "humidity": 65}]
+        mock_vegetable.return_value = {"name": "Tomato"}
+        mock_agent_logs.return_value = [{"action": "起動"}]
+        
+        response = client.get("/api/character/message")
+        
+        assert response.status_code == 200
+        assert "message" in response.json()
+        assert "mood" in response.json()
+        assert "sensor_status" in response.json()
+        assert isinstance(response.json()["message"], str)
+        assert response.json()["mood"] in ["happy", "concerned", "excited"]
+    
+    @patch('main.get_recent_sensor_logs')
+    @patch('main.get_latest_vegetable')
+    @patch('main.get_agent_execution_logs')
+    def test_character_message_with_low_temp(self, mock_agent_logs, mock_vegetable, mock_sensor, client):
+        """Test character message with low temperature"""
+        mock_sensor.return_value = [{"temperature": 15, "humidity": 65}]
+        mock_vegetable.return_value = {"name": "Tomato"}
+        mock_agent_logs.return_value = []
+        
+        response = client.get("/api/character/message")
+        
+        assert response.status_code == 200
+        assert "mood" in response.json()
+        # Should be concerned due to low temperature
+        assert response.json()["mood"] in ["concerned", "happy"]
+    
+    @patch('main.get_recent_sensor_logs')
+    @patch('main.get_latest_vegetable')
+    @patch('main.get_agent_execution_logs')
+    def test_character_message_error_fallback(self, mock_agent_logs, mock_vegetable, mock_sensor, client):
+        """Test character message returns default on error"""
+        mock_sensor.side_effect = Exception("Database Error")
+        mock_vegetable.return_value = None
+        mock_agent_logs.return_value = []
+        
+        response = client.get("/api/character/message")
+        
+        # Should still return 200 with default message
+        assert response.status_code == 200
+        assert "message" in response.json()
+        assert "mood" in response.json()
+        assert response.json()["mood"] == "happy"
+

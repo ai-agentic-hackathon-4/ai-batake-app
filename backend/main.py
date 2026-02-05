@@ -105,6 +105,97 @@ async def get_agent_logs_endpoint():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/character/message")
+async def get_character_message():
+    """
+    Generate a friendly character message based on current garden status.
+    Similar to Asken's character feedback system.
+    """
+    try:
+        import random
+        
+        # Get current sensor data
+        sensor_logs = get_recent_sensor_logs(limit=1)
+        sensor_data = sensor_logs[0] if sensor_logs else None
+        
+        # Get latest vegetable data
+        vegetable_data = get_latest_vegetable()
+        
+        # Get recent agent logs
+        agent_logs = get_agent_execution_logs(limit=5)
+        
+        # Generate character message based on current state
+        messages = []
+        mood = "happy"  # happy, concerned, excited
+        
+        # Check temperature
+        if sensor_data and 'temperature' in sensor_data:
+            temp = sensor_data['temperature']
+            if isinstance(temp, (int, float)):
+                if 20 <= temp <= 28:
+                    messages.append("気温がちょうど良い感じだね！🌱")
+                elif temp < 20:
+                    messages.append("少し寒いかも...暖かくしてあげようね")
+                    mood = "concerned"
+                elif temp > 28:
+                    messages.append("暑いね！水分補給を忘れずに💧")
+                    mood = "concerned"
+        
+        # Check humidity
+        if sensor_data and 'humidity' in sensor_data:
+            humidity = sensor_data['humidity']
+            if isinstance(humidity, (int, float)):
+                if 60 <= humidity <= 80:
+                    messages.append("湿度もバッチリだよ！✨")
+                elif humidity < 60:
+                    messages.append("少し乾燥気味かな")
+                    mood = "concerned"
+                elif humidity > 80:
+                    messages.append("湿度が高めだね")
+        
+        # Check growth stage
+        if vegetable_data and 'name' in vegetable_data:
+            veg_name = vegetable_data['name']
+            messages.append(f"{veg_name}の様子を見守っているよ！")
+        
+        # Check recent agent activity
+        if agent_logs:
+            recent_actions = [log.get('action', '') for log in agent_logs[:3]]
+            if any('起動' in action or 'ON' in action for action in recent_actions):
+                messages.append("エージェントが頑張ってお世話しているよ！")
+                mood = "excited"
+        
+        # Default encouraging messages if nothing specific
+        if not messages:
+            encouraging = [
+                "今日も元気に育ってね！🌿",
+                "順調に成長しているみたい！",
+                "毎日の観察が大切だよ✨",
+                "一緒に見守っていこうね！"
+            ]
+            messages.append(random.choice(encouraging))
+        
+        # Create main message
+        main_message = " ".join(messages[:2]) if len(messages) > 1 else messages[0] if messages else "今日も元気に育ってね！"
+        
+        return {
+            "message": main_message,
+            "mood": mood,
+            "sensor_status": {
+                "temperature": sensor_data.get('temperature') if sensor_data else None,
+                "humidity": sensor_data.get('humidity') if sensor_data else None
+            }
+        }
+        
+    except Exception as e:
+        logging.error(f"Error in character message: {e}")
+        # Return a default friendly message even on error
+        return {
+            "message": "今日も一緒に見守っていこうね！🌱",
+            "mood": "happy",
+            "sensor_status": {}
+        }
+
 # --- feature/#3 Endpoints (Research Agent UI Support) ---
 
 def process_research(doc_id: str, vegetable_name: str, analysis_data: dict):

@@ -8,6 +8,7 @@ import { EnvironmentChart } from "@/components/environment-chart"
 import { AIActivityLog } from "@/components/ai-activity-log"
 import { WeatherCard } from "@/components/weather-card"
 import { GrowthStageCard } from "@/components/growth-stage-card"
+import { CharacterCard } from "@/components/character-card"
 
 export default function Dashboard() {
     const [sensorData, setSensorData] = useState<{ temperature: number | string; humidity: number | string }>({
@@ -57,6 +58,9 @@ export default function Dashboard() {
             <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
                 {/* Plant Camera Section */}
                 <PlantCamera />
+
+                {/* Character Card - Friendly Status Commentary */}
+                <CharacterCard />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <WeatherCard />
