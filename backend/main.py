@@ -429,12 +429,8 @@ async def process_seed_guide(job_id: str, image_source: str):
                         del step["image_base64"]
                     except Exception as img_e:
                         warning(f"Failed to upload output image {i}: {img_e}")
-
             info(f"Seed guide job {job_id} completed with {len(steps)} steps")
             # Update to COMPLETED with result using DB function or manual update
-            # Since we are unifying, let's use the local logic or db func if available, 
-            # but maintain the structure relevant to the unified flow.
-            # Using manual update here to match earlier fix structure which works well.
             await doc_ref.update({
                 "status": "COMPLETED",
                 "result": steps,
@@ -446,12 +442,11 @@ async def process_seed_guide(job_id: str, image_source: str):
                 "status": "FAILED",
                 "message": "Analysis service not available"
             })
-
     except Exception as e:
         error(f"Seed guide job {job_id} failed: {str(e)}", exc_info=True)
         await doc_ref.update({
-             "status": "FAILED",
-             "message": str(e)
+            "status": "FAILED",
+            "message": str(e)
         })
 
 @app.post("/api/seed-guide/generate")
@@ -476,33 +471,30 @@ async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: 
             blob.upload_from_file(file.file, content_type=file.content_type)
             
             image_url = f"https://storage.googleapis.com/{bucket_name}/{blob_name}"
+
             
         except Exception as e:
             error(f"Failed to upload input to GCS: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to upload image: {e}")
 
         # Create persistent document immediately
-        # Use simple dictionary set if possible, or use db func if needed, 
-        # but to ensure consistency with job_id and no base64 overhead:
         doc_ref = db.collection(COLLECTION_NAME).document(job_id)
         
-        # Or use save_func if we want to stick to the pattern, but save_func might expect strict schema?
-        # Let's write directly to avoid overhead/imports issues seen before.
         await doc_ref.set({
-            "job_id": job_id, # store as job_id or just id in doc
+            "job_id": job_id, 
             "title": "New Seed Guide",
             "status": "PENDING",
             "message": "Job created, waiting for worker...",
             "input_image_url": image_url,
             "result": None,
-            "steps": [], # Initialize empty steps for frontend
+            "steps": [], 
             "created_at": firestore.SERVER_TIMESTAMP
         })
         
         # Pass blob_name (str) instead of content (bytes)
         background_tasks.add_task(process_seed_guide, job_id, blob_name)
         debug(f"Background task queued for job {job_id}")
-        
+
         return {"job_id": job_id, "status": "PENDING"}
         
     except Exception as e:
@@ -583,8 +575,6 @@ async def get_saved_guide(doc_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get guide: {str(e)}")
-
-
 # --- Diary Endpoints ---
 
 class DiaryGenerateRequest(BaseModel):

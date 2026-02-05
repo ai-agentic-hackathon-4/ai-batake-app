@@ -410,7 +410,7 @@ async def generate_diary_with_ai(
     prompt = build_diary_prompt(date_str, statistics, events, vegetable_info)
     
     # Gemini API call
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent{query_param}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent{query_param}"
     
     payload = {
         "contents": [{
