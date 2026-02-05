@@ -8,6 +8,7 @@ import os
 import time
 import base64
 import json
+import asyncio
 from google.cloud import storage
 from google.cloud import firestore
 from dotenv import load_dotenv
@@ -397,7 +398,7 @@ async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: 
         except ImportError:
             from db import save_seed_guide as save_func
             
-        doc_id = save_func(initial_data)
+        doc_id = await asyncio.to_thread(save_func, initial_data)
         info(f"Created persistent seed guide record: {doc_id}")
         
         # Start background task
@@ -448,7 +449,7 @@ async def save_seed_guide_endpoint(request: SaveGuideRequest):
         except ImportError:
             from db import save_seed_guide as save_func
             
-        doc_id = save_func(request.dict())
+        doc_id = await asyncio.to_thread(save_func, request.dict())
         return {"status": "success", "id": doc_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save guide: {str(e)}")
@@ -462,7 +463,7 @@ async def list_saved_guides():
         except ImportError:
             from db import get_all_seed_guides as list_func
             
-        return list_func()
+        return await asyncio.to_thread(list_func)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list guides: {str(e)}")
 
@@ -475,7 +476,7 @@ async def get_saved_guide(doc_id: str):
         except ImportError:
             from db import get_seed_guide as get_func
             
-        data = get_func(doc_id)
+        data = await asyncio.to_thread(get_func, doc_id)
         if not data:
             raise HTTPException(status_code=404, detail="Guide not found")
         return data
