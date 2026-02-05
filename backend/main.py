@@ -7,6 +7,7 @@ import os
 import logging
 import base64
 import json
+import random
 from google.cloud import storage
 from google.cloud import firestore
 from dotenv import load_dotenv
@@ -112,8 +113,6 @@ async def get_character_message():
     Similar to Asken's character feedback system.
     """
     try:
-        import random
-        
         # Get current sensor data
         sensor_logs = get_recent_sensor_logs(limit=1)
         sensor_data = sensor_logs[0] if sensor_logs else None
@@ -176,7 +175,12 @@ async def get_character_message():
             messages.append(random.choice(encouraging))
         
         # Create main message
-        main_message = " ".join(messages[:2]) if len(messages) > 1 else messages[0] if messages else "今日も元気に育ってね！"
+        if len(messages) > 1:
+            main_message = " ".join(messages[:2])
+        elif messages:
+            main_message = messages[0]
+        else:
+            main_message = "今日も元気に育ってね！"
         
         return {
             "message": main_message,
