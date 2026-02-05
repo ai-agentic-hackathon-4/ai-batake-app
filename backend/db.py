@@ -369,7 +369,7 @@ def update_seed_guide_status(doc_id: str, status: str, message: str = None, resu
         if result:
             update_data["steps"] = result
             
-        doc_ref.update(update_data)
+        doc_ref.set(update_data, merge=True)
         logging.info(f"Updated guide {doc_id} status to {status}")
     except Exception as e:
         logging.error(f"Error updating guide status: {e}")
