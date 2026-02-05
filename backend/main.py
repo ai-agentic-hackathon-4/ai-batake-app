@@ -8,6 +8,7 @@ import os
 import time
 import base64
 import json
+import asyncio
 from google.cloud import storage
 from google.cloud import firestore
 from dotenv import load_dotenv
@@ -38,14 +39,12 @@ load_dotenv()
 # Imports
 try:
     # Try importing from feature/#3 db functions
-    from .db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs
-    # Also old ones just in case
-    from .db import save_growing_instructions, save_seed_guide, get_all_seed_guides, get_seed_guide, update_seed_guide_status
+    from .db import init_vegetable_status, update_vegetable_status, get_all_vegetables, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs
     from .research_agent import analyze_seed_packet, perform_deep_research
     from .agent import get_weather_from_agent
 except ImportError:
     # When running directly as a script
-    from db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, save_growing_instructions, get_agent_execution_logs, save_seed_guide, get_all_seed_guides, get_seed_guide, update_seed_guide_status
+    from db import init_vegetable_status, update_vegetable_status, get_all_vegetables, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs
     from research_agent import analyze_seed_packet, perform_deep_research
     from agent import get_weather_from_agent
 
@@ -369,8 +368,8 @@ async def process_seed_guide(doc_id: str, image_bytes: bytes):
             update_func(doc_id, "COMPLETED", "Complete!", steps)
             
         else:
-             warning(f"analyze_seed_and_generate_guide not available for job {doc_id}")
-             update_func(doc_id, "FAILED", "Analysis service not available")
+            warning(f"analyze_seed_and_generate_guide not available for job {doc_id}")
+            update_func(doc_id, "FAILED", "Analysis service not available")
 
     except Exception as e:
         error(f"Seed guide job {doc_id} failed: {str(e)}", exc_info=True)
@@ -399,7 +398,7 @@ async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: 
         except ImportError:
             from db import save_seed_guide as save_func
             
-        doc_id = save_func(initial_data)
+        doc_id = await asyncio.to_thread(save_func, initial_data)
         info(f"Created persistent seed guide record: {doc_id}")
         
         # Start background task
@@ -450,7 +449,7 @@ async def save_seed_guide_endpoint(request: SaveGuideRequest):
         except ImportError:
             from db import save_seed_guide as save_func
             
-        doc_id = save_func(request.dict())
+        doc_id = await asyncio.to_thread(save_func, request.dict())
         return {"status": "success", "id": doc_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save guide: {str(e)}")
@@ -464,7 +463,7 @@ async def list_saved_guides():
         except ImportError:
             from db import get_all_seed_guides as list_func
             
-        return list_func()
+        return await asyncio.to_thread(list_func)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list guides: {str(e)}")
 
@@ -477,7 +476,7 @@ async def get_saved_guide(doc_id: str):
         except ImportError:
             from db import get_seed_guide as get_func
             
-        data = get_func(doc_id)
+        data = await asyncio.to_thread(get_func, doc_id)
         if not data:
             raise HTTPException(status_code=404, detail="Guide not found")
         return data

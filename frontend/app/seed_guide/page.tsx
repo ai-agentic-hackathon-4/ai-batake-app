@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { Upload, ArrowLeft, ArrowRight, RotateCcw, Sprout, AlertCircle, Loader2, BookOpen, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Upload, ArrowLeft, ArrowRight, Sprout, AlertCircle, Loader2, BookOpen, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from 'next/link';
@@ -35,7 +35,6 @@ export default function SeedGuidePage() {
 
     // List/Detail Mode State
     const [savedGuides, setSavedGuides] = useState<SavedGuide[]>([]);
-    const [docLoading, setDocLoading] = useState(false);
     const [selectedGuide, setSelectedGuide] = useState<SavedGuide | null>(null);
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
