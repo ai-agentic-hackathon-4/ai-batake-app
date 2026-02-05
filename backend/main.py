@@ -356,7 +356,7 @@ async def get_latest_plant_image():
 
 # --- feature/#5 Endpoints (Async Firestore Jobs) ---
 
-async def process_seed_guide(job_id: str, image_bytes: bytes):
+async def process_seed_guide(job_id: str, image_source: str):
     """Background task to process seed guide generation (Feature #5)."""
     # Set session ID for background task tracing
     task_session_id = f"job-{job_id[:8]}"
@@ -375,11 +375,62 @@ async def process_seed_guide(job_id: str, image_bytes: bytes):
         debug(f"[Job {job_id}] Progress: {msg}")
         await doc_ref.update({"message": msg})
 
+    # Download image if source is a path/URL
+    image_bytes = None
+    try:
+        if isinstance(image_source, str) and image_source.startswith("gs://"):
+            # Download from GCS
+            bucket_name = "ai-agentic-hackathon-4-bk"
+            blob_name = image_source.replace(f"gs://{bucket_name}/", "")
+            
+            debug(f"Downloading input image from GCS: {blob_name}")
+            storage_client = storage.Client()
+            bucket = storage_client.bucket(bucket_name)
+            blob = bucket.blob(blob_name)
+            image_bytes = blob.download_as_bytes()
+        elif isinstance(image_source, bytes):
+             image_bytes = image_source
+        else:
+             # Fallback: assume it is a blob name if string
+             bucket_name = "ai-agentic-hackathon-4-bk"
+             debug(f"Downloading input image from GCS (blob): {image_source}")
+             storage_client = storage.Client()
+             bucket = storage_client.bucket(bucket_name)
+             blob = bucket.blob(image_source)
+             image_bytes = blob.download_as_bytes()
+             
+    except Exception as e:
+        error(f"Failed to download input image: {e}")
+        await doc_ref.update({"status": "FAILED", "message": "Failed to retrieve input image"})
+        return
+
     try:
         # Check if analyze_seed_and_generate_guide is available
         if 'analyze_seed_and_generate_guide' in globals():
             debug(f"Calling analyze_seed_and_generate_guide for job {job_id}")
             steps = await analyze_seed_and_generate_guide(image_bytes, progress_callback)
+            
+            # Post-process steps: Upload generated images to GCS
+            info(f"Uploading {len(steps)} generated images to GCS...")
+            storage_client = storage.Client()
+            bucket = storage_client.bucket("ai-agentic-hackathon-4-bk")
+            
+            for i, step in enumerate(steps):
+                if step.get("image_base64"):
+                    try:
+                        b64_data = step["image_base64"]
+                        img_data = base64.b64decode(b64_data)
+                        timestamp = int(time.time())
+                        blob_name = f"seed-guides/output/{job_id}_{timestamp}_{i}.jpg"
+                        blob = bucket.blob(blob_name)
+                        blob.upload_from_string(img_data, content_type="image/jpeg")
+                        
+                        # Replace base64 with URL
+                        step["image_url"] = f"https://storage.googleapis.com/ai-agentic-hackathon-4-bk/{blob_name}"
+                        del step["image_base64"]
+                    except Exception as img_e:
+                        warning(f"Failed to upload output image {i}: {img_e}")
+
             info(f"Seed guide job {job_id} completed with {len(steps)} steps")
             await doc_ref.update({
                 "status": "COMPLETED",
@@ -403,21 +454,44 @@ async def process_seed_guide(job_id: str, image_bytes: bytes):
 async def create_seed_guide_job(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """Starts an async job using feature/#5 architecture."""
     try:
-        content = await file.read()
+        # Upload to GCS (streaming)
         job_id = str(uuid.uuid4())
+        info(f"Creating seed guide job: {job_id}, file: {file.filename}")
         
-        info(f"Creating seed guide job: {job_id}, file: {file.filename}, size: {len(content)} bytes")
-        
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        try:
+            storage_client = storage.Client()
+            bucket = storage_client.bucket(bucket_name)
+            
+            timestamp = int(time.time())
+            safe_filename = file.filename.replace(" ", "_").replace("/", "_")
+            blob_name = f"seed-guides/input/{timestamp}_{safe_filename}"
+            blob = bucket.blob(blob_name)
+            
+            info(f"Uploading input image to GCS: {blob_name}")
+            blob.upload_from_file(file.file, content_type=file.content_type)
+            
+            image_url = f"https://storage.googleapis.com/{bucket_name}/{blob_name}"
+            # Pass gs:// URI or just blob name for internal use? let's pass blob_name
+            
+        except Exception as e:
+            error(f"Failed to upload input to GCS: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to upload image: {e}")
+
         doc_ref = db.collection(COLLECTION_NAME).document(job_id)
         await doc_ref.set({
             "job_id": job_id,
             "status": "PENDING",
             "message": "Job created, waiting for worker...",
+            "input_image_url": image_url,
             "result": None,
             "created_at": firestore.SERVER_TIMESTAMP
         })
         
-        background_tasks.add_task(process_seed_guide, job_id, content)
+        # Pass blob_name (str) instead of content (bytes)
+        # We prepend gs://... to be explicit or just pass blob_name
+        # process_seed_guide handles implicit blob name from hackathon bucket
+        background_tasks.add_task(process_seed_guide, job_id, blob_name)
         debug(f"Background task queued for job {job_id}")
         
         return {"job_id": job_id}
