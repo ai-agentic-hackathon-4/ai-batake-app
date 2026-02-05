@@ -42,7 +42,7 @@ export function GrowthStageCard() {
     useEffect(() => {
         const fetchGrowthStage = async () => {
             try {
-                const response = await fetch("http://localhost:8081/api/agent-logs")
+                const response = await fetch("/api/agent-logs")
                 const data: AgentLogsResponse = await response.json()
 
                 // Get the most recent log with growth_stage
@@ -59,7 +59,7 @@ export function GrowthStageCard() {
 
         const fetchDaysSincePlanting = async () => {
             try {
-                const response = await fetch("http://localhost:8081/api/agent-logs/oldest")
+                const response = await fetch("/api/agent-logs/oldest")
                 const data: { timestamp: string | null } = await response.json()
 
                 if (data.timestamp) {

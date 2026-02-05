@@ -184,15 +184,12 @@ async def get_oldest_agent_log_endpoint():
     """Get the oldest agent log to calculate days since planting"""
     try:
         debug("Fetching oldest agent execution log")
-        from google.cloud import firestore as fs
-        
         collection_name = "agent_execution_logs"
-        # Get the oldest log by ordering timestamp ascending and limiting to 1
-        docs = list(fs.Client(project=project_id, database="ai-agentic-hackathon-4-db")
-                   .collection(collection_name)
-                   .order_by("timestamp", direction=fs.Query.ASCENDING)
-                   .limit(1)
-                   .stream())
+        
+        # Using the global async db client
+        from google.cloud import firestore as fs
+        query = db.collection(collection_name).order_by("timestamp", direction=fs.Query.ASCENDING).limit(1)
+        docs = await query.get()
         
         if docs:
             oldest_log = docs[0].to_dict()
@@ -204,6 +201,7 @@ async def get_oldest_agent_log_endpoint():
     except Exception as e:
         error(f"Failed to fetch oldest agent log: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/agent-logs")
 async def get_agent_logs_endpoint():
