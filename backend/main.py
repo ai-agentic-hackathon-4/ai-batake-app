@@ -59,6 +59,14 @@ except ImportError:
         warning(f"Failed to import seed_service: {e}")
         pass
 
+try:
+    from character_service import analyze_seed_and_generate_character
+except ImportError:
+    try:
+        from .character_service import analyze_seed_and_generate_character
+    except ImportError:
+        pass
+
 app = FastAPI()
 
 
@@ -418,6 +426,21 @@ async def get_seed_guide_job(job_id: str):
             raise HTTPException(status_code=404, detail="Job not found")
         
         job_data = doc.to_dict()
+        
+        def make_serializable(obj):
+            if isinstance(obj, dict):
+                return {k: make_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_serializable(v) for v in obj]
+            elif hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            elif isinstance(obj, (str, int, float, bool, type(None))):
+                return obj
+            else:
+                return str(obj)
+
+        job_data = make_serializable(job_data)
+        
         debug(f"Job {job_id} status: {job_data.get('status')}")
         return job_data
     except HTTPException:
@@ -425,6 +448,72 @@ async def get_seed_guide_job(job_id: str):
     except Exception as e:
         error(f"Failed to fetch job {job_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+# --- Character Generation Endpoints ---
+
+async def process_character_generation(job_id: str, image_bytes: bytes):
+    """Background task to process character generation."""
+    task_session_id = f"char-{job_id[:8]}"
+    set_session_id(task_session_id)
+    set_request_id(generate_request_id())
+    
+    info(f"Starting character generation job: {job_id}")
+    doc_ref = db.collection(COLLECTION_NAME).document(job_id)
+    
+    await doc_ref.update({
+        "status": "PROCESSING",
+        "message": "Generating character..."
+    })
+    
+    try:
+        # Check if analyze_seed_and_generate_character is available
+        if 'analyze_seed_and_generate_character' in globals():
+            debug(f"Calling analyze_seed_and_generate_character for job {job_id}")
+            result = await analyze_seed_and_generate_character(image_bytes)
+            
+            await doc_ref.update({
+                "status": "COMPLETED",
+                "result": result,
+                "message": "Character generated!"
+            })
+        else:
+            warning(f"analyze_seed_and_generate_character not available for job {job_id}")
+            await doc_ref.update({
+                "status": "FAILED",
+                "message": "Analysis service not available"
+            })
+    except Exception as e:
+        error(f"Character generation job {job_id} failed: {str(e)}", exc_info=True)
+        await doc_ref.update({
+            "status": "FAILED",
+            "message": str(e)
+        })
+
+@app.post("/api/seed-guide/character")
+async def create_character_job(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """Starts an async job for character generation."""
+    try:
+        content = await file.read()
+        job_id = str(uuid.uuid4())
+        
+        info(f"Creating character generation job: {job_id}, file: {file.filename}")
+        
+        doc_ref = db.collection(COLLECTION_NAME).document(job_id)
+        await doc_ref.set({
+            "job_id": job_id,
+            "status": "PENDING",
+            "message": "Job created...",
+            "result": None,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "type": "character" 
+        })
+        
+        background_tasks.add_task(process_character_generation, job_id, content)
+        
+        return {"job_id": job_id}
+    except Exception as e:
+        error(f"Failed to create character job: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to start job: {str(e)}")
 
 
 @app.on_event("startup")
