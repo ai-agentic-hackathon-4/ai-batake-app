@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks, Request
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
@@ -580,21 +581,15 @@ class DiaryGenerateRequest(BaseModel):
 
 @app.get("/api/diary/list")
 async def list_diaries(limit: int = 30, offset: int = 0):
-    """
-    Get list of all completed growing diaries.
-    
-    Args:
-        limit: Maximum number of diaries to return (default 30).
-        offset: Number of diaries to skip for pagination.
-    
-    Returns:
-        Dictionary with list of diaries.
-    """
     if get_all_diaries is None:
         raise HTTPException(status_code=503, detail="Diary service not available")
     
     try:
         diaries = get_all_diaries(limit=limit, offset=offset)
+        # Transform plant_image_url to proxy URL if it's a GCS path
+        for diary in diaries:
+            if diary.get("plant_image_url") and diary["plant_image_url"].startswith("gs://"):
+                diary["plant_image_url"] = f"/api/diary/image/{diary['date']}"
         return {"diaries": diaries}
     except Exception as e:
         logging.error(f"Error listing diaries: {e}")
@@ -603,15 +598,6 @@ async def list_diaries(limit: int = 30, offset: int = 0):
 
 @app.get("/api/diary/{date}")
 async def get_diary(date: str):
-    """
-    Get a specific diary by date.
-    
-    Args:
-        date: Date in ISO format (YYYY-MM-DD).
-    
-    Returns:
-        Diary data for the specified date.
-    """
     if get_diary_by_date is None:
         raise HTTPException(status_code=503, detail="Diary service not available")
     
@@ -621,11 +607,74 @@ async def get_diary(date: str):
         if diary is None:
             raise HTTPException(status_code=404, detail="Diary not found")
         
+        # Transform plant_image_url to proxy URL if it's a GCS path
+        if diary.get("plant_image_url") and diary["plant_image_url"].startswith("gs://"):
+            diary["plant_image_url"] = f"/api/diary/image/{diary['date']}"
+            
         return diary
     except HTTPException:
         raise
     except Exception as e:
         logging.error(f"Error fetching diary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ProgressWrapper:
+    def __init__(self):
+        self.queue = asyncio.Queue()
+    
+    async def callback(self, msg):
+        await self.queue.put(msg)
+    
+    async def __aiter__(self):
+        while True:
+            msg = await self.queue.get()
+            if msg == "__DONE__":
+                break
+            yield msg
+
+@app.get("/api/diary/image/{date}")
+async def get_diary_image(date: str):
+    """
+    Serve diary image from GCS via proxy.
+    """
+    if get_diary_by_date is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        diary = get_diary_by_date(date)
+        if not diary or not diary.get("plant_image_url") or not diary["plant_image_url"].startswith("gs://"):
+            raise HTTPException(status_code=404, detail="Image not found or not in GCS format")
+        
+        # Parse GCS path (gs://bucket/path/to/blob)
+        gcs_uri = diary["plant_image_url"]
+        path_without_scheme = gcs_uri[5:]
+        parts = path_without_scheme.split("/", 1)
+        if len(parts) < 2:
+            raise HTTPException(status_code=400, detail="Invalid GCS URI")
+        
+        bucket_name = parts[0]
+        blob_name = parts[1]
+        
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+        
+        if not blob.exists():
+            raise HTTPException(status_code=404, detail="Image blob not found in GCS")
+            
+        # Stream the blob content
+        # For simplicity in this hackathon environment, we can download and return Response
+        # but StreamingResponse is better for large files.
+        img_bytes = blob.download_as_bytes()
+        from fastapi import Response
+        return Response(content=img_bytes, media_type="image/png")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error serving diary image: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -687,13 +736,48 @@ async def generate_manual_diary_endpoint(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
         
-        background_tasks.add_task(process_daily_diary, request.date)
-        
-        return {
-            "status": "accepted",
-            "date": request.date,
-            "message": "Manual diary generation started"
-        }
+        async def event_generator():
+            # Initial kickoff message to ensure the stream starts
+            yield f"data: {json.dumps({'status': 'processing', 'message': '生成の準備ができました'})}\n\n"
+            
+            try:
+                pw = ProgressWrapper()
+                
+                async def run_work():
+                    try:
+                        await process_daily_diary(request.date, pw.callback)
+                    finally:
+                        await pw.callback("__DONE__")
+
+                work_task = asyncio.create_task(run_work())
+                
+                while True:
+                    try:
+                        # Wait for message or timeout for ping
+                        msg = await asyncio.wait_for(pw.queue.get(), timeout=10.0)
+                        if msg == "__DONE__":
+                            break
+                        yield f"data: {json.dumps({'status': 'processing', 'message': msg})}\n\n"
+                    except asyncio.TimeoutError:
+                        # Send a ping to keep connection alive
+                        yield f": ping\n\n"
+                
+                await work_task
+                yield f"data: {json.dumps({'status': 'completed', 'message': '完了しました'})}\n\n"
+            except Exception as e:
+                error(f"Streaming generation failed: {e}", exc_info=True)
+                yield f"data: {json.dumps({'status': 'failed', 'message': str(e)})}\n\n"
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # For Nginx/Proxy
+                "Transfer-Encoding": "chunked",
+            }
+        )
     except HTTPException:
         raise
     except Exception as e:
