@@ -87,11 +87,16 @@ export default function DiaryPage() {
         setGenerating(true);
         setGenerationMessage("準備中...");
         try {
-            const res = await fetch("/api/diary/generate-manual", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ date: selectedDate }),
+            const query = new URLSearchParams({ date: selectedDate }).toString();
+            // Use environment variable for API base URL
+            // Development: direct backend connection (bypasses Next.js proxy buffering)
+            // Production: empty string uses relative URLs (Next.js proxy or same container)
+            const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+            const res = await fetch(`${apiBaseUrl}/api/diary/generate-manual?${query}`, {
+                method: "GET",
             });
+
+            console.log("Fetch response received:", res.status, res.statusText);
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({ detail: res.statusText }));
@@ -99,8 +104,10 @@ export default function DiaryPage() {
             }
 
             // Handle streaming response
+            console.log("Starting stream reader...");
             const reader = res.body?.getReader();
             if (!reader) {
+                console.error("Stream reader is not available (res.body is null)");
                 setGenerating(false);
                 return;
             }
@@ -113,7 +120,9 @@ export default function DiaryPage() {
                 const { value, done: doneReading } = await reader.read();
                 done = doneReading;
                 if (value) {
-                    buffer += decoder.decode(value, { stream: true });
+                    const chunk = decoder.decode(value, { stream: true });
+                    console.log("Stream chunk received:", chunk);
+                    buffer += chunk;
 
                     const parts = buffer.split("\n\n");
                     buffer = parts.pop() || "";
@@ -130,6 +139,8 @@ export default function DiaryPage() {
                                     }
                                     if (data.message) {
                                         setGenerationMessage(data.message);
+                                        // Yield to the browser's event loop to allow React to render
+                                        await new Promise(resolve => setTimeout(resolve, 0));
                                     }
                                 } catch (e) {
                                     console.warn("Failed to parse SSE data:", e);

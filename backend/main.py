@@ -579,6 +579,93 @@ async def get_saved_guide(doc_id: str):
 class DiaryGenerateRequest(BaseModel):
     date: str  # ISO format date string (YYYY-MM-DD)
 
+class ProgressWrapper:
+    def __init__(self):
+        self.queue = asyncio.Queue()
+    
+    async def callback(self, msg):
+        await self.queue.put(msg)
+    
+    async def __aiter__(self):
+        while True:
+            msg = await self.queue.get()
+            if msg == "__DONE__":
+                break
+            yield msg
+
+@app.get("/api/diary/generate-manual")
+async def generate_manual_diary_endpoint(
+    date: str
+):
+    """
+    Trigger manual diary generation for a specific date and stream progress.
+    Now uses GET to avoid proxy buffering issues with POST responses.
+    """
+    if process_daily_diary is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        from datetime import date as date_module
+        
+        # Validate date format
+        try:
+            target_date = date_module.fromisoformat(date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        
+        async def event_generator():
+            # Initial padding to force proxy flush (some proxies buffer until 2KB or 4KB)
+            yield ":" + " " * 2048 + "\n\n"
+            
+            debug("SSE stream: Kickoff")
+            yield f"data: {json.dumps({'status': 'processing', 'message': '生成の準備ができました'})}\n\n"
+            
+            try:
+                pw = ProgressWrapper()
+                
+                async def run_work():
+                    try:
+                        await process_daily_diary(date, pw.callback)
+                    finally:
+                        await pw.callback("__DONE__")
+
+                work_task = asyncio.create_task(run_work())
+                
+                while True:
+                    try:
+                        # Wait for message or timeout for ping
+                        msg = await asyncio.wait_for(pw.queue.get(), timeout=10.0)
+                        if msg == "__DONE__":
+                            debug("SSE stream: Done signal received")
+                            break
+                        debug(f"SSE stream: Yielding message: {msg}")
+                        yield f"data: {json.dumps({'status': 'processing', 'message': msg})}\n\n"
+                    except asyncio.TimeoutError:
+                        debug("SSE stream: Yielding ping")
+                        yield f": ping\n\n"
+                
+                await work_task
+                yield f"data: {json.dumps({'status': 'completed', 'message': '完了しました'})}\n\n"
+            except Exception as e:
+                error(f"Streaming generation failed: {e}", exc_info=True)
+                yield f"data: {json.dumps({'status': 'failed', 'message': str(e)})}\n\n"
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # For Nginx/Proxy
+                "Transfer-Encoding": "chunked",
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error starting manual diary generation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/diary/list")
 async def list_diaries(limit: int = 30, offset: int = 0):
     if get_all_diaries is None:
@@ -618,21 +705,6 @@ async def get_diary(date: str):
         logging.error(f"Error fetching diary: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-class ProgressWrapper:
-    def __init__(self):
-        self.queue = asyncio.Queue()
-    
-    async def callback(self, msg):
-        await self.queue.put(msg)
-    
-    async def __aiter__(self):
-        while True:
-            msg = await self.queue.get()
-            if msg == "__DONE__":
-                break
-            yield msg
-
 @app.get("/api/diary/image/{date}")
 async def get_diary_image(date: str):
     """
@@ -665,8 +737,6 @@ async def get_diary_image(date: str):
             raise HTTPException(status_code=404, detail="Image blob not found in GCS")
             
         # Stream the blob content
-        # For simplicity in this hackathon environment, we can download and return Response
-        # but StreamingResponse is better for large files.
         img_bytes = blob.download_as_bytes()
         from fastapi import Response
         return Response(content=img_bytes, media_type="image/png")
@@ -682,23 +752,14 @@ async def get_diary_image(date: str):
 async def generate_daily_diary_endpoint(background_tasks: BackgroundTasks):
     """
     Trigger daily diary generation.
-    This endpoint is designed to be called by Cloud Scheduler at 23:50 JST.
-    Generates a diary for the previous day's data.
-    
-    Returns:
-        Status message with the target date.
     """
     if process_daily_diary is None:
         raise HTTPException(status_code=503, detail="Diary service not available")
     
     try:
         from datetime import datetime, timedelta
-        
-        # Generate for today (this runs at 23:50, so we capture all of today's data)
         target_date = (datetime.now() - timedelta(hours=1)).date()
-        
         background_tasks.add_task(process_daily_diary, target_date.isoformat())
-        
         return {
             "status": "accepted",
             "date": target_date.isoformat(),
@@ -706,82 +767,6 @@ async def generate_daily_diary_endpoint(background_tasks: BackgroundTasks):
         }
     except Exception as e:
         logging.error(f"Error starting diary generation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/diary/generate-manual")
-async def generate_manual_diary_endpoint(
-    background_tasks: BackgroundTasks,
-    request: DiaryGenerateRequest
-):
-    """
-    Manually trigger diary generation for a specific date.
-    Useful for testing or regenerating failed diaries.
-    
-    Args:
-        request: DiaryGenerateRequest with target date.
-    
-    Returns:
-        Status message with the target date.
-    """
-    if process_daily_diary is None:
-        raise HTTPException(status_code=503, detail="Diary service not available")
-    
-    try:
-        from datetime import date as date_module
-        
-        # Validate date format
-        try:
-            target_date = date_module.fromisoformat(request.date)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-        
-        async def event_generator():
-            # Initial kickoff message to ensure the stream starts
-            yield f"data: {json.dumps({'status': 'processing', 'message': '生成の準備ができました'})}\n\n"
-            
-            try:
-                pw = ProgressWrapper()
-                
-                async def run_work():
-                    try:
-                        await process_daily_diary(request.date, pw.callback)
-                    finally:
-                        await pw.callback("__DONE__")
-
-                work_task = asyncio.create_task(run_work())
-                
-                while True:
-                    try:
-                        # Wait for message or timeout for ping
-                        msg = await asyncio.wait_for(pw.queue.get(), timeout=10.0)
-                        if msg == "__DONE__":
-                            break
-                        yield f"data: {json.dumps({'status': 'processing', 'message': msg})}\n\n"
-                    except asyncio.TimeoutError:
-                        # Send a ping to keep connection alive
-                        yield f": ping\n\n"
-                
-                await work_task
-                yield f"data: {json.dumps({'status': 'completed', 'message': '完了しました'})}\n\n"
-            except Exception as e:
-                error(f"Streaming generation failed: {e}", exc_info=True)
-                yield f"data: {json.dumps({'status': 'failed', 'message': str(e)})}\n\n"
-
-        return StreamingResponse(
-            event_generator(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",  # For Nginx/Proxy
-                "Transfer-Encoding": "chunked",
-            }
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"Error starting manual diary generation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

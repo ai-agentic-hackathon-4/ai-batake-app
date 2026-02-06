@@ -55,11 +55,11 @@ export function DiaryGenerationLoading({ statusMessage }: LoadingProps) {
 
                 {/* Text and Progress */}
                 <div className="space-y-2 text-center w-full">
-                    <h3 className="text-lg font-semibold animate-pulse">
-                        日記を生成しています
+                    <h3 className="text-xl font-bold animate-pulse text-primary min-h-[1.75rem]">
+                        {statusMessage || "日記を生成しています"}
                     </h3>
-                    <p className="text-muted-foreground transition-all duration-300 min-h-[1.5rem]">
-                        {statusMessage || steps[step].text}
+                    <p className="text-sm text-muted-foreground transition-all duration-300">
+                        {statusMessage ? "しばらくお待ちください..." : steps[step].text}
                     </p>
 
                     {/* Progress Indicator */}
