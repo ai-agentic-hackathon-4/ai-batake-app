@@ -18,7 +18,10 @@ import google.auth
 import google.auth.transport.requests
 
 # Setup logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+try:
+    from .logger import info, debug, error, warning
+except ImportError:
+    from logger import info, debug, error, warning
 
 # Try importing db functions
 try:
@@ -48,18 +51,22 @@ def request_with_retry(method: str, url: str, **kwargs) -> requests.Response:
     
     for i in range(max_retries):
         try:
+            info(f"API Request attempt {i+1}/{max_retries}: {method} {url[:50]}...")
             response = requests.request(method, url, **kwargs)
+            info(f"API Response status: {response.status_code}")
+            
             if response.status_code == 429:
                 sleep_time = backoff_factor ** i
-                logging.warning(f"429 Too Many Requests. Retrying in {sleep_time}s...")
+                warning(f"429 Too Many Requests. Retrying in {sleep_time}s...")
                 time.sleep(sleep_time)
                 continue
             return response
         except requests.exceptions.RequestException as e:
-            logging.warning(f"Request failed: {e}. Retrying...")
+            warning(f"Request failed: {e}. Retrying...")
             time.sleep(backoff_factor ** i)
     
     # Final attempt
+    info("Final API Request attempt...")
     return requests.request(method, url, **kwargs)
 
 
@@ -363,7 +370,8 @@ def parse_diary_response(text: str) -> Dict[str, str]:
             "recommendations": parsed.get("recommendations", "")
         }
     except Exception as e:
-        logging.error(f"Failed to parse AI response: {e}")
+        error(f"Failed to parse AI response: {e}")
+        error(f"Raw text was: {text}")
         # Fallback: use text as summary
         return {
             "summary": text[:300] if text else "データを分析中です。",
@@ -391,14 +399,17 @@ def generate_diary_with_ai(
         Dictionary with AI-generated diary content.
     """
     # API Key Handling (Explicit as requested)
-    api_key = os.environ.get("GEMINI_API_KEY")
+    # Prioritize SEED_GUIDE_GEMINI_KEY for Vertex AI as requested
+    api_key = os.environ.get("SEED_GUIDE_GEMINI_KEY")
     if not api_key:
-        logging.error("No GEMINI_API_KEY found in environment variables")
-        return {
-            "summary": "AIサービスが利用できません (API Key Missing)。",
-            "observations": "データ収集は正常に完了しました。",
-            "recommendations": "手動で観察記録を追加してください。"
-        }
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            logging.error("No GEMINI_API_KEY or SEED_GUIDE_GEMINI_KEY found in environment variables")
+            return {
+                "summary": "AIサービスが利用できません (API Key Missing)。",
+                "observations": "データ収集は正常に完了しました。",
+                "recommendations": "手動で観察記録を追加してください。"
+            }
     
     headers = {"Content-Type": "application/json"}
     
@@ -406,10 +417,12 @@ def generate_diary_with_ai(
     prompt = build_diary_prompt(date_str, statistics, events, vegetable_info)
     
     # Gemini API call with explicit key parameter
+    # Using Vertex AI endpoint v1 with gemini-3-flash-preview as per user's specific example
     url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-3-flash-preview:generateContent?key={api_key}"
     
     payload = {
         "contents": [{
+            "role": "user",
             "parts": [{
                 "text": prompt
             }]
@@ -417,7 +430,8 @@ def generate_diary_with_ai(
         "generationConfig": {
             "temperature": 0.7,
             "topP": 0.9,
-            "maxOutputTokens": 1000
+            "maxOutputTokens": 4000,
+            "responseMimeType": "application/json"
         }
     }
     
@@ -425,7 +439,7 @@ def generate_diary_with_ai(
         response = request_with_retry("POST", url, headers=headers, json=payload, timeout=60)
         
         if response.status_code != 200:
-            logging.error(f"Gemini API error: {response.status_code} - {response.text}")
+            error(f"Gemini API error: {response.status_code} - {response.text}")
             return {
                 "summary": f"AI生成エラー (HTTP {response.status_code})",
                 "observations": "エラーが発生しました。",
@@ -438,7 +452,7 @@ def generate_diary_with_ai(
         return parse_diary_response(generated_text)
         
     except Exception as e:
-        logging.error(f"Error calling Gemini API: {e}")
+        error(f"Error calling Gemini API: {e}", exc_info=True)
         return {
             "summary": "AI生成中にエラーが発生しました。",
             "observations": "データ収集は正常に完了しました。",
@@ -456,12 +470,26 @@ def collect_daily_data(target_date: date) -> Dict[str, Any]:
     Returns:
         Dictionary containing all collected data.
     """
+    info(f"Collecting daily data - step 1: agent logs")
+    agent_logs = get_agent_logs_for_date(target_date)
+    
+    info(f"Collecting daily data - step 2: sensor data")
+    sensor_data = get_sensor_data_for_date(target_date)
+    
+    info(f"Collecting daily data - step 3: vegetable info")
+    vegetable = get_current_vegetable()
+    
+    info(f"Collecting daily data - step 4: plant image")
+    plant_image = get_plant_image_for_date(target_date)
+    
+    info("Collecting daily data - finished")
+    
     return {
         "date": target_date.isoformat(),
-        "agent_logs": get_agent_logs_for_date(target_date),
-        "sensor_data": get_sensor_data_for_date(target_date),
-        "vegetable": get_current_vegetable(),
-        "plant_image": get_plant_image_for_date(target_date)
+        "agent_logs": agent_logs,
+        "sensor_data": sensor_data,
+        "vegetable": vegetable,
+        "plant_image": plant_image
     }
 
 
@@ -487,9 +515,9 @@ def save_diary(diary_id: str, data: Dict):
     
     try:
         db.collection("growing_diaries").document(diary_id).set(data)
-        logging.info(f"Diary saved: {diary_id}")
+        info(f"Diary saved: {diary_id}")
     except Exception as e:
-        logging.error(f"Error saving diary: {e}")
+        error(f"Error saving diary: {e}")
 
 
 def mark_diary_failed(diary_id: str, error: str):
@@ -521,21 +549,27 @@ def process_daily_diary(target_date_str: str):
         target_date = date.fromisoformat(target_date_str)
         
         # Initialize status
-        logging.info(f"Starting diary generation for {target_date_str}...")
+        info(f"Starting diary generation for {target_date_str}...")
         init_diary_status(diary_id)
         
         # 1. Collect data
-        logging.info(f"Collecting data for {target_date_str}...")
+        info(f"Collecting data for {target_date_str}...")
         daily_data = collect_daily_data(target_date)
+        info("Data collection finished")
         
         # 2. Calculate statistics
+        info("Calculating statistics...")
         statistics = calculate_statistics(daily_data["sensor_data"])
+        info(f"Statistics calculated: {statistics}")
+
+        info("Extracting events...")
         events = extract_key_events(daily_data["agent_logs"])
+        info(f"Events extracted: {len(events)}")
         
-        logging.info(f"Collected {len(daily_data['sensor_data'])} sensor readings and {len(daily_data['agent_logs'])} agent logs")
+        info(f"Collected {len(daily_data['sensor_data'])} sensor readings and {len(daily_data['agent_logs'])} agent logs")
         
         # 3. Generate AI diary
-        logging.info(f"Generating diary with AI for {target_date_str}...")
+        info(f"Generating diary with AI for {target_date_str}...")
         ai_content = generate_diary_with_ai(
             target_date_str,
             statistics,
@@ -564,10 +598,10 @@ def process_daily_diary(target_date_str: str):
         
         save_diary(diary_id, diary_data)
         
-        logging.info(f"Diary generated successfully for {target_date_str} in {generation_time_ms}ms")
+        info(f"Diary generated successfully for {target_date_str} in {generation_time_ms}ms")
         
     except Exception as e:
-        logging.error(f"Failed to generate diary for {target_date_str}: {e}")
+        error(f"Failed to generate diary for {target_date_str}: {e}")
         mark_diary_failed(diary_id, str(e))
 
 
@@ -588,9 +622,9 @@ def get_all_diaries(limit: int = 30, offset: int = 0) -> List[Dict]:
     try:
         from google.cloud import firestore as fs
         
+        # Index workaround: Remove order_by, sort in memory
         query = db.collection("growing_diaries") \
             .where("generation_status", "==", "completed") \
-            .order_by("date", direction=fs.Query.DESCENDING) \
             .limit(limit)
         
         if offset > 0:
@@ -607,10 +641,13 @@ def get_all_diaries(limit: int = 30, offset: int = 0) -> List[Dict]:
                 diary['created_at'] = diary['created_at'].isoformat()
             diaries.append(diary)
         
+        # Sort by date descending (in memory)
+        diaries.sort(key=lambda x: x.get('date', ''), reverse=True)
+        
         return diaries
         
     except Exception as e:
-        logging.error(f"Error fetching diaries: {e}")
+        error(f"Error fetching diaries: {e}")
         return []
 
 
