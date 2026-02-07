@@ -595,11 +595,16 @@ class ProgressWrapper:
             yield msg
 
 @app.post("/api/diary/auto-generate")
-async def auto_generate_diary_endpoint():
+async def auto_generate_diary_endpoint(key: Optional[str] = None):
     """
     Endpoint for Cloud Scheduler to trigger automatic diary generation.
-    Generates diary for the current date.
+    Secured by a simple API key check.
     """
+    secret_key = os.environ.get("DIARY_API_KEY")
+    if secret_key and key != secret_key:
+        error(f"Unauthorized attempt to trigger auto-generation (key: {key})")
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
     try:
         current_date_str = datetime.now().date().isoformat()
         info(f"Auto-generating diary for today: {current_date_str}")

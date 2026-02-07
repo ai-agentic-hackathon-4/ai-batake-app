@@ -9,13 +9,9 @@ import {
     ThermometerSun,
     Droplets,
     CloudRain,
-    ChevronLeft,
-    ChevronRight,
     RefreshCw,
     BookOpen,
 } from "lucide-react";
-
-import { DiaryGenerationLoading } from "@/components/diary-generation-loading";
 
 interface DiaryStatistics {
     temperature: { min: number; max: number; avg: number };
