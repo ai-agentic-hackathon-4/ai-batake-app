@@ -88,11 +88,8 @@ export default function DiaryPage() {
         setGenerationMessage("準備中...");
         try {
             const query = new URLSearchParams({ date: selectedDate }).toString();
-            // Use environment variable for API base URL
-            // Development: direct backend connection (bypasses Next.js proxy buffering)
-            // Production: empty string uses relative URLs (Next.js proxy or same container)
-            const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-            const res = await fetch(`${apiBaseUrl}/api/diary/generate-manual?${query}`, {
+            // Use Next.js API Route proxy for streaming (no buffering)
+            const res = await fetch(`/api/diary/generate-manual?${query}`, {
                 method: "GET",
             });
 
