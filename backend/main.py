@@ -10,6 +10,7 @@ import time
 import base64
 import json
 import asyncio
+from datetime import datetime
 from google.cloud import storage
 from google.cloud import firestore
 from dotenv import load_dotenv
@@ -593,9 +594,33 @@ class ProgressWrapper:
                 break
             yield msg
 
-@app.get("/api/diary/generate-manual")
+@app.post("/api/diary/auto-generate")
+async def auto_generate_diary_endpoint():
+    """
+    Endpoint for Cloud Scheduler to trigger automatic diary generation.
+    Generates diary for the current date.
+    """
+    try:
+        current_date_str = datetime.now().date().isoformat()
+        info(f"Auto-generating diary for today: {current_date_str}")
+        
+        # Run background task to actually generate
+        # Note: We return success immediately to Scheduler
+        asyncio.create_task(process_daily_diary(current_date_str))
+        
+        return {
+            "status": "accepted",
+            "date": current_date_str,
+            "message": "Automatic diary generation started"
+        }
+    except Exception as e:
+        error(f"Failed to trigger auto-generation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/diary/generate-manual")
 async def generate_manual_diary_endpoint(
-    date: str
+    request: DiaryGenerateRequest
 ):
     """
     Trigger manual diary generation for a specific date and stream progress.

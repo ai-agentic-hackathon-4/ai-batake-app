@@ -49,10 +49,6 @@ export default function DiaryPage() {
     const [diaries, setDiaries] = useState<GrowingDiary[]>([]);
     const [selectedDiary, setSelectedDiary] = useState<GrowingDiary | null>(null);
     const [loading, setLoading] = useState(true);
-    const [generating, setGenerating] = useState(false);
-
-    const [generationMessage, setGenerationMessage] = useState("");
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
 
     useEffect(() => {
         fetchDiaries();
@@ -83,85 +79,6 @@ export default function DiaryPage() {
         }
     };
 
-    const handleGenerateDiary = async () => {
-        setGenerating(true);
-        setGenerationMessage("準備中...");
-        try {
-            const query = new URLSearchParams({ date: selectedDate }).toString();
-            // Use Next.js API Route proxy for streaming (no buffering)
-            const res = await fetch(`/api/diary/generate-manual?${query}`, {
-                method: "GET",
-            });
-
-            console.log("Fetch response received:", res.status, res.statusText);
-
-            if (!res.ok) {
-                const errorData = await res.json().catch(() => ({ detail: res.statusText }));
-                throw new Error(errorData.detail || `Server error: ${res.status}`);
-            }
-
-            // Handle streaming response
-            console.log("Starting stream reader...");
-            const reader = res.body?.getReader();
-            if (!reader) {
-                console.error("Stream reader is not available (res.body is null)");
-                setGenerating(false);
-                return;
-            }
-
-            const decoder = new TextDecoder();
-            let done = false;
-            let buffer = "";
-
-            while (!done) {
-                const { value, done: doneReading } = await reader.read();
-                done = doneReading;
-                if (value) {
-                    const chunk = decoder.decode(value, { stream: true });
-                    console.log("Stream chunk received:", chunk);
-                    buffer += chunk;
-
-                    const parts = buffer.split("\n\n");
-                    buffer = parts.pop() || "";
-
-                    for (const part of parts) {
-                        const lines = part.split("\n");
-                        for (const line of lines) {
-                            if (line.startsWith("data: ")) {
-                                try {
-                                    const data = JSON.parse(line.slice(6));
-                                    console.log("SSE data received:", data);
-                                    if (data.status === "failed") {
-                                        throw new Error(data.message || "日記の生成に失敗しました");
-                                    }
-                                    if (data.message) {
-                                        setGenerationMessage(data.message);
-                                        // Yield to the browser's event loop to allow React to render
-                                        await new Promise(resolve => setTimeout(resolve, 0));
-                                    }
-                                } catch (e) {
-                                    console.warn("Failed to parse SSE data:", e);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // After streaming finishes
-            setGenerating(false);
-            setGenerationMessage("");
-            // Refresh list
-            fetchDiaries();
-        } catch (error: any) {
-            console.error("Failed to generate diary:", error);
-            // Show error message on button or somewhere
-            setGenerationMessage(`エラー: ${error.message || "生成に失敗しました"}`);
-            // Let the message be visible for a moment before closing
-            setTimeout(() => setGenerating(false), 3000);
-        }
-    };
-
     const formatDate = (dateStr: string) => {
         const date = new Date(dateStr);
         return date.toLocaleDateString("ja-JP", {
@@ -187,7 +104,6 @@ export default function DiaryPage() {
 
     return (
         <div className="min-h-screen bg-background">
-            {generating && <DiaryGenerationLoading statusMessage={generationMessage} />}
             {/* Header */}
             <header className="border-b border-border bg-card">
                 <div className="max-w-7xl mx-auto px-6 py-4">
@@ -201,29 +117,9 @@ export default function DiaryPage() {
                                     育成日記
                                 </h1>
                                 <p className="text-sm text-muted-foreground">
-                                    AI自動生成の栽培記録
+                                    AI自動生成の栽培記録 (毎日18:00更新)
                                 </p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <input
-                                type="date"
-                                value={selectedDate}
-                                onChange={(e) => setSelectedDate(e.target.value)}
-                                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            />
-                            <button
-                                onClick={handleGenerateDiary}
-                                disabled={generating}
-                                className="inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 gap-2"
-                            >
-                                {generating ? (
-                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <Sprout className="w-4 h-4" />
-                                )}
-                                指定日の日記を生成
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -239,7 +135,7 @@ export default function DiaryPage() {
                         <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
                         <h2 className="text-xl font-semibold mb-2">日記がありません</h2>
                         <p className="text-muted-foreground mb-6">
-                            「今日の日記を生成」ボタンをクリックして最初の日記を作成しましょう。
+                            毎日の成長記録は18:00に自動生成されます。
                         </p>
                     </div>
                 ) : (

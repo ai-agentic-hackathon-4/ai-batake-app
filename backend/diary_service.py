@@ -102,11 +102,14 @@ async def get_sensor_data_for_date_async(target_date: date) -> List[Dict]:
         return []
     
     try:
+        # Calculate hours back to the start of the target date
         now = datetime.now()
-        date_diff = now.date() - target_date
-        hours_back = date_diff.days * 24 + 24
+        start_of_day = datetime.combine(target_date, datetime.min.time())
+        hours_back_to_start = int((now - start_of_day).total_seconds() / 3600) + 1
         
-        all_data = await asyncio.to_thread(get_sensor_history, hours=hours_back + 24)
+        # Buffer to ensure we get everything
+        info(f"Fetching sensor history for {target_date} (hours back: {hours_back_to_start})")
+        all_data = await asyncio.to_thread(get_sensor_history, hours=max(hours_back_to_start, 24))
         
         filtered_data = []
         for reading in all_data:
@@ -116,6 +119,7 @@ async def get_sensor_data_for_date_async(target_date: date) -> List[Dict]:
                 if reading_date == target_date:
                     filtered_data.append(reading)
         
+        info(f"Retrieved {len(filtered_data)} sensor records for {target_date}")
         return filtered_data
     except Exception as e:
         logging.error(f"Error fetching sensor data for date: {e}")
