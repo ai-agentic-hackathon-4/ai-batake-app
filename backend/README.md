@@ -11,6 +11,7 @@ FastAPIで構築されたAI Batake Appのバックエンドサーバーです。
 - **種袋解析**: Gemini APIを使用した種袋画像の解析
 - **Deep Research**: AIによる詳細な栽培条件の調査
 - **栽培ガイド生成**: 非同期ジョブによるステップバイステップガイドの生成
+- **アクティブ野菜設定**: エッジエージェント設定（`configurations/edge_agent`）に基づく日記生成（過去の野菜を選択した場合でもその野菜名を優先）
 
 ## 🛠️ 技術スタック
 
@@ -266,6 +267,7 @@ pytest --cov=. --cov-report=html
 | test_diary_service.py | 10+ | 日記サービステスト |
 | test_async_flow.py | 3 | 非同期フローテスト |
 | test_select_feature.py | 5 | 野菜選択機能テスト |
+| test_vegetable_config.py | 4 | 野菜設定・日記生成優先順位テスト |
 | test_logger.py | 5 | ロガーテスト |
 | test_utils.py | 4 | ユーティリティテスト |
 
