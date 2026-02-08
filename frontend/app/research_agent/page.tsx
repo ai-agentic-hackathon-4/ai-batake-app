@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Search, Plus, CloudUpload, Leaf, Clock, ArrowRight, ExternalLink, ArrowLeft, X, FlaskConical } from "lucide-react"
-import Link from "next/link"
-    ;
+import { Search, Plus, CloudUpload, Leaf, Clock, ArrowRight, ExternalLink, ArrowLeft, X, FlaskConical } from "lucide-react";
+import Link from "next/link";
 
 interface Vegetable {
     id: string;
