@@ -74,6 +74,70 @@ class TestRequestWithRetry:
         
         assert response.status_code == 200
         assert mock_request.call_count == 2
+    
+    @patch('research_agent.requests.request')
+    @patch('research_agent.time.sleep')
+    def test_request_with_retry_retries_on_5xx(self, mock_sleep, mock_request):
+        """Test retry behavior on 500/503 errors"""
+        mock_fail_response_500 = Mock()
+        mock_fail_response_500.status_code = 500
+        
+        mock_fail_response_503 = Mock()
+        mock_fail_response_503.status_code = 503
+        
+        mock_success_response = Mock()
+        mock_success_response.status_code = 200
+        
+        mock_request.side_effect = [mock_fail_response_500, mock_fail_response_503, mock_success_response]
+        
+        from research_agent import request_with_retry
+        
+        response = request_with_retry("GET", "https://example.com/api")
+        
+        assert response.status_code == 200
+        assert mock_request.call_count == 3
+        # Should sleep twice
+        assert mock_sleep.call_count == 2
+
+    @patch('research_agent.requests.request')
+    @patch('research_agent.time.sleep')
+    def test_request_with_retry_max_retries_exceeded(self, mock_sleep, mock_request):
+        """Test max retries exceeded behavior"""
+        mock_fail_response = Mock()
+        mock_fail_response.status_code = 500
+        
+        mock_request.return_value = mock_fail_response
+        
+        from research_agent import request_with_retry
+        
+        response = request_with_retry("GET", "https://example.com/api")
+        
+        assert response.status_code == 500
+        # 5 retries in loop (0..4)
+        # i=0 (call 1) -> sleep 1
+        # i=1 (call 2) -> sleep 2
+        # i=2 (call 3) -> sleep 3
+        # i=3 (call 4) -> sleep 4
+        # i=4 (call 5) -> no sleep, return response
+        
+        assert mock_request.call_count == 5 
+        assert mock_sleep.call_count == 4
+
+    @patch('research_agent.requests.request')
+    @patch('research_agent.time.sleep')
+    def test_request_with_retry_no_retry_on_400(self, mock_sleep, mock_request):
+        """Test no retry on 400 error"""
+        mock_response = Mock()
+        mock_response.status_code = 400
+        mock_request.return_value = mock_response
+        
+        from research_agent import request_with_retry
+        
+        response = request_with_retry("GET", "https://example.com/api")
+        
+        assert response.status_code == 400
+        assert mock_request.call_count == 1
+        assert mock_sleep.call_count == 0
 
 
 class TestAnalyzeSeedPacket:
