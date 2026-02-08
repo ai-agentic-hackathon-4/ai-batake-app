@@ -17,10 +17,10 @@ except ImportError:
     from logger import info, debug, error, warning
 
 try:
-    from .db import db, get_agent_execution_logs, get_sensor_history, get_latest_vegetable
+    from .db import db, get_agent_execution_logs, get_sensor_history, get_latest_vegetable, get_edge_agent_config
     from .image_service import generate_picture_diary
 except ImportError:
-    from db import db, get_agent_execution_logs, get_sensor_history, get_latest_vegetable
+    from db import db, get_agent_execution_logs, get_sensor_history, get_latest_vegetable, get_edge_agent_config
     from image_service import generate_picture_diary
 
 
@@ -129,6 +129,17 @@ async def get_sensor_data_for_date_async(target_date: date) -> List[Dict]:
 async def get_current_vegetable_async() -> Optional[Dict]:
     """Get information about the currently growing vegetable (async)."""
     try:
+        # First try to get from edge agent config (active vegetable)
+        config = await asyncio.to_thread(get_edge_agent_config)
+        if config and config.get("vegetable_name"):
+            # Return a dict that mimics the vegetable object, at least with the name
+            # We might miss the ID if we don't look it up, but for the diary prompt, name is key.
+            return {
+                "name": config.get("vegetable_name"),
+                "id": None, # ID is unknown without lookup, but acceptable for diary content
+                "status": "active_in_config"
+            }
+
         return await asyncio.to_thread(get_latest_vegetable)
     except Exception as e:
         logging.error(f"Error fetching current vegetable: {e}")

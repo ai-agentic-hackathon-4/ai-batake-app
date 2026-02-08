@@ -171,6 +171,7 @@ def update_edge_agent_config(research_data: dict):
         doc_ref = db.collection("configurations").document("edge_agent")
         doc_ref.set({
             "instruction": support_prompt,
+            "vegetable_name": research_data.get("name", "Unknown Plant"),
             "updated_at": datetime.now()
         }, merge=True)
         info(f"Updated edge_agent configuration with new research data for: {research_data.get('name', 'Unknown')}")
@@ -425,3 +426,21 @@ if __name__ == "__main__":
 
     else:
         print("Firestore client is not initialized.")
+
+def get_edge_agent_config() -> dict:
+    """
+    Retrieves the current edge agent configuration from Firestore.
+    """
+    if db is None:
+        warning("Firestore is not available.")
+        return {}
+
+    try:
+        doc_ref = db.collection("configurations").document("edge_agent")
+        doc = doc_ref.get()
+        if doc.exists:
+            return doc.to_dict()
+        return {}
+    except Exception as e:
+        error(f"Error fetching edge agent config: {e}", exc_info=True)
+        return {}
