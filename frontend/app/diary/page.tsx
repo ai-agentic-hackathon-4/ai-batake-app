@@ -9,8 +9,6 @@ import {
     ThermometerSun,
     Droplets,
     CloudRain,
-    ChevronLeft,
-    ChevronRight,
     RefreshCw,
     BookOpen,
 } from "lucide-react";
@@ -47,7 +45,6 @@ export default function DiaryPage() {
     const [diaries, setDiaries] = useState<GrowingDiary[]>([]);
     const [selectedDiary, setSelectedDiary] = useState<GrowingDiary | null>(null);
     const [loading, setLoading] = useState(true);
-    const [generating, setGenerating] = useState(false);
 
     useEffect(() => {
         fetchDiaries();
@@ -59,41 +56,22 @@ export default function DiaryPage() {
             const res = await fetch("/api/diary/list?limit=30");
             if (res.ok) {
                 const data = await res.json();
-                setDiaries(data.diaries || []);
-                // Auto-select the first diary
-                if (data.diaries && data.diaries.length > 0 && !selectedDiary) {
-                    setSelectedDiary(data.diaries[0]);
+                const fetchedDiaries = data.diaries || [];
+                setDiaries(fetchedDiaries);
+
+                // If there's a selected diary, update it with fresh data from the list
+                if (selectedDiary) {
+                    const fresh = fetchedDiaries.find((d: any) => d.id === selectedDiary.id || d.date === selectedDiary.date);
+                    if (fresh) setSelectedDiary(fresh);
+                } else if (fetchedDiaries.length > 0) {
+                    // Auto-select the first diary if none selected
+                    setSelectedDiary(fetchedDiaries[0]);
                 }
             }
         } catch (error) {
             console.error("Failed to fetch diaries:", error);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleGenerateToday = async () => {
-        setGenerating(true);
-        try {
-            const today = new Date().toISOString().split("T")[0];
-            const res = await fetch("/api/diary/generate-manual", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ date: today }),
-            });
-
-            if (res.ok) {
-                alert("日記の生成を開始しました。数秒後に更新してください。");
-                // Wait and refresh
-                setTimeout(fetchDiaries, 5000);
-            } else {
-                alert("日記の生成に失敗しました。");
-            }
-        } catch (error) {
-            console.error("Failed to generate diary:", error);
-            alert("エラーが発生しました。");
-        } finally {
-            setGenerating(false);
         }
     };
 
@@ -135,22 +113,10 @@ export default function DiaryPage() {
                                     育成日記
                                 </h1>
                                 <p className="text-sm text-muted-foreground">
-                                    AI自動生成の栽培記録
+                                    AI自動生成の栽培記録 (毎日18:00更新)
                                 </p>
                             </div>
                         </div>
-                        <button
-                            onClick={handleGenerateToday}
-                            disabled={generating}
-                            className="inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 gap-2"
-                        >
-                            {generating ? (
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <Sprout className="w-4 h-4" />
-                            )}
-                            今日の日記を生成
-                        </button>
                     </div>
                 </div>
             </header>
@@ -165,7 +131,7 @@ export default function DiaryPage() {
                         <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
                         <h2 className="text-xl font-semibold mb-2">日記がありません</h2>
                         <p className="text-muted-foreground mb-6">
-                            「今日の日記を生成」ボタンをクリックして最初の日記を作成しましょう。
+                            毎日の成長記録は18:00に自動生成されます。
                         </p>
                     </div>
                 ) : (
@@ -181,25 +147,38 @@ export default function DiaryPage() {
                                     <div
                                         key={diary.id}
                                         onClick={() => setSelectedDiary(diary)}
-                                        className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
-                                            selectedDiary?.id === diary.id
-                                                ? "border-primary bg-primary/5"
-                                                : "border-border bg-card hover:border-primary/50"
-                                        }`}
+                                        className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${selectedDiary?.id === diary.id
+                                            ? "border-primary bg-primary/5"
+                                            : "border-border bg-card hover:border-primary/50"
+                                            }`}
                                     >
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className="font-medium">
-                                                {formatDate(diary.date)}
-                                            </span>
-                                            {diary.vegetable_name && (
-                                                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                                                    {diary.vegetable_name}
-                                                </span>
+                                        <div className="flex gap-4">
+                                            {diary.plant_image_url && (
+                                                <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0 border border-border bg-muted/20">
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img
+                                                        src={diary.plant_image_url}
+                                                        alt="Thumbnail"
+                                                        className="object-cover w-full h-full"
+                                                    />
+                                                </div>
                                             )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <span className="font-medium">
+                                                        {formatDate(diary.date)}
+                                                    </span>
+                                                    {diary.vegetable_name && (
+                                                        <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                                                            {diary.vegetable_name}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm text-muted-foreground line-clamp-2">
+                                                    {diary.ai_summary}
+                                                </p>
+                                            </div>
                                         </div>
-                                        <p className="text-sm text-muted-foreground line-clamp-2">
-                                            {diary.ai_summary}
-                                        </p>
                                     </div>
                                 ))}
                             </div>
@@ -267,6 +246,26 @@ export default function DiaryPage() {
                                         </div>
                                     </div>
 
+                                    {/* Picture Diary Image */}
+                                    {selectedDiary.plant_image_url && (
+                                        <div className="rounded-lg border border-border bg-card overflow-hidden">
+                                            <div className="relative aspect-square md:aspect-video w-full bg-muted/20">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                    src={selectedDiary.plant_image_url}
+                                                    alt="Picture Diary"
+                                                    className="object-contain w-full h-full"
+                                                />
+                                            </div>
+                                            <div className="p-4 border-t border-border">
+                                                <h3 className="text-base font-semibold flex items-center gap-2">
+                                                    <BookOpen className="w-4 h-4 text-pink-500" />
+                                                    今日の絵日記 (Powered by NanoBanana-pro)
+                                                </h3>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* AI Summary */}
                                     <div className="rounded-lg border border-border bg-card p-6">
                                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -332,12 +331,12 @@ export default function DiaryPage() {
                                                         <span className="text-xs text-muted-foreground">
                                                             {event.time
                                                                 ? new Date(event.time).toLocaleTimeString(
-                                                                      "ja-JP",
-                                                                      {
-                                                                          hour: "2-digit",
-                                                                          minute: "2-digit",
-                                                                      }
-                                                                  )
+                                                                    "ja-JP",
+                                                                    {
+                                                                        hour: "2-digit",
+                                                                        minute: "2-digit",
+                                                                    }
+                                                                )
                                                                 : ""}
                                                         </span>
                                                     </div>
