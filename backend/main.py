@@ -363,6 +363,24 @@ async def get_latest_plant_image():
         error(f"Error serving plant image: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+def _download_from_gcs_sync(bucket_name, blob_name):
+    """Sync helper to download bytes from GCS."""
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+    return blob.download_as_bytes()
+
+def _upload_to_gcs_sync(bucket_name, blob_name, content, content_type):
+    """Sync helper to upload bytes/string to GCS."""
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+    if isinstance(content, str):
+        blob.upload_from_string(content, content_type=content_type)
+    else:
+        blob.upload_from_string(content, content_type=content_type)
+    return f"https://storage.googleapis.com/{bucket_name}/{blob_name}"
+
 # --- feature/#5 Endpoints (Async Firestore Jobs) ---
 
 async def process_seed_guide(job_id: str, image_source: str):
@@ -387,26 +405,20 @@ async def process_seed_guide(job_id: str, image_source: str):
     # Download image if source is a path/URL
     image_bytes = None
     try:
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        blob_name = None
+        
         if isinstance(image_source, str) and image_source.startswith("gs://"):
-            # Download from GCS
-            bucket_name = "ai-agentic-hackathon-4-bk"
             blob_name = image_source.replace(f"gs://{bucket_name}/", "")
-            
-            debug(f"Downloading input image from GCS: {blob_name}")
-            storage_client = storage.Client()
-            bucket = storage_client.bucket(bucket_name)
-            blob = bucket.blob(blob_name)
-            image_bytes = blob.download_as_bytes()
         elif isinstance(image_source, bytes):
-             image_bytes = image_source
+            image_bytes = image_source
         else:
-             # Fallback: assume it is a blob name if string
-             bucket_name = "ai-agentic-hackathon-4-bk"
-             debug(f"Downloading input image from GCS (blob): {image_source}")
-             storage_client = storage.Client()
-             bucket = storage_client.bucket(bucket_name)
-             blob = bucket.blob(image_source)
-             image_bytes = blob.download_as_bytes()
+            # Fallback: assume it is a blob name if string
+            blob_name = image_source
+            
+        if blob_name:
+            debug(f"Downloading input image from GCS: {blob_name}")
+            image_bytes = await asyncio.to_thread(_download_from_gcs_sync, bucket_name, blob_name)
              
     except Exception as e:
         error(f"Failed to download input image: {e}")
@@ -417,12 +429,12 @@ async def process_seed_guide(job_id: str, image_source: str):
         # Check if analyze_seed_and_generate_guide is available
         if 'analyze_seed_and_generate_guide' in globals():
             debug(f"Calling analyze_seed_and_generate_guide for job {job_id}")
-            steps = await analyze_seed_and_generate_guide(image_bytes, progress_callback)
+            
+            # Unpack the new return values (title, description, steps)
+            guide_title, guide_description, steps = await analyze_seed_and_generate_guide(image_bytes, progress_callback)
             
             # Post-process steps: Upload generated images to GCS
             info(f"Uploading {len(steps)} generated images to GCS...")
-            storage_client = storage.Client()
-            bucket = storage_client.bucket("ai-agentic-hackathon-4-bk")
             
             for i, step in enumerate(steps):
                 if step.get("image_base64"):
@@ -431,21 +443,38 @@ async def process_seed_guide(job_id: str, image_source: str):
                         img_data = base64.b64decode(b64_data)
                         timestamp = int(time.time())
                         blob_name = f"seed-guides/output/{job_id}_{timestamp}_{i}.jpg"
-                        blob = bucket.blob(blob_name)
-                        blob.upload_from_string(img_data, content_type="image/jpeg")
+                        
+                        image_url = await asyncio.to_thread(
+                            _upload_to_gcs_sync, 
+                            "ai-agentic-hackathon-4-bk", 
+                            blob_name, 
+                            img_data, 
+                            "image/jpeg"
+                        )
                         
                         # Replace base64 with URL
-                        step["image_url"] = f"https://storage.googleapis.com/ai-agentic-hackathon-4-bk/{blob_name}"
+                        step["image_url"] = image_url
                         del step["image_base64"]
                     except Exception as img_e:
                         warning(f"Failed to upload output image {i}: {img_e}")
             info(f"Seed guide job {job_id} completed with {len(steps)} steps")
+            
             # Update to COMPLETED with result using DB function or manual update
-            await doc_ref.update({
+            update_data = {
                 "status": "COMPLETED",
                 "result": steps,
+                "steps": steps, 
                 "message": "Complete!"
-            })
+            }
+            
+            # Only update title/description if they are valid
+            if guide_title and guide_title != "Seed Guide":
+                update_data["title"] = guide_title
+            
+            if guide_description:
+                 update_data["description"] = guide_description
+                 
+            await doc_ref.update(update_data)
         else:
             warning(f"analyze_seed_and_generate_guide not available for job {job_id}")
             await doc_ref.update({
@@ -469,20 +498,22 @@ async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: 
         
         bucket_name = "ai-agentic-hackathon-4-bk"
         try:
-            storage_client = storage.Client()
-            bucket = storage_client.bucket(bucket_name)
-            
             timestamp = int(time.time())
             safe_filename = file.filename.replace(" ", "_").replace("/", "_")
             blob_name = f"seed-guides/input/{timestamp}_{safe_filename}"
-            blob = bucket.blob(blob_name)
             
             info(f"Uploading input image to GCS: {blob_name}")
-            blob.upload_from_file(file.file, content_type=file.content_type)
+            content = await file.read()
             
-            image_url = f"https://storage.googleapis.com/{bucket_name}/{blob_name}"
+            # Use sync helper in thread
+            image_url = await asyncio.to_thread(
+                _upload_to_gcs_sync,
+                bucket_name,
+                blob_name,
+                content,
+                file.content_type
+            )
 
-            
         except Exception as e:
             error(f"Failed to upload input to GCS: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to upload image: {e}")
@@ -561,14 +592,55 @@ async def list_saved_guides():
         error(f"Failed to list guides: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to list guides: {str(e)}")
 
+def _hydrate_image_for_frontend(url: str):
+    """Downloads image from GCS URL and returns base64 string (Sync)."""
+    try:
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        if url.startswith("https://storage.googleapis.com/"):
+            # Extract relative path from URL
+            # Format: https://storage.googleapis.com/BUCKET_NAME/BLOB_NAME
+            # Or: https://storage.googleapis.com/ai-agentic-hackathon-4-bk/seed-guides/output/...
+            prefix = f"https://storage.googleapis.com/{bucket_name}/"
+            if url.startswith(prefix):
+                 blob_name = url[len(prefix):]
+                 storage_client = storage.Client()
+                 bucket = storage_client.bucket(bucket_name)
+                 blob = bucket.blob(blob_name)
+                 image_data = blob.download_as_bytes()
+                 return base64.b64encode(image_data).decode('utf-8')
+        return None
+    except Exception as e:
+        warning(f"Failed to hydrate image from {url}: {e}")
+        return None
+
 @app.get("/api/seed-guide/saved/{doc_id}")
 async def get_saved_guide(doc_id: str):
-    """Returns a specific saved seed guide."""
+    """Returns a specific saved seed guide with hydrated images."""
     try:
         # Use globally imported get_seed_guide
         data = await asyncio.to_thread(get_seed_guide, doc_id)
         if not data:
             raise HTTPException(status_code=404, detail="Guide not found")
+        
+        # Hydrate images if needed (because GCS is private)
+        # This iterates over steps and replaces image_url with image_base64
+        if "steps" in data:
+            debug(f"Hydrating images for guide {doc_id}...")
+            # Run parallel download for images
+            async def hydrate_step(step):
+                if step.get("image_url") and not step.get("image_base64"):
+                     # Download image
+                     b64 = await asyncio.to_thread(_hydrate_image_for_frontend, step["image_url"])
+                     if b64:
+                         step["image_base64"] = b64
+                         # Remove URL so frontend uses base64
+                         del step["image_url"]
+            
+            # Since step is dict reference, modification works in-place
+            tasks = [hydrate_step(step) for step in data["steps"]]
+            await asyncio.gather(*tasks)
+            debug(f"Hydration complete for guide {doc_id}")
+
         return data
     except HTTPException:
         raise

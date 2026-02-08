@@ -2,6 +2,9 @@
 
 # Start the Python Backend in the background
 # We run it on port 8081 as configured in our design
+# echo "Cleaning up ports 8081 and 3000..."
+# fuser -k 8081/tcp || true
+# fuser -k 3000/tcp || true
 echo "Starting Backend on port 8081..."
 uvicorn backend.main:app --host 0.0.0.0 --port 8081 &
 BACKEND_PID=$!

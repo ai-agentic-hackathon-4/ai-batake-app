@@ -10,6 +10,7 @@ interface Step {
     title: string;
     description: string;
     image_base64: string | null;
+    image_url?: string;
     error?: string;
 }
 
@@ -37,6 +38,7 @@ export default function SeedGuidePage() {
     const [savedGuides, setSavedGuides] = useState<SavedGuide[]>([]);
     const [selectedGuide, setSelectedGuide] = useState<SavedGuide | null>(null);
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
+    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
     // Auto-refresh interval for list
     useEffect(() => {
@@ -48,7 +50,7 @@ export default function SeedGuidePage() {
     // Also poll specifically when viewing a processing guide
     useEffect(() => {
         let detailInterval: number;
-        if (viewMode === 'detail' && selectedGuide && (selectedGuide.status === 'PENDING' || selectedGuide.status === 'PROCESSING')) {
+        if (viewMode === 'detail' && selectedGuide && (selectedGuide.status === 'PENDING' || selectedGuide.status === 'PROCESSING') && !isLoadingDetails) {
             detailInterval = window.setInterval(async () => {
                 try {
                     const res = await fetch(`/api/seed-guide/saved/${selectedGuide.id}`);
@@ -62,7 +64,7 @@ export default function SeedGuidePage() {
             }, 3000);
         }
         return () => clearInterval(detailInterval);
-    }, [viewMode, selectedGuide]);
+    }, [viewMode, selectedGuide, isLoadingDetails]);
 
     const fetchSavedGuides = async () => {
         try {
@@ -114,10 +116,25 @@ export default function SeedGuidePage() {
         }
     };
 
-    const handleSelectGuide = (guide: SavedGuide) => {
+    const handleSelectGuide = async (guide: SavedGuide) => {
+        // Optimistically set guide from list to get IDs etc
         setSelectedGuide(guide);
         setCurrentStepIndex(0);
         setViewMode('detail');
+        setIsLoadingDetails(true);
+
+        // Fetch full details (including hydrated images)
+        try {
+            const res = await fetch(`/api/seed-guide/saved/${guide.id}`);
+            if (res.ok) {
+                const fullGuide = await res.json();
+                setSelectedGuide(fullGuide);
+            }
+        } catch (e) {
+            console.error("Failed to fetch guide details:", e);
+        } finally {
+            setIsLoadingDetails(false);
+        }
     };
 
     const handleNext = () => {
@@ -278,93 +295,134 @@ export default function SeedGuidePage() {
                 {/* --- DETAIL VIEW --- */}
                 {viewMode === 'detail' && selectedGuide && (
                     <div className="max-w-3xl mx-auto space-y-6">
-                        {/* Status Banner for Processing Items */}
-                        {(selectedGuide.status === 'PENDING' || selectedGuide.status === 'PROCESSING') && (
-                            <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20">
-                                <CardContent className="py-6 flex flex-col items-center text-center gap-2">
-                                    <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-                                    <h3 className="font-semibold text-lg">AI is working on it...</h3>
-                                    <p className="text-muted-foreground">{selectedGuide.message}</p>
-                                    <p className="text-xs text-muted-foreground mt-2">You can navigate away. The guide will be saved automatically.</p>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {selectedGuide.status === 'FAILED' && (
-                            <Card className="border-red-200 bg-red-50 dark:bg-red-900/20">
-                                <CardContent className="py-6 flex flex-col items-center text-center gap-2">
-                                    <XCircle className="h-8 w-8 text-destructive" />
-                                    <h3 className="font-semibold text-lg">Generation Failed</h3>
-                                    <p className="text-muted-foreground">{selectedGuide.message}</p>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Completed Steps View */}
-                        {selectedGuide.status === 'COMPLETED' && selectedGuide.steps && selectedGuide.steps.length > 0 && (
-                            <div className="space-y-6">
-                                <div className="flex justify-between items-center text-sm text-muted-foreground">
-                                    <span className="font-medium">Step {currentStepIndex + 1} of {selectedGuide.steps.length}</span>
-                                    <div className="flex gap-1">
-                                        {selectedGuide.steps.map((_, idx) => (
-                                            <div
-                                                key={idx}
-                                                className={`h-1.5 w-8 rounded-full transition-colors ${idx <= currentStepIndex ? 'bg-primary' : 'bg-muted'}`}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-
+                        {isLoadingDetails ? (
+                            // Full Page Loading State
+                            <div className="space-y-6 animate-pulse">
+                                <div className="h-6 w-32 bg-muted rounded"></div>
                                 <Card className="overflow-hidden border-border shadow-sm">
                                     <div className="aspect-video bg-muted relative flex items-center justify-center border-b border-border">
-                                        {selectedGuide.steps[currentStepIndex].image_base64 ? (
-                                            <img
-                                                src={`data:image/jpeg;base64,${selectedGuide.steps[currentStepIndex].image_base64}`}
-                                                alt={selectedGuide.steps[currentStepIndex].title}
-                                                className="w-full h-full object-cover"
-                                            />
-                                        ) : (
-                                            <div className="flex flex-col items-center text-muted-foreground">
-                                                <Sprout className="h-12 w-12 mb-2 opacity-20" />
-                                                <span>No Visual Available</span>
-                                            </div>
-                                        )}
+                                        <Loader2 className="h-12 w-12 text-muted-foreground animate-spin" />
                                     </div>
                                     <CardContent className="pt-6 space-y-4">
-                                        <h3 className="text-2xl font-bold tracking-tight">{selectedGuide.steps[currentStepIndex].title}</h3>
+                                        <div className="h-8 w-3/4 bg-muted rounded"></div>
                                         <div className="h-px w-full bg-border" />
-                                        <p className="text-lg leading-relaxed text-muted-foreground">
-                                            {selectedGuide.steps[currentStepIndex].description}
-                                        </p>
+                                        <div className="space-y-2">
+                                            <div className="h-4 w-full bg-muted rounded"></div>
+                                            <div className="h-4 w-full bg-muted rounded"></div>
+                                            <div className="h-4 w-5/6 bg-muted rounded"></div>
+                                        </div>
                                     </CardContent>
                                 </Card>
-
-                                <div className="flex justify-between pt-4">
-                                    <button
-                                        onClick={handlePrev}
-                                        disabled={currentStepIndex === 0}
-                                        className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 gap-2"
-                                    >
-                                        <ArrowLeft className="h-4 w-4" /> Back
-                                    </button>
-
-                                    <div className="flex gap-3">
-                                        <button
-                                            onClick={() => setViewMode('list')}
-                                            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 gap-2"
-                                        >
-                                            Back to List
-                                        </button>
-                                        <button
-                                            onClick={handleNext}
-                                            disabled={currentStepIndex === (selectedGuide.steps.length) - 1}
-                                            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-10 px-4 py-2 gap-2"
-                                        >
-                                            Next <ArrowRight className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
+                        ) : (
+                            <>
+                                {/* Status Banner for Processing Items */}
+                                {(selectedGuide.status === 'PENDING' || selectedGuide.status === 'PROCESSING') && (
+                                    <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20">
+                                        <CardContent className="py-6 flex flex-col items-center text-center gap-2">
+                                            <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+                                            <h3 className="font-semibold text-lg">AI is working on it...</h3>
+                                            <p className="text-muted-foreground">{selectedGuide.message}</p>
+                                            <p className="text-xs text-muted-foreground mt-2">You can navigate away. The guide will be saved automatically.</p>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {selectedGuide.status === 'FAILED' && (
+                                    <Card className="border-red-200 bg-red-50 dark:bg-red-900/20">
+                                        <CardContent className="py-6 flex flex-col items-center text-center gap-2">
+                                            <XCircle className="h-8 w-8 text-destructive" />
+                                            <h3 className="font-semibold text-lg">Generation Failed</h3>
+                                            <p className="text-muted-foreground">{selectedGuide.message}</p>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {/* Completed Steps View */}
+                                {selectedGuide.status === 'COMPLETED' && selectedGuide.steps && selectedGuide.steps.length > 0 && (
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center text-sm text-muted-foreground">
+                                            <span className="font-medium">Step {currentStepIndex + 1} of {selectedGuide.steps.length}</span>
+                                            <div className="flex gap-1">
+                                                {selectedGuide.steps.map((_, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        className={`h-1.5 w-8 rounded-full transition-colors ${idx <= currentStepIndex ? 'bg-primary' : 'bg-muted'}`}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <Card className="overflow-hidden border-border shadow-sm">
+                                            <div className="aspect-video bg-muted relative flex items-center justify-center border-b border-border">
+                                                {(() => {
+                                                    const step = selectedGuide.steps[currentStepIndex];
+                                                    const imageUrl = step.image_url;
+                                                    const imageBase64 = step.image_base64;
+
+                                                    if (imageBase64) {
+                                                        return (
+                                                            <img
+                                                                src={`data:image/jpeg;base64,${imageBase64}`}
+                                                                alt={step.title}
+                                                                className="w-full h-full object-cover animate-in fade-in duration-500"
+                                                            />
+                                                        );
+                                                    } else if (imageUrl) {
+                                                        // Should rely on parent loading state, but safe fallback
+                                                        return (
+                                                            <div className="flex flex-col items-center justify-center h-full w-full bg-muted/50 text-muted-foreground animate-pulse">
+                                                                <Loader2 className="h-10 w-10 mb-3 animate-spin text-primary/50" />
+                                                                <span className="text-sm font-medium">Loading image...</span>
+                                                            </div>
+                                                        );
+                                                    } else {
+                                                        return (
+                                                            <div className="flex flex-col items-center text-muted-foreground">
+                                                                <Sprout className="h-12 w-12 mb-2 opacity-20" />
+                                                                <span>No Visual Available</span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                })()}
+                                            </div>
+                                            <CardContent className="pt-6 space-y-4">
+                                                <h3 className="text-2xl font-bold tracking-tight">{selectedGuide.steps[currentStepIndex].title}</h3>
+                                                <div className="h-px w-full bg-border" />
+                                                <p className="text-lg leading-relaxed text-muted-foreground">
+                                                    {selectedGuide.steps[currentStepIndex].description}
+                                                </p>
+                                            </CardContent>
+                                        </Card>
+
+                                        <div className="flex justify-between pt-4">
+                                            <button
+                                                onClick={handlePrev}
+                                                disabled={currentStepIndex === 0}
+                                                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 gap-2"
+                                            >
+                                                <ArrowLeft className="h-4 w-4" /> Back
+                                            </button>
+
+                                            <div className="flex gap-3">
+                                                <button
+                                                    onClick={() => setViewMode('list')}
+                                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 gap-2"
+                                                >
+                                                    Back to List
+                                                </button>
+                                                <button
+                                                    onClick={handleNext}
+                                                    disabled={currentStepIndex === (selectedGuide.steps.length) - 1}
+                                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-10 px-4 py-2 gap-2"
+                                                >
+                                                    Next <ArrowRight className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 )}
