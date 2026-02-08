@@ -12,6 +12,7 @@ AI Batake Appは、家庭菜園や農業を支援するためのAIプラット�
 - **栽培ガイド生成**: ステップバイステップの栽培手順と画像の自動生成
 - **AIキャラクター作成**: 種袋画像からオリジナルの野菜キャラクターを生成
 - **AIアクティビティログ**: エージェントの自律動作内容をタイムラインで表示
+- **自動栽培日記生成**: 毎日のセンサーデータと天気情報から栽培日記を自動生成 (by Cloud Scheduler)
 
 ## 🛠️ 技術スタック
 
@@ -25,6 +26,7 @@ AI Batake Appは、家庭菜園や農業を支援するためのAIプラット�
 | Google Cloud Storage | - | 画像ストレージ |
 | Google Vertex AI | - | AI エージェント基盤 |
 | Gemini API | - | 画像解析・Deep Research |
+| Google Cloud Scheduler | - | 定期実行ジョブ (日記生成) |
 
 ### フロントエンド
 | 技術 | バージョン | 用途 |
@@ -41,6 +43,7 @@ AI Batake Appは、家庭菜園や農業を支援するためのAIプラット�
 |------|------|
 | Docker | コンテナ化 |
 | Google Cloud Run | サーバーレスデプロイ |
+| Google Cloud Scheduler | 定期実行ジョブ |
 
 ## 📁 ディレクトリ構成
 
@@ -97,6 +100,9 @@ export AGENT_ENDPOINT="projects/{PROJECT_ID}/locations/us-central1/reasoningEngi
 # Gemini API (Optional)
 export GEMINI_API_KEY="your-api-key"
 export SEED_GUIDE_GEMINI_KEY="your-api-key"
+
+# Diary Auto Generation (Optional)
+export DIARY_API_KEY="your-secret-key-for-scheduler"
 ```
 
 ### ローカル開発
@@ -149,6 +155,7 @@ graph TB
         GCS[(Cloud Storage)]
         VAI[Vertex AI<br/>Agent Engine]
         GEM[Gemini API]
+        SCH[Cloud Scheduler]
     end
 
     subgraph "エッジデバイス"
@@ -174,6 +181,8 @@ graph TB
 
     API --> FS
     API --> GCS
+
+    SCH --> API
 
     SENS --> FS
     CAM --> GCS
@@ -290,6 +299,10 @@ npm test
 | POST | `/api/seed-guide/character` | キャラクター生成ジョブ作成 |
 | GET | `/api/character` | 最新キャラクター情報取得 |
 | GET | `/api/character/image` | キャラクター画像取得 (プロキシ) |
+| POST | `/api/diary/auto-generate` | 栽培日記自動生成 (Scheduler用) |
+| POST | `/api/diary/generate-manual` | 栽培日記手動生成 (SSE) |
+| GET | `/api/diary/list` | 栽培日記一覧取得 |
+| GET | `/api/diary/{date}` | 指定日の日記取得 |
 
 ## 📄 ライセンス
 
