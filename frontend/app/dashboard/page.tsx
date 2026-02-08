@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Thermometer, Droplets, Leaf } from "lucide-react"
+import { Thermometer, Droplets, Leaf, ArrowLeft } from "lucide-react"
+import Link from "next/link"
 import { PlantCamera } from "@/components/plant-camera"
 import { MetricCard } from "@/components/metric-card"
 import { EnvironmentChart } from "@/components/environment-chart"
@@ -40,15 +41,16 @@ export default function Dashboard() {
         <div className="min-h-screen bg-background">
             {/* Header */}
             <header className="border-b border-border bg-card">
-                <div className="max-w-7xl mx-auto px-6 py-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                            <Leaf className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-semibold text-card-foreground">Smart Farm Dashboard</h1>
-                            <p className="text-sm text-muted-foreground">AI栽培管理システム</p>
-                        </div>
+                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-3">
+                    <Link href="/" className="mr-2 p-1 hover:bg-accent rounded-full transition-colors">
+                        <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+                    </Link>
+                    <div className="p-2 rounded-lg bg-primary/10">
+                        <Leaf className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-semibold text-card-foreground">Smart Farm Dashboard</h1>
+                        <p className="text-sm text-muted-foreground">AI栽培管理システム</p>
                     </div>
                 </div>
             </header>
