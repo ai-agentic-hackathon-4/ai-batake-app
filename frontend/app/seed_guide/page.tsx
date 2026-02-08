@@ -399,17 +399,6 @@ export default function SeedGuidePage() {
                                                 <p className="text-lg leading-relaxed text-muted-foreground">
                                                     {selectedGuide.steps[currentStepIndex].description}
                                                 </p>
-                                                <div className="mt-6 pt-6 border-t border-border">
-                                                    <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">元の画像</h4>
-                                                    <div className="relative aspect-video max-w-sm rounded-lg overflow-hidden border border-border bg-muted/20">
-                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img
-                                                            src={selectedGuide.original_image}
-                                                            alt="Original Seed Packet"
-                                                            className="w-full h-full object-contain"
-                                                        />
-                                                    </div>
-                                                </div>
                                             </CardContent>
                                         </Card>
 
