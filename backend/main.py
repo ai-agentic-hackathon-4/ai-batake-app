@@ -639,13 +639,15 @@ async def generate_manual_diary_endpoint(
         
         # Validate date format
         try:
-            target_date = date_module.fromisoformat(date)
+            target_date_obj = date_module.fromisoformat(request.date)
+            target_date_str = request.date
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
         
         async def event_generator():
             # Initial padding to force proxy flush (some proxies buffer until 2KB or 4KB)
-            yield ":" + " " * 2048 + "\n\n"
+            # Cloud Run/Load Balancer can be aggressive
+            yield ":" + " " * 4096 + "\n\n"
             
             debug("SSE stream: Kickoff")
             yield f"data: {json.dumps({'status': 'processing', 'message': '生成の準備ができました'})}\n\n"
@@ -655,7 +657,7 @@ async def generate_manual_diary_endpoint(
                 
                 async def run_work():
                     try:
-                        await process_daily_diary(date, pw.callback)
+                        await process_daily_diary(target_date_str, pw.callback)
                     finally:
                         await pw.callback("__DONE__")
 
@@ -664,7 +666,8 @@ async def generate_manual_diary_endpoint(
                 while True:
                     try:
                         # Wait for message or timeout for ping
-                        msg = await asyncio.wait_for(pw.queue.get(), timeout=10.0)
+                        # Cloud Run idle timeout is often 30-60s, keeping ping frequent
+                        msg = await asyncio.wait_for(pw.queue.get(), timeout=15.0)
                         if msg == "__DONE__":
                             debug("SSE stream: Done signal received")
                             break
