@@ -637,6 +637,7 @@ async def get_saved_guide(doc_id: str):
             
             # Since step is dict reference, modification works in-place
             tasks = [hydrate_step(step) for step in data["steps"]]
+            
             await asyncio.gather(*tasks)
             debug(f"Hydration complete for guide {doc_id}")
 
