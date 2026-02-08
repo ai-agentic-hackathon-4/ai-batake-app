@@ -53,6 +53,15 @@
 | BE-API-011 | main.py | /api/register-seed 解析エラー | 異常系 | 500エラーを返却 | ✅ 完了 |
 | BE-API-012 | main.py | /api/seed-guide/jobs 作成成功 | 正常系 | job_idを返却 | ✅ 完了 |
 | BE-API-013 | main.py | /api/seed-guide/jobs/{job_id} 存在しない | 異常系 | 404エラーを返却 | ✅ 完了 |
+| BE-API-014 | main.py | /api/plant-camera/latest 成功 | 正常系 | 画像データとタイムスタンプを返却 | ✅ 完了 |
+| BE-API-015 | main.py | /api/plant-camera/latest 画像なし | 正常系 | エラーメッセージを返却 | ✅ 完了 |
+| BE-API-016 | main.py | /api/diary/auto-generate 成功 | 正常系 | accepted状態を返却 | ✅ 完了 |
+| BE-API-017 | main.py | /api/diary/auto-generate 認証エラー | 異常系 | 403エラーを返却 | ✅ 完了 |
+| BE-API-018 | main.py | /api/diary/auto-generate キー不要 | 正常系 | キー未設定時は認証不要 | ✅ 完了 |
+| BE-API-019 | main.py | /api/diary/image/{date} 日記なし | 異常系 | 404エラーを返却 | ✅ 完了 |
+| BE-API-020 | main.py | /api/diary/image/{date} 画像URLなし | 異常系 | 404エラーを返却 | ✅ 完了 |
+| BE-API-021 | main.py | /api/diary/image/{date} 成功 | 正常系 | 画像バイナリを返却 | ✅ 完了 |
+
 
 ### 4. 種分析サービス（seed_service.py）
 
@@ -143,9 +152,9 @@ npm test
 ## テストカバレッジ
 
 ### バックエンド
-- **合計テストケース数**: 42件
-- **正常系テスト**: 31件
-- **異常系テスト**: 11件
+- **合計テストケース数**: 50件
+- **正常系テスト**: 36件
+- **異常系テスト**: 14件
 - **実装完了率**: 100%
 
 ### フロントエンド

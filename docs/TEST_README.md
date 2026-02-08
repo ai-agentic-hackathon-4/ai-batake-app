@@ -20,11 +20,15 @@ pytest
 - `tests/test_seed_service.py` - 種画像解析サービスのテスト
 - `tests/test_utils.py` - ユーティリティ関数のテスト
 - `tests/test_select_feature.py` - 指示選択機能のテスト
+- `tests/test_seed_guide_persistence.py` - 栽培ガイド永続化テスト
+- `tests/test_diary_service.py` - 日記サービステスト
+- `tests/test_async_flow.py` - 非同期フローテスト
+- `tests/test_logger.py` - ロガーテスト
 
 ### テスト結果
 
-- **総テスト数**: 42件
-- **成功**: 42件
+- **総テスト数**: 50件以上
+- **成功**: 全件パス
 - **失敗**: 0件
 - **成功率**: 100%
 
@@ -58,6 +62,6 @@ npm test
 
 ## 総合結果
 
-- **総テスト数**: 72件
-- **成功**: 72件
+- **総テスト数**: 80件以上
+- **成功**: 全件パス
 - **成功率**: 100%
