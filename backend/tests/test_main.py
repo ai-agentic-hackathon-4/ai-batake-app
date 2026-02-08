@@ -222,3 +222,212 @@ class TestAgentLogsEndpoint:
         
         assert response.status_code == 500
         assert "detail" in response.json()
+
+
+class TestDiaryEndpoints:
+    """Tests for /api/diary/* endpoints"""
+    
+    @patch('main.get_all_diaries')
+    def test_list_diaries_success(self, mock_get_diaries, client):
+        """Test successful diary list retrieval"""
+        mock_diaries = [
+            {"id": "2025-01-01", "date": "2025-01-01", "ai_summary": "Test summary"}
+        ]
+        mock_get_diaries.return_value = mock_diaries
+        
+        response = client.get("/api/diary/list")
+        
+        assert response.status_code == 200
+        assert response.json() == {"diaries": mock_diaries}
+        mock_get_diaries.assert_called_once_with(limit=30, offset=0)
+    
+    @patch('main.get_all_diaries')
+    def test_list_diaries_with_pagination(self, mock_get_diaries, client):
+        """Test diary list with pagination parameters"""
+        mock_get_diaries.return_value = []
+        
+        response = client.get("/api/diary/list?limit=10&offset=5")
+        
+        assert response.status_code == 200
+        mock_get_diaries.assert_called_once_with(limit=10, offset=5)
+    
+    @patch('main.get_diary_by_date')
+    def test_get_diary_success(self, mock_get_diary, client):
+        """Test successful diary retrieval by date"""
+        mock_diary = {
+            "id": "2025-01-01",
+            "date": "2025-01-01",
+            "ai_summary": "Test summary",
+            "observations": "Test observations",
+            "recommendations": "Test recommendations"
+        }
+        mock_get_diary.return_value = mock_diary
+        
+        response = client.get("/api/diary/2025-01-01")
+        
+        assert response.status_code == 200
+        assert response.json() == mock_diary
+        mock_get_diary.assert_called_once_with("2025-01-01")
+    
+    @patch('main.get_diary_by_date')
+    def test_get_diary_not_found(self, mock_get_diary, client):
+        """Test diary not found error"""
+        mock_get_diary.return_value = None
+        
+        response = client.get("/api/diary/2025-01-01")
+        
+        assert response.status_code == 404
+        assert "detail" in response.json()
+    
+    @patch('main.process_daily_diary')
+    def test_generate_daily_diary_success(self, mock_process, client):
+        """Test successful daily diary generation trigger"""
+        response = client.post("/api/diary/generate-daily")
+        
+        assert response.status_code == 200
+        result = response.json()
+        assert result["status"] == "accepted"
+        assert "date" in result
+    
+    @patch('main.process_daily_diary')
+    def test_generate_manual_diary_success(self, mock_process, client):
+        """Test successful manual diary generation"""
+        response = client.post(
+            "/api/diary/generate-manual",
+            json={"date": "2025-01-15"}
+        )
+        
+        assert response.status_code == 200
+        result = response.json()
+        assert result["status"] == "accepted"
+        assert result["date"] == "2025-01-15"
+    
+    def test_generate_manual_diary_invalid_date(self, client):
+        """Test manual diary generation with invalid date"""
+        response = client.post(
+            "/api/diary/generate-manual",
+            json={"date": "invalid-date"}
+        )
+        
+        assert response.status_code == 400
+        assert "Invalid date format" in response.json()["detail"]
+
+
+class TestPlantCameraEndpoint:
+    """Tests for /api/plant-camera/latest endpoint"""
+    
+    @patch('main.storage.Client')
+    def test_get_latest_plant_image_success(self, mock_storage, client):
+        """Test successful retrieval of latest plant camera image"""
+        mock_blob = Mock()
+        mock_blob.name = "logger-captures/test.jpg"
+        mock_blob.time_created = Mock(isoformat=Mock(return_value="2025-01-01T12:00:00"))
+        mock_blob.download_as_bytes.return_value = b"fake image data"
+        mock_blob.content_type = "image/jpeg"
+        
+        mock_bucket = Mock()
+        mock_bucket.list_blobs.return_value = [mock_blob]
+        
+        mock_client = Mock()
+        mock_client.bucket.return_value = mock_bucket
+        mock_storage.return_value = mock_client
+        
+        response = client.get("/api/plant-camera/latest")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "image" in data
+        assert "timestamp" in data
+    
+    @patch('main.storage.Client')
+    def test_get_latest_plant_image_no_images(self, mock_storage, client):
+        """Test when no plant images are found"""
+        mock_bucket = Mock()
+        mock_bucket.list_blobs.return_value = []
+        
+        mock_client = Mock()
+        mock_client.bucket.return_value = mock_bucket
+        mock_storage.return_value = mock_client
+        
+        response = client.get("/api/plant-camera/latest")
+        
+        assert response.status_code == 200
+        assert "error" in response.json()
+
+
+class TestAutoGenerateDiaryEndpoint:
+    """Tests for /api/diary/auto-generate endpoint"""
+    
+    @patch('main.process_daily_diary')
+    @patch.dict('os.environ', {'DIARY_API_KEY': 'test-key'})
+    def test_auto_generate_diary_success(self, mock_process, client):
+        """Test successful auto diary generation with correct key"""
+        response = client.post("/api/diary/auto-generate?key=test-key")
+        
+        assert response.status_code == 200
+        result = response.json()
+        assert result["status"] == "accepted"
+        assert "date" in result
+    
+    @patch.dict('os.environ', {'DIARY_API_KEY': 'test-key'})
+    def test_auto_generate_diary_unauthorized(self, client):
+        """Test unauthorized access with wrong key"""
+        response = client.post("/api/diary/auto-generate?key=wrong-key")
+        
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Unauthorized"
+    
+    @patch('main.process_daily_diary')
+    @patch.dict('os.environ', {}, clear=True)
+    def test_auto_generate_diary_no_key_required(self, mock_process, client):
+        """Test access allowed when no API key is configured"""
+        response = client.post("/api/diary/auto-generate")
+        
+        assert response.status_code == 200
+
+
+class TestDiaryImageEndpoint:
+    """Tests for /api/diary/image/{date} endpoint"""
+    
+    @patch('main.get_diary_by_date')
+    def test_get_diary_image_not_found(self, mock_get_diary, client):
+        """Test diary image not found"""
+        mock_get_diary.return_value = None
+        
+        response = client.get("/api/diary/image/2025-01-01")
+        
+        assert response.status_code == 404
+    
+    @patch('main.get_diary_by_date')
+    def test_get_diary_image_no_image_url(self, mock_get_diary, client):
+        """Test diary exists but has no image URL"""
+        mock_get_diary.return_value = {"date": "2025-01-01", "plant_image_url": None}
+        
+        response = client.get("/api/diary/image/2025-01-01")
+        
+        assert response.status_code == 404
+    
+    @patch('main.storage.Client')
+    @patch('main.get_diary_by_date')
+    def test_get_diary_image_success(self, mock_get_diary, mock_storage, client):
+        """Test successful diary image retrieval"""
+        mock_get_diary.return_value = {
+            "date": "2025-01-01",
+            "plant_image_url": "gs://test-bucket/path/to/image.png"
+        }
+        
+        mock_blob = Mock()
+        mock_blob.exists.return_value = True
+        mock_blob.download_as_bytes.return_value = b"fake png data"
+        
+        mock_bucket = Mock()
+        mock_bucket.blob.return_value = mock_blob
+        
+        mock_client = Mock()
+        mock_client.bucket.return_value = mock_bucket
+        mock_storage.return_value = mock_client
+        
+        response = client.get("/api/diary/image/2025-01-01")
+        
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"

@@ -15,12 +15,12 @@ export default function LandingPage() {
                         AI Batake App
                     </h1>
                     <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-                        AI-powered smart farming platform for monitoring, research, and guidance.
+                        AIを活用したスマート農業プラットフォーム。監視、研究、そして栽培ガイドを提供します。
                     </p>
                 </div>
 
                 {/* Features Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 w-full animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
 
                     {/* Dashboard Card */}
                     <Link href="/dashboard" className="group">
@@ -28,9 +28,9 @@ export default function LandingPage() {
                             <div className="mb-4 p-3 bg-blue-50 rounded-lg w-fit mx-auto group-hover:scale-110 transition-transform">
                                 <Activity className="h-8 w-8 text-blue-600" />
                             </div>
-                            <h2 className="text-xl font-semibold mb-2 text-slate-900">Dashboard</h2>
+                            <h2 className="text-xl font-semibold mb-2 text-slate-900">ダッシュボード</h2>
                             <p className="text-slate-500 text-sm">
-                                Real-time monitoring of environmental data and plant growth status.
+                                環境データと植物の成長状態をリアルタイムで監視します。
                             </p>
                         </div>
                     </Link>
@@ -41,9 +41,9 @@ export default function LandingPage() {
                             <div className="mb-4 p-3 bg-purple-50 rounded-lg w-fit mx-auto group-hover:scale-110 transition-transform">
                                 <Microscope className="h-8 w-8 text-purple-600" />
                             </div>
-                            <h2 className="text-xl font-semibold mb-2 text-slate-900">Research Agent</h2>
+                            <h2 className="text-xl font-semibold mb-2 text-slate-900">リサーチエージェント</h2>
                             <p className="text-slate-500 text-sm">
-                                AI-driven seed packet analysis and deep research for optimal growing conditions.
+                                AIによる種袋分析と、最適な栽培条件の詳細調査を行います。
                             </p>
                         </div>
                     </Link>
@@ -54,12 +54,12 @@ export default function LandingPage() {
                             <div className="mb-4 p-3 bg-green-50 rounded-lg w-fit mx-auto group-hover:scale-110 transition-transform">
                                 <Sprout className="h-8 w-8 text-green-600" />
                             </div>
-                            <h2 className="text-xl font-semibold mb-2 text-slate-900">Seed Guide (Async)</h2>
+                            <h2 className="text-xl font-semibold mb-2 text-slate-900">栽培ガイド生成</h2>
                             <p className="text-slate-500 text-sm">
-                                Upload a photo to generate a step-by-step planting guide using async AI jobs.
+                                写真をアップロードして、AIがステップバイステップの栽培ガイドを作成します。
                             </p>
                             <div className="mt-4 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                New Feature
+                                新機能
                             </div>
                         </div>
                     </Link>
@@ -72,10 +72,10 @@ export default function LandingPage() {
                             </div>
                             <h2 className="text-xl font-semibold mb-2 text-slate-900">育成日記</h2>
                             <p className="text-slate-500 text-sm">
-                                AI-generated daily diary from sensor data and agent logs for tracking plant growth.
+                                センサーデータやログからAIが生成する日々の栽培記録を確認します。
                             </p>
                             <div className="mt-4 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                                New Feature
+                                新機能
                             </div>
                         </div>
                     </Link>
@@ -83,7 +83,7 @@ export default function LandingPage() {
                 </div>
 
                 <footer className="text-sm text-slate-400 pt-8">
-                    © 2025 Smart Farm AI Team
+                    © 2025 Smart Farm AI チーム
                 </footer>
             </div>
         </div>
