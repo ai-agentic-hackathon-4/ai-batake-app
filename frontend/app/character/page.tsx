@@ -10,7 +10,8 @@ interface CharacterResult {
     name: string;
     character_name: string;
     personality: string;
-    image_base64: string;
+    image_base64?: string;
+    image_url?: string;
 }
 
 interface JobStatus {
@@ -30,8 +31,10 @@ export default function CharacterPage() {
     // Animation states
     const [animationStage, setAnimationStage] = useState<'idle' | 'seed-shaking' | 'sprouting' | 'blooming'>('idle');
 
-    // Polling interval ref
-    const pollingRef = useRef<number | null>(null);
+    // Polling refs
+    const pollingTimeoutRef = useRef<number | null>(null);
+    const isPollingRef = useRef(false);
+    const retryCountRef = useRef(0);
 
     useEffect(() => {
         return () => {
@@ -57,40 +60,72 @@ export default function CharacterPage() {
     }, [jobStatus, character]);
 
     const startPolling = (id: string) => {
-        if (pollingRef.current) return;
+        if (isPollingRef.current) return;
+        isPollingRef.current = true;
+        retryCountRef.current = 0;
 
-        pollingRef.current = window.setInterval(async () => {
+        const poll = async () => {
+            if (!isPollingRef.current) return;
+
             try {
                 const response = await fetch(`/api/seed-guide/jobs/${id}`);
+
+                // Handle non-200 responses
                 if (!response.ok) {
-                    if (response.status !== 404) throw new Error(`Polling failed: ${response.statusText}`);
-                    return;
+                    if (response.status === 404) {
+                        // Job not found yet? Retry.
+                        throw new Error("Job not found");
+                    }
+                    throw new Error(`Polling failed: ${response.statusText}`);
                 }
 
                 const status: JobStatus = await response.json();
+
+                // If we stopped polling while fetching, ignore result
+                if (!isPollingRef.current) return;
+
                 setJobStatus(status);
+                retryCountRef.current = 0; // Reset retry count on success
 
                 if (status.status === 'COMPLETED') {
+                    // Success!
                     setCharacter(status.result as CharacterResult);
-                    // Animation transition is handled in useEffect
+                    stopPolling();
                 } else if (status.status === 'FAILED') {
+                    // Fatal failure
                     setError(status.message);
                     setAnimationStage('idle');
                     stopPolling();
+                } else {
+                    // Continue polling
+                    pollingTimeoutRef.current = window.setTimeout(poll, 2000);
                 }
             } catch (err) {
                 console.error("Polling error", err);
-                stopPolling();
-                setError("通信エラーが発生しました");
-                setAnimationStage('idle');
+                retryCountRef.current++;
+
+                if (retryCountRef.current > 3) {
+                    // Too many failures, valid error
+                    stopPolling();
+                    setError("通信エラーが発生しました");
+                    setAnimationStage('idle');
+                } else {
+                    // Retry
+                    if (isPollingRef.current) {
+                        pollingTimeoutRef.current = window.setTimeout(poll, 2000);
+                    }
+                }
             }
-        }, 2000);
+        };
+
+        poll();
     };
 
     const stopPolling = () => {
-        if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
+        isPollingRef.current = false;
+        if (pollingTimeoutRef.current) {
+            clearTimeout(pollingTimeoutRef.current);
+            pollingTimeoutRef.current = null;
         }
     };
 
@@ -248,9 +283,11 @@ export default function CharacterPage() {
                             <p className="text-gray-500">
                                 {jobStatus?.message || "AIが一生懸命考えています"}
                             </p>
-                            {/* Progress bar simulation */}
-                            <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div className="h-full bg-green-500 animate-[width-grow_10s_linear_infinite]" style={{ width: animationStage === 'sprouting' ? '90%' : '30%' }}></div>
+                            {/* Loading Indicator */}
+                            <div className="flex justify-center space-x-2 mt-4">
+                                <div className="w-3 h-3 bg-green-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                                <div className="w-3 h-3 bg-green-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                                <div className="w-3 h-3 bg-green-500 rounded-full animate-bounce"></div>
                             </div>
                         </div>
                     </div>
@@ -271,7 +308,7 @@ export default function CharacterPage() {
 
                                     <div className="relative w-64 h-64 rounded-3xl overflow-hidden border-8 border-white shadow-2xl rotate-3 transform transition-transform hover:rotate-0 hover:scale-105 duration-300">
                                         <img
-                                            src={`data:image/jpeg;base64,${character.image_base64}`}
+                                            src={character.image_url || `data:image/jpeg;base64,${character.image_base64}`}
                                             alt={character.character_name}
                                             className="w-full h-full object-cover"
                                         />

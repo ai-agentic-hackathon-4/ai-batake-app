@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Leaf, Sprout, Microscope, Activity, BookOpen } from "lucide-react"
+import { Leaf, Sprout, Microscope, Activity, BookOpen, Sparkles } from "lucide-react"
 
 export default function LandingPage() {
     return (
@@ -32,6 +32,22 @@ export default function LandingPage() {
                             <p className="text-slate-500 text-sm">
                                 環境データと植物の成長状態をリアルタイムで監視します。
                             </p>
+                        </div>
+                    </Link>
+
+                    {/* Character Creation Card */}
+                    <Link href="/character" className="group">
+                        <div className="h-full bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-primary/50 transition-all duration-300">
+                            <div className="mb-4 p-3 bg-pink-50 rounded-lg w-fit mx-auto group-hover:scale-110 transition-transform">
+                                <Sparkles className="h-8 w-8 text-pink-600" />
+                            </div>
+                            <h2 className="text-xl font-semibold mb-2 text-slate-900">AIキャラクター作成</h2>
+                            <p className="text-slate-500 text-sm">
+                                種や野菜の写真から、あなただけの妖精キャラクターを生み出します。
+                            </p>
+                            <div className="mt-4 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-pink-100 text-pink-800">
+                                New
+                            </div>
                         </div>
                     </Link>
 

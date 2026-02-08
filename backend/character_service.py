@@ -102,7 +102,7 @@ async def analyze_seed_and_generate_character(image_bytes: bytes):
     img_model_id = "gemini-3-pro-image-preview" 
     img_url = f"https://generativelanguage.googleapis.com/v1beta/models/{img_model_id}:generateContent?key={api_key}"
     
-    img_prompt = f"Generate an image of {data['image_prompt']}, cute mascot character, simple design, white background, high quality"
+    img_prompt = f"Generate an image of ONE single {data['image_prompt']}, solo character, centered, cute mascot character, simple design, white background, high quality, no other characters, single subject"
     img_payload = {
         "contents": [{ "role": "user", "parts": [{"text": img_prompt}] }],
         "generationConfig": {} 
