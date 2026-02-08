@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical, Droplets, Thermometer, Sun, Sprout, Check, Send, AlertCircle, ArrowRight } from "lucide-react";
+import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical, Droplets, Thermometer, Sun, Sprout, Check, Send, AlertCircle, ArrowRight, ArrowLeft, Search, ExternalLink } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import Link from "next/link";
 
 interface Vegetable {
     id: string;
@@ -190,12 +191,15 @@ export default function ResearchDashboard() {
                 <div className="max-w-7xl mx-auto px-6 py-4">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3">
+                            <Link href="/" className="mr-2 p-1 hover:bg-accent rounded-full transition-colors">
+                                <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+                            </Link>
                             <div className="p-2 rounded-lg bg-primary/10">
                                 <FlaskConical className="h-6 w-6 text-primary" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-semibold text-card-foreground">Research Agent</h1>
-                                <p className="text-sm text-muted-foreground">AI Deep Research Dashboard</p>
+                                <h1 className="text-xl font-semibold text-card-foreground">リサーチエージェント</h1>
+                                <p className="text-sm text-muted-foreground">AIによる栽培情報の深層調査</p>
                             </div>
                         </div>
                         <div className={`px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-2 border ${isSystemExecuting
@@ -217,7 +221,7 @@ export default function ResearchDashboard() {
                         className="inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 gap-2"
                     >
                         <Plus className="w-4 h-4" />
-                        New Seed
+                        新しい種を登録
                     </button>
                 </div>
 
