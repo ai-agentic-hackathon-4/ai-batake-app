@@ -70,6 +70,15 @@ except ImportError:
         warning(f"Failed to import seed_service: {e}")
         pass
 
+# Imports for Character Service
+try:
+    from .character_service import analyze_seed_and_generate_character
+except ImportError:
+    try:
+        from character_service import analyze_seed_and_generate_character
+    except ImportError:
+        pass
+
 # Imports for Diary Service
 try:
     from .diary_service import (
@@ -85,7 +94,7 @@ except ImportError:
             get_diary_by_date
         )
     except ImportError as e:
-        logging.warning(f"Failed to import diary_service: {e}")
+        warning(f"Failed to import diary_service: {e}")
         process_daily_diary = None
         get_all_diaries = None
         get_diary_by_date = None
@@ -559,6 +568,37 @@ async def get_seed_guide_job(job_id: str):
             raise HTTPException(status_code=404, detail="Job not found")
         
         job_data = doc.to_dict()
+        
+        def make_serializable(obj):
+            if isinstance(obj, dict):
+                return {k: make_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_serializable(v) for v in obj]
+            elif hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            elif isinstance(obj, (str, int, float, bool, type(None))):
+                return obj
+            else:
+                return str(obj)
+
+        job_data = make_serializable(job_data)
+        
+        if "result" in job_data and isinstance(job_data["result"], dict):
+            res = job_data["result"]
+            if res.get("image_url") and res["image_url"].startswith("https://storage.googleapis.com/"):
+                gcs_uri = res["image_url"]
+                bucket_name = "ai-agentic-hackathon-4-bk"
+                prefix = f"https://storage.googleapis.com/{bucket_name}/"
+                
+                if gcs_uri.startswith(prefix):
+                    blob_path = gcs_uri[len(prefix):]
+                    import urllib.parse
+                    encoded_path = urllib.parse.quote(blob_path)
+                    res["image_url"] = f"/api/character/image?path={encoded_path}"
+                    # Ensure base64 is cleared if it exists (though backend job clears it usually)
+                    if "image_base64" in res:
+                        del res["image_base64"]
+
         debug(f"Job {job_id} status: {job_data.get('status')}")
         return job_data
     except HTTPException:
@@ -566,6 +606,182 @@ async def get_seed_guide_job(job_id: str):
     except Exception as e:
         error(f"Failed to fetch job {job_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+# --- Character Generation Endpoints ---
+
+async def process_character_generation(job_id: str, image_bytes: bytes):
+    """Background task to process character generation."""
+    task_session_id = f"char-{job_id[:8]}"
+    set_session_id(task_session_id)
+    set_request_id(generate_request_id())
+    
+    info(f"Starting character generation job: {job_id}")
+    doc_ref = db.collection(COLLECTION_NAME).document(job_id)
+    
+    await doc_ref.update({
+        "status": "PROCESSING",
+        "message": "Generating character..."
+    })
+    
+    try:
+        # Check if analyze_seed_and_generate_character is available
+        if 'analyze_seed_and_generate_character' in globals():
+            debug(f"Calling analyze_seed_and_generate_character for job {job_id}")
+            result = await analyze_seed_and_generate_character(image_bytes)
+            
+            # Save image to GCS
+            if result.get("image_base64"):
+                try:
+                    b64_data = result["image_base64"]
+                    img_data = base64.b64decode(b64_data)
+                    timestamp = int(time.time())
+                    blob_name = f"characters/{job_id}_{timestamp}.png"
+                    
+                    # Upload to GCS
+                    info(f"Uploading character image to GCS: {blob_name}")
+                    image_url = await asyncio.to_thread(
+                        _upload_to_gcs_sync, 
+                        "ai-agentic-hackathon-4-bk", 
+                        blob_name, 
+                        img_data, 
+                        "image/png"
+                    )
+                    
+                    # Update result with URL
+                    result["image_url"] = image_url
+                    
+                    # Save to Firestore /growing_diaries/Character
+                    # name, image_uri, personality
+                    char_doc_ref = db.collection("growing_diaries").document("Character")
+                    await char_doc_ref.set({
+                        "name": result.get("character_name"),
+                        "image_uri": image_url,
+                        "personality": result.get("personality"),
+                        "updated_at": firestore.SERVER_TIMESTAMP
+                    }, merge=True)
+                    info(f"Saved character to /growing_diaries/Character: {result.get('character_name')}")
+                    
+                    # Remove base64 from result to save space in job doc
+                    del result["image_base64"]
+                    
+                except Exception as img_e:
+                    warning(f"Failed to save character image/data: {img_e}")
+                    # Continue to complete job even if saving failed? 
+                    # Probably better to report error but let job complete with base64 if upload fails?
+                    # For now, let's just log and continue, result still has base64 if del didn't happen
+                    pass
+
+            await doc_ref.update({
+                "status": "COMPLETED",
+                "result": result,
+                "message": "Character generated!"
+            })
+        else:
+            warning(f"analyze_seed_and_generate_character not available for job {job_id}")
+            await doc_ref.update({
+                "status": "FAILED",
+                "message": "Analysis service not available"
+            })
+    except Exception as e:
+        error(f"Character generation job {job_id} failed: {str(e)}", exc_info=True)
+        await doc_ref.update({
+            "status": "FAILED",
+            "message": str(e)
+        })
+
+@app.get("/api/character")
+async def get_character():
+    """
+    Returns the current character from /growing_diaries/Character.
+    The image_uri is transformed to a local proxy URL.
+    """
+    try:
+        doc_ref = db.collection("growing_diaries").document("Character")
+        doc = await doc_ref.get()
+        
+        if not doc.exists:
+            return {}
+        
+        data = doc.to_dict()
+        
+        # Transform image_uri to proxy URL
+        if data.get("image_uri") and data["image_uri"].startswith("https://storage.googleapis.com/"):
+            # Extract path after bucket name or full path?
+            # Let's just pass the full GCS path to the proxy for simplicity, or relative path
+            # The proxy implementation below expects relative path after bucket
+            gcs_uri = data["image_uri"]
+            bucket_name = "ai-agentic-hackathon-4-bk"
+            prefix = f"https://storage.googleapis.com/{bucket_name}/"
+            
+            if gcs_uri.startswith(prefix):
+                blob_path = gcs_uri[len(prefix):]
+                # Encode path to be safe in query param
+                import urllib.parse
+                encoded_path = urllib.parse.quote(blob_path)
+                data["image_uri"] = f"/api/character/image?path={encoded_path}"
+                
+        return data
+    except Exception as e:
+        error(f"Failed to get character: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/character/image")
+async def get_character_image(path: str):
+    """
+    Proxies character image from GCS.
+    Path should be relative to bucket root.
+    """
+    try:
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        
+        # Security check: basic path traversal prevention
+        if ".." in path or path.startswith("/"):
+             raise HTTPException(status_code=400, detail="Invalid path")
+             
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(path)
+        
+        if not blob.exists():
+            raise HTTPException(status_code=404, detail="Image not found")
+        
+        img_bytes = blob.download_as_bytes()
+        from fastapi import Response
+        return Response(content=img_bytes, media_type="image/png")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error(f"Error serving character image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/seed-guide/character")
+async def create_character_job(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """Starts an async job for character generation."""
+    try:
+        content = await file.read()
+        job_id = str(uuid.uuid4())
+        
+        info(f"Creating character generation job: {job_id}, file: {file.filename}")
+        
+        doc_ref = db.collection(COLLECTION_NAME).document(job_id)
+        await doc_ref.set({
+            "job_id": job_id,
+            "status": "PENDING",
+            "message": "Job created...",
+            "result": None,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "type": "character" 
+        })
+        
+        background_tasks.add_task(process_character_generation, job_id, content)
+        
+        return {"job_id": job_id}
+    except Exception as e:
+        error(f"Failed to create character job: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to start job: {str(e)}")
 
 class SaveGuideRequest(BaseModel):
     title: str
@@ -599,8 +815,6 @@ def _hydrate_image_for_frontend(url: str):
         bucket_name = "ai-agentic-hackathon-4-bk"
         if url.startswith("https://storage.googleapis.com/"):
             # Extract relative path from URL
-            # Format: https://storage.googleapis.com/BUCKET_NAME/BLOB_NAME
-            # Or: https://storage.googleapis.com/ai-agentic-hackathon-4-bk/seed-guides/output/...
             prefix = f"https://storage.googleapis.com/{bucket_name}/"
             if url.startswith(prefix):
                  blob_name = url[len(prefix):]
@@ -623,23 +837,17 @@ async def get_saved_guide(doc_id: str):
         if not data:
             raise HTTPException(status_code=404, detail="Guide not found")
         
-        # Hydrate images if needed (because GCS is private)
-        # This iterates over steps and replaces image_url with image_base64
+        # Hydrate images if needed
         if "steps" in data:
             debug(f"Hydrating images for guide {doc_id}...")
-            # Run parallel download for images
             async def hydrate_step(step):
                 if step.get("image_url") and not step.get("image_base64"):
-                     # Download image
                      b64 = await asyncio.to_thread(_hydrate_image_for_frontend, step["image_url"])
                      if b64:
                          step["image_base64"] = b64
-                         # Remove URL so frontend uses base64
                          del step["image_url"]
             
-            # Since step is dict reference, modification works in-place
             tasks = [hydrate_step(step) for step in data["steps"]]
-            
             await asyncio.gather(*tasks)
             debug(f"Hydration complete for guide {doc_id}")
 
@@ -649,6 +857,7 @@ async def get_saved_guide(doc_id: str):
     except Exception as e:
         error(f"Failed to get guide: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get guide: {str(e)}")
+
 # --- Diary Endpoints ---
 
 class DiaryGenerateRequest(BaseModel):
@@ -683,8 +892,6 @@ async def auto_generate_diary_endpoint(key: Optional[str] = None):
         current_date_str = datetime.now().date().isoformat()
         info(f"Auto-generating diary for today: {current_date_str}")
         
-        # Run background task to actually generate
-        # Note: We return success immediately to Scheduler
         asyncio.create_task(process_daily_diary(current_date_str))
         
         return {
@@ -703,7 +910,6 @@ async def generate_manual_diary_endpoint(
 ):
     """
     Trigger manual diary generation for a specific date and stream progress.
-    Now uses GET to avoid proxy buffering issues with POST responses.
     """
     if process_daily_diary is None:
         raise HTTPException(status_code=503, detail="Diary service not available")
@@ -711,7 +917,6 @@ async def generate_manual_diary_endpoint(
     try:
         from datetime import date as date_module
         
-        # Validate date format
         try:
             target_date_obj = date_module.fromisoformat(request.date)
             target_date_str = request.date
@@ -719,8 +924,6 @@ async def generate_manual_diary_endpoint(
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
         
         async def event_generator():
-            # Initial padding to force proxy flush (some proxies buffer until 2KB or 4KB)
-            # Cloud Run/Load Balancer can be aggressive
             yield ":" + " " * 4096 + "\n\n"
             
             debug("SSE stream: Kickoff")
@@ -739,8 +942,6 @@ async def generate_manual_diary_endpoint(
                 
                 while True:
                     try:
-                        # Wait for message or timeout for ping
-                        # Cloud Run idle timeout is often 30-60s, keeping ping frequent
                         msg = await asyncio.wait_for(pw.queue.get(), timeout=15.0)
                         if msg == "__DONE__":
                             debug("SSE stream: Done signal received")
@@ -763,14 +964,14 @@ async def generate_manual_diary_endpoint(
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",  # For Nginx/Proxy
+                "X-Accel-Buffering": "no",
                 "Transfer-Encoding": "chunked",
             }
         )
     except HTTPException:
         raise
     except Exception as e:
-        logging.error(f"Error starting manual diary generation: {e}")
+        error(f"Error starting manual diary generation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/diary/list")
@@ -780,13 +981,12 @@ async def list_diaries(limit: int = 30, offset: int = 0):
     
     try:
         diaries = get_all_diaries(limit=limit, offset=offset)
-        # Transform plant_image_url to proxy URL if it's a GCS path
         for diary in diaries:
             if diary.get("plant_image_url") and diary["plant_image_url"].startswith("gs://"):
                 diary["plant_image_url"] = f"/api/diary/image/{diary['date']}"
         return {"diaries": diaries}
     except Exception as e:
-        logging.error(f"Error listing diaries: {e}")
+        error(f"Error listing diaries: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -801,7 +1001,6 @@ async def get_diary(date: str):
         if diary is None:
             raise HTTPException(status_code=404, detail="Diary not found")
         
-        # Transform plant_image_url to proxy URL if it's a GCS path
         if diary.get("plant_image_url") and diary["plant_image_url"].startswith("gs://"):
             diary["plant_image_url"] = f"/api/diary/image/{diary['date']}"
             
@@ -809,7 +1008,7 @@ async def get_diary(date: str):
     except HTTPException:
         raise
     except Exception as e:
-        logging.error(f"Error fetching diary: {e}")
+        error(f"Error fetching diary: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/diary/image/{date}")
@@ -825,7 +1024,6 @@ async def get_diary_image(date: str):
         if not diary or not diary.get("plant_image_url") or not diary["plant_image_url"].startswith("gs://"):
             raise HTTPException(status_code=404, detail="Image not found or not in GCS format")
         
-        # Parse GCS path (gs://bucket/path/to/blob)
         gcs_uri = diary["plant_image_url"]
         path_without_scheme = gcs_uri[5:]
         parts = path_without_scheme.split("/", 1)
@@ -843,7 +1041,6 @@ async def get_diary_image(date: str):
         if not blob.exists():
             raise HTTPException(status_code=404, detail="Image blob not found in GCS")
             
-        # Stream the blob content
         img_bytes = blob.download_as_bytes()
         from fastapi import Response
         return Response(content=img_bytes, media_type="image/png")
@@ -851,7 +1048,7 @@ async def get_diary_image(date: str):
     except HTTPException:
         raise
     except Exception as e:
-        logging.error(f"Error serving diary image: {e}")
+        error(f"Error serving diary image: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -873,9 +1070,74 @@ async def generate_daily_diary_endpoint(background_tasks: BackgroundTasks):
             "message": "Diary generation started"
         }
     except Exception as e:
-        logging.error(f"Error starting diary generation: {e}")
+        error(f"Error starting diary generation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+@app.get("/api/character")
+async def get_character_metadata():
+    """
+    Get the current character metadata.
+    Proxies the GCS image URL to a local API URL.
+    """
+    try:
+        doc_ref = db.collection("growing_diaries").document("Character")
+        doc = await doc_ref.get()
+        
+        if not doc.exists:
+            # Return empty if not found, or 404
+            return {}
+            
+        data = doc.to_dict()
+        
+        # Transform image_uri to proxy URL
+        if data.get("image_uri") and data["image_uri"].startswith("https://storage.googleapis.com/"):
+            gcs_uri = data["image_uri"]
+            bucket_name = "ai-agentic-hackathon-4-bk"
+            prefix = f"https://storage.googleapis.com/{bucket_name}/"
+            
+            if gcs_uri.startswith(prefix):
+                blob_path = gcs_uri[len(prefix):]
+                import urllib.parse
+                encoded_path = urllib.parse.quote(blob_path)
+                data["image_uri"] = f"/api/character/image?path={encoded_path}"
+                
+        return data
+    except Exception as e:
+        error(f"Error fetching character: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/character/image")
+async def get_character_image_endpoint(path: str):
+    """
+    Serve character image from GCS via proxy.
+    path: Relative path in GCS bucket (e.g. characters/xyz.png)
+    """
+    try:
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        
+        # Security check: prevent path traversal or accessing other buckets? 
+        # GCS paths don't use .. usually, but good to be safe. 
+        # We assume path is just the object name.
+        
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(path)
+        
+        if not blob.exists():
+            raise HTTPException(status_code=404, detail="Image not found")
+            
+        img_bytes = blob.download_as_bytes()
+        from fastapi import Response
+        return Response(content=img_bytes, media_type="image/png")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error(f"Error serving character image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.on_event("startup")
 async def startup_event():
