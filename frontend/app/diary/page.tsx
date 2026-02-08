@@ -11,7 +11,9 @@ import {
     CloudRain,
     RefreshCw,
     BookOpen,
+    ArrowLeft,
 } from "lucide-react";
+import Link from "next/link";
 
 interface DiaryStatistics {
     temperature: { min: number; max: number; avg: number };
@@ -105,6 +107,9 @@ export default function DiaryPage() {
                 <div className="max-w-7xl mx-auto px-6 py-4">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3">
+                            <Link href="/" className="mr-2 p-1 hover:bg-accent rounded-full transition-colors">
+                                <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+                            </Link>
                             <div className="p-2 rounded-lg bg-primary/10">
                                 <BookOpen className="h-6 w-6 text-primary" />
                             </div>
@@ -316,7 +321,9 @@ export default function DiaryPage() {
                                                                 event.type
                                                             )}`}
                                                         >
-                                                            {event.type}
+                                                            {event.type === 'alert' ? 'アラート' :
+                                                                event.type === 'warning' ? '警告' :
+                                                                    event.type === 'action' ? 'アクション' : '情報'}
                                                         </span>
                                                         <div className="flex-1">
                                                             <span className="text-sm">
