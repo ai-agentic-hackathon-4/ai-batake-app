@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical } from "lucide-react";
+import { Search, Plus, CloudUpload, Leaf, Clock, ArrowRight, ExternalLink, ArrowLeft, X, FlaskConical } from "lucide-react"
+import Link from "next/link"
+    ;
 
 interface Vegetable {
     id: string;
@@ -90,12 +92,15 @@ export default function ResearchDashboard() {
                 <div className="max-w-7xl mx-auto px-6 py-4">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3">
+                            <Link href="/" className="mr-2 p-1 hover:bg-accent rounded-full transition-colors">
+                                <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+                            </Link>
                             <div className="p-2 rounded-lg bg-primary/10">
                                 <Leaf className="h-6 w-6 text-primary" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-semibold text-card-foreground">Research Agent</h1>
-                                <p className="text-sm text-muted-foreground">AI Deep Research Dashboard</p>
+                                <h1 className="text-xl font-semibold text-card-foreground">リサーチエージェント</h1>
+                                <p className="text-sm text-muted-foreground">AIによる栽培情報の深層調査</p>
                             </div>
                         </div>
                         <div className={`px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 border ${isSystemExecuting
@@ -103,7 +108,7 @@ export default function ResearchDashboard() {
                             : "bg-primary/10 text-primary border-primary/20"
                             }`}>
                             <div className={`w-2 h-2 rounded-full ${isSystemExecuting ? "bg-blue-500 animate-pulse" : "bg-primary"}`}></div>
-                            {isSystemExecuting ? "Executing Deep Research..." : "System Idle"}
+                            {isSystemExecuting ? "深層調査を実行中..." : "システム待機中"}
                         </div>
                     </div>
                 </div>
@@ -111,13 +116,13 @@ export default function ResearchDashboard() {
 
             <main className="max-w-7xl mx-auto px-6 py-8">
                 <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-2xl font-semibold tracking-tight">Vegetable Research</h2>
+                    <h2 className="text-2xl font-semibold tracking-tight">野菜の研究情報</h2>
                     <button
                         onClick={openModal}
                         className="inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 gap-2"
                     >
                         <Plus className="w-4 h-4" />
-                        New Seed
+                        新しい種を登録
                     </button>
                 </div>
 
@@ -187,24 +192,24 @@ export default function ResearchDashboard() {
                         </button>
 
                         <div className="flex flex-col space-y-1.5 text-center sm:text-left mb-6">
-                            <h2 className="text-lg font-semibold leading-none tracking-tight">Register New Seed</h2>
+                            <h2 className="text-lg font-semibold leading-none tracking-tight">新しい種の登録</h2>
                             <p className="text-sm text-muted-foreground">
-                                Upload an image of the seed packet to begin AI analysis.
+                                種袋の画像をアップロードしてAI分析を開始します。
                             </p>
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                    Seed Packet Image
+                                    種袋の画像
                                 </label>
                                 <div
                                     className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-accent/50 hover:border-accent transition-colors cursor-pointer"
                                     onClick={() => fileInputRef.current?.click()}
                                 >
                                     <CloudUpload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                                    <p className="text-sm text-muted-foreground font-medium">{fileName}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">Supports: JPG, PNG</p>
+                                    <p className="text-sm text-muted-foreground font-medium">{fileName === "Click to browse or drag file here" ? "クリックして選択、またはドラッグ＆ドロップ" : fileName}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">対応形式: JPG, PNG</p>
                                     <input
                                         type="file"
                                         ref={fileInputRef}
@@ -223,7 +228,7 @@ export default function ResearchDashboard() {
                                 {uploading ? (
                                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                                 ) : (
-                                    "Register & Analyze"
+                                    "登録して分析を開始"
                                 )}
                             </button>
                         </form>
@@ -249,7 +254,7 @@ export default function ResearchDashboard() {
                             </div>
                             <div>
                                 <h2 className="text-xl font-semibold">{selectedVeg.name}</h2>
-                                <p className="text-sm text-muted-foreground">Analysis Results</p>
+                                <p className="text-sm text-muted-foreground">調査・分析結果</p>
                             </div>
                         </div>
 
@@ -301,7 +306,7 @@ export default function ResearchDashboard() {
                                 </>
                             ) : (
                                 <div className="text-center py-12 text-muted-foreground">
-                                    <p>No detailed data available.</p>
+                                    <p>詳細データがありません。</p>
                                 </div>
                             )}
                         </div>
