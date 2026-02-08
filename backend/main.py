@@ -1074,6 +1074,71 @@ async def generate_daily_diary_endpoint(background_tasks: BackgroundTasks):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+@app.get("/api/character")
+async def get_character_metadata():
+    """
+    Get the current character metadata.
+    Proxies the GCS image URL to a local API URL.
+    """
+    try:
+        doc_ref = db.collection("growing_diaries").document("Character")
+        doc = await doc_ref.get()
+        
+        if not doc.exists:
+            # Return empty if not found, or 404
+            return {}
+            
+        data = doc.to_dict()
+        
+        # Transform image_uri to proxy URL
+        if data.get("image_uri") and data["image_uri"].startswith("https://storage.googleapis.com/"):
+            gcs_uri = data["image_uri"]
+            bucket_name = "ai-agentic-hackathon-4-bk"
+            prefix = f"https://storage.googleapis.com/{bucket_name}/"
+            
+            if gcs_uri.startswith(prefix):
+                blob_path = gcs_uri[len(prefix):]
+                import urllib.parse
+                encoded_path = urllib.parse.quote(blob_path)
+                data["image_uri"] = f"/api/character/image?path={encoded_path}"
+                
+        return data
+    except Exception as e:
+        error(f"Error fetching character: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/character/image")
+async def get_character_image_endpoint(path: str):
+    """
+    Serve character image from GCS via proxy.
+    path: Relative path in GCS bucket (e.g. characters/xyz.png)
+    """
+    try:
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        
+        # Security check: prevent path traversal or accessing other buckets? 
+        # GCS paths don't use .. usually, but good to be safe. 
+        # We assume path is just the object name.
+        
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(path)
+        
+        if not blob.exists():
+            raise HTTPException(status_code=404, detail="Image not found")
+            
+        img_bytes = blob.download_as_bytes()
+        from fastapi import Response
+        return Response(content=img_bytes, media_type="image/png")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error(f"Error serving character image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.on_event("startup")
 async def startup_event():
     """Log application startup."""

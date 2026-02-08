@@ -10,6 +10,7 @@ AI Batake Appは、家庭菜園や農業を支援するためのAIプラット�
 - **種袋画像解析**: AIによる種袋画像の自動分析と栽培情報の抽出
 - **Deep Research**: Gemini AIを活用した詳細な栽培条件の調査
 - **栽培ガイド生成**: ステップバイステップの栽培手順と画像の自動生成
+- **AIキャラクター作成**: 種袋画像からオリジナルの野菜キャラクターを生成
 - **AIアクティビティログ**: エージェントの自律動作内容をタイムラインで表示
 
 ## 🛠️ 技術スタック
@@ -286,6 +287,9 @@ npm test
 | POST | `/api/seed-guide/jobs` | 栽培ガイドジョブ作成 |
 | GET | `/api/seed-guide/jobs/{job_id}` | ジョブステータス取得 |
 | GET | `/api/agent-logs` | エージェント実行ログ取得 |
+| POST | `/api/seed-guide/character` | キャラクター生成ジョブ作成 |
+| GET | `/api/character` | 最新キャラクター情報取得 |
+| GET | `/api/character/image` | キャラクター画像取得 (プロキシ) |
 
 ## 📄 ライセンス
 
