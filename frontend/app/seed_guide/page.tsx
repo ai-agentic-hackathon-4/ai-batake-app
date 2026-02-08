@@ -22,7 +22,6 @@ interface SavedGuide {
     message?: string;
     created_at: string;
     steps: Step[];
-    original_image?: string;
 }
 
 export default function SeedGuidePage() {

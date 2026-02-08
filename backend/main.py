@@ -569,7 +569,6 @@ class SaveGuideRequest(BaseModel):
     title: str
     description: Optional[str] = None
     steps: list
-    original_image: Optional[str] = None # Base64 string of the original image
 
 @app.post("/api/seed-guide/save")
 async def save_seed_guide_endpoint(request: SaveGuideRequest):
