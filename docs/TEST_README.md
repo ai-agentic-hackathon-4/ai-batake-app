@@ -23,15 +23,15 @@ pytest
 | `tests/test_diary_service.py` | 日記サービステスト |
 | `tests/test_research_agent.py` | 種袋解析・Deep Researchテスト **[NEW]** |
 | `tests/test_image_service.py` | 絵日記画像生成テスト **[NEW]** |
-| `tests/test_select_feature.py` | 指示選択機能のテスト |
-| `tests/test_seed_guide_persistence.py` | 栽培ガイド永続化テスト |
 | `tests/test_async_flow.py` | 非同期フローテスト |
+| `tests/test_select_feature.py` | 指示選択機能のテスト |
+| `tests/test_vegetable_config.py` | 野菜設定・日記生成優先順位テスト **[NEW]** |
 | `tests/test_logger.py` | ロガーテスト |
 | `tests/test_utils.py` | ユーティリティ関数のテスト |
 
 ### テスト結果
 
-- **総テスト数**: 67件（+17件追加）
+- **総テスト数**: 71件（+21件追加）
 - **成功**: 全件パス
 - **成功率**: 100%
 
@@ -72,6 +72,6 @@ npm test
 
 ## 総合結果
 
-- **総テスト数**: 109件（+29件追加）
+- **総テスト数**: 113件（+33件追加）
 - **成功**: 全件パス
 - **成功率**: 100%
