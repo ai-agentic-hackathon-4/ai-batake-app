@@ -571,7 +571,6 @@ class SaveGuideRequest(BaseModel):
     title: str
     description: Optional[str] = None
     steps: list
-    original_image: Optional[str] = None # Base64 string of the original image
 
 @app.post("/api/seed-guide/save")
 async def save_seed_guide_endpoint(request: SaveGuideRequest):
@@ -640,6 +639,7 @@ async def get_saved_guide(doc_id: str):
             
             # Since step is dict reference, modification works in-place
             tasks = [hydrate_step(step) for step in data["steps"]]
+            
             await asyncio.gather(*tasks)
             debug(f"Hydration complete for guide {doc_id}")
 
