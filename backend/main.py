@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks, Request
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
@@ -8,6 +9,8 @@ import os
 import time
 import base64
 import json
+import asyncio
+from datetime import datetime
 from google.cloud import storage
 from google.cloud import firestore
 from dotenv import load_dotenv
@@ -38,14 +41,22 @@ load_dotenv()
 # Imports
 try:
     # Try importing from feature/#3 db functions
-    from .db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs
-    # Also old ones just in case
-    from .db import save_growing_instructions 
+    from .db import (
+        init_vegetable_status, update_vegetable_status, 
+        get_all_vegetables, get_latest_vegetable, 
+        get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs,
+        get_all_seed_guides, save_seed_guide, get_seed_guide
+    )
     from .research_agent import analyze_seed_packet, perform_deep_research
     from .agent import get_weather_from_agent
 except ImportError:
     # When running directly as a script
-    from db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, save_growing_instructions, get_agent_execution_logs
+    from db import (
+        init_vegetable_status, update_vegetable_status, 
+        get_all_vegetables, get_latest_vegetable, 
+        get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs,
+        get_all_seed_guides, save_seed_guide, get_seed_guide
+    )
     from research_agent import analyze_seed_packet, perform_deep_research
     from agent import get_weather_from_agent
 
@@ -58,6 +69,26 @@ except ImportError:
     except ImportError as e:
         warning(f"Failed to import seed_service: {e}")
         pass
+
+# Imports for Diary Service
+try:
+    from .diary_service import (
+        process_daily_diary,
+        get_all_diaries,
+        get_diary_by_date
+    )
+except ImportError:
+    try:
+        from diary_service import (
+            process_daily_diary,
+            get_all_diaries,
+            get_diary_by_date
+        )
+    except ImportError as e:
+        logging.warning(f"Failed to import diary_service: {e}")
+        process_daily_diary = None
+        get_all_diaries = None
+        get_diary_by_date = None
 
 app = FastAPI()
 
@@ -334,9 +365,27 @@ async def get_latest_plant_image():
         error(f"Error serving plant image: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+def _download_from_gcs_sync(bucket_name, blob_name):
+    """Sync helper to download bytes from GCS."""
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+    return blob.download_as_bytes()
+
+def _upload_to_gcs_sync(bucket_name, blob_name, content, content_type):
+    """Sync helper to upload bytes/string to GCS."""
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+    if isinstance(content, str):
+        blob.upload_from_string(content, content_type=content_type)
+    else:
+        blob.upload_from_string(content, content_type=content_type)
+    return f"https://storage.googleapis.com/{bucket_name}/{blob_name}"
+
 # --- feature/#5 Endpoints (Async Firestore Jobs) ---
 
-async def process_seed_guide(job_id: str, image_bytes: bytes):
+async def process_seed_guide(job_id: str, image_source: str):
     """Background task to process seed guide generation (Feature #5)."""
     # Set session ID for background task tracing
     task_session_id = f"job-{job_id[:8]}"
@@ -355,17 +404,79 @@ async def process_seed_guide(job_id: str, image_bytes: bytes):
         debug(f"[Job {job_id}] Progress: {msg}")
         await doc_ref.update({"message": msg})
 
+    # Download image if source is a path/URL
+    image_bytes = None
+    try:
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        blob_name = None
+        
+        if isinstance(image_source, str) and image_source.startswith("gs://"):
+            blob_name = image_source.replace(f"gs://{bucket_name}/", "")
+        elif isinstance(image_source, bytes):
+            image_bytes = image_source
+        else:
+            # Fallback: assume it is a blob name if string
+            blob_name = image_source
+            
+        if blob_name:
+            debug(f"Downloading input image from GCS: {blob_name}")
+            image_bytes = await asyncio.to_thread(_download_from_gcs_sync, bucket_name, blob_name)
+             
+    except Exception as e:
+        error(f"Failed to download input image: {e}")
+        await doc_ref.update({"status": "FAILED", "message": "Failed to retrieve input image"})
+        return
+
     try:
         # Check if analyze_seed_and_generate_guide is available
         if 'analyze_seed_and_generate_guide' in globals():
             debug(f"Calling analyze_seed_and_generate_guide for job {job_id}")
-            steps = await analyze_seed_and_generate_guide(image_bytes, progress_callback)
+            
+            # Unpack the new return values (title, description, steps)
+            guide_title, guide_description, steps = await analyze_seed_and_generate_guide(image_bytes, progress_callback)
+            
+            # Post-process steps: Upload generated images to GCS
+            info(f"Uploading {len(steps)} generated images to GCS...")
+            
+            for i, step in enumerate(steps):
+                if step.get("image_base64"):
+                    try:
+                        b64_data = step["image_base64"]
+                        img_data = base64.b64decode(b64_data)
+                        timestamp = int(time.time())
+                        blob_name = f"seed-guides/output/{job_id}_{timestamp}_{i}.jpg"
+                        
+                        image_url = await asyncio.to_thread(
+                            _upload_to_gcs_sync, 
+                            "ai-agentic-hackathon-4-bk", 
+                            blob_name, 
+                            img_data, 
+                            "image/jpeg"
+                        )
+                        
+                        # Replace base64 with URL
+                        step["image_url"] = image_url
+                        del step["image_base64"]
+                    except Exception as img_e:
+                        warning(f"Failed to upload output image {i}: {img_e}")
             info(f"Seed guide job {job_id} completed with {len(steps)} steps")
-            await doc_ref.update({
+            
+            # Update to COMPLETED with result using DB function or manual update
+            update_data = {
                 "status": "COMPLETED",
                 "result": steps,
+                "steps": steps, 
                 "message": "Complete!"
-            })
+            }
+            
+            # Only update title/description if they are valid
+            if guide_title and guide_title != "Seed Guide":
+                update_data["title"] = guide_title
+            
+            if guide_description:
+                 update_data["description"] = guide_description
+                 
+            await doc_ref.update(update_data)
         else:
             warning(f"analyze_seed_and_generate_guide not available for job {job_id}")
             await doc_ref.update({
@@ -379,31 +490,61 @@ async def process_seed_guide(job_id: str, image_bytes: bytes):
             "message": str(e)
         })
 
-@app.post("/api/seed-guide/jobs")
-async def create_seed_guide_job(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    """Starts an async job using feature/#5 architecture."""
+@app.post("/api/seed-guide/generate")
+async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """Starts an async seed guide generation, persisting immediately to Saved Guides."""
     try:
-        content = await file.read()
+        # Upload to GCS (streaming)
         job_id = str(uuid.uuid4())
+        info(f"Creating seed guide job: {job_id}, file: {file.filename}")
         
-        info(f"Creating seed guide job: {job_id}, file: {file.filename}, size: {len(content)} bytes")
-        
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        try:
+            timestamp = int(time.time())
+            safe_filename = file.filename.replace(" ", "_").replace("/", "_")
+            blob_name = f"seed-guides/input/{timestamp}_{safe_filename}"
+            
+            info(f"Uploading input image to GCS: {blob_name}")
+            content = await file.read()
+            
+            # Use sync helper in thread
+            image_url = await asyncio.to_thread(
+                _upload_to_gcs_sync,
+                bucket_name,
+                blob_name,
+                content,
+                file.content_type
+            )
+
+        except Exception as e:
+            error(f"Failed to upload input to GCS: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to upload image: {e}")
+
+        # Create persistent document immediately
         doc_ref = db.collection(COLLECTION_NAME).document(job_id)
+        
         await doc_ref.set({
-            "job_id": job_id,
+            "job_id": job_id, 
+            "title": "New Seed Guide",
             "status": "PENDING",
             "message": "Job created, waiting for worker...",
+            "input_image_url": image_url,
             "result": None,
+            "steps": [], 
             "created_at": firestore.SERVER_TIMESTAMP
         })
         
-        background_tasks.add_task(process_seed_guide, job_id, content)
+        # Pass blob_name (str) instead of content (bytes)
+        background_tasks.add_task(process_seed_guide, job_id, blob_name)
         debug(f"Background task queued for job {job_id}")
+
+        return {"job_id": job_id, "status": "PENDING"}
         
-        return {"job_id": job_id}
     except Exception as e:
-        error(f"Failed to create seed guide job: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to start job: {str(e)}")
+        error(f"Failed to start generation: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to start generation: {str(e)}")
+
+# Legacy job endpoints removed/deprecated in favor of unified flow
 
 @app.get("/api/seed-guide/jobs/{job_id}")
 async def get_seed_guide_job(job_id: str):
@@ -425,6 +566,315 @@ async def get_seed_guide_job(job_id: str):
     except Exception as e:
         error(f"Failed to fetch job {job_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+class SaveGuideRequest(BaseModel):
+    title: str
+    description: Optional[str] = None
+    steps: list
+    original_image: Optional[str] = None # Base64 string of the original image
+
+@app.post("/api/seed-guide/save")
+async def save_seed_guide_endpoint(request: SaveGuideRequest):
+    """Saves a generated seed guide."""
+    try:
+        # Use globally imported save_seed_guide
+        doc_id = await asyncio.to_thread(save_seed_guide, request.dict())
+        return {"status": "success", "id": doc_id}
+    except Exception as e:
+        error(f"Failed to save guide: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to save guide: {str(e)}")
+
+@app.get("/api/seed-guide/saved")
+async def list_saved_guides():
+    """Returns a list of saved seed guides."""
+    try:
+        # Use globally imported get_all_seed_guides
+        return await asyncio.to_thread(get_all_seed_guides)
+    except Exception as e:
+        error(f"Failed to list guides: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to list guides: {str(e)}")
+
+def _hydrate_image_for_frontend(url: str):
+    """Downloads image from GCS URL and returns base64 string (Sync)."""
+    try:
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        if url.startswith("https://storage.googleapis.com/"):
+            # Extract relative path from URL
+            # Format: https://storage.googleapis.com/BUCKET_NAME/BLOB_NAME
+            # Or: https://storage.googleapis.com/ai-agentic-hackathon-4-bk/seed-guides/output/...
+            prefix = f"https://storage.googleapis.com/{bucket_name}/"
+            if url.startswith(prefix):
+                 blob_name = url[len(prefix):]
+                 storage_client = storage.Client()
+                 bucket = storage_client.bucket(bucket_name)
+                 blob = bucket.blob(blob_name)
+                 image_data = blob.download_as_bytes()
+                 return base64.b64encode(image_data).decode('utf-8')
+        return None
+    except Exception as e:
+        warning(f"Failed to hydrate image from {url}: {e}")
+        return None
+
+@app.get("/api/seed-guide/saved/{doc_id}")
+async def get_saved_guide(doc_id: str):
+    """Returns a specific saved seed guide with hydrated images."""
+    try:
+        # Use globally imported get_seed_guide
+        data = await asyncio.to_thread(get_seed_guide, doc_id)
+        if not data:
+            raise HTTPException(status_code=404, detail="Guide not found")
+        
+        # Hydrate images if needed (because GCS is private)
+        # This iterates over steps and replaces image_url with image_base64
+        if "steps" in data:
+            debug(f"Hydrating images for guide {doc_id}...")
+            # Run parallel download for images
+            async def hydrate_step(step):
+                if step.get("image_url") and not step.get("image_base64"):
+                     # Download image
+                     b64 = await asyncio.to_thread(_hydrate_image_for_frontend, step["image_url"])
+                     if b64:
+                         step["image_base64"] = b64
+                         # Remove URL so frontend uses base64
+                         del step["image_url"]
+            
+            # Since step is dict reference, modification works in-place
+            tasks = [hydrate_step(step) for step in data["steps"]]
+            await asyncio.gather(*tasks)
+            debug(f"Hydration complete for guide {doc_id}")
+
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        error(f"Failed to get guide: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get guide: {str(e)}")
+# --- Diary Endpoints ---
+
+class DiaryGenerateRequest(BaseModel):
+    date: str  # ISO format date string (YYYY-MM-DD)
+
+class ProgressWrapper:
+    def __init__(self):
+        self.queue = asyncio.Queue()
+    
+    async def callback(self, msg):
+        await self.queue.put(msg)
+    
+    async def __aiter__(self):
+        while True:
+            msg = await self.queue.get()
+            if msg == "__DONE__":
+                break
+            yield msg
+
+@app.post("/api/diary/auto-generate")
+async def auto_generate_diary_endpoint(key: Optional[str] = None):
+    """
+    Endpoint for Cloud Scheduler to trigger automatic diary generation.
+    Secured by a simple API key check.
+    """
+    secret_key = os.environ.get("DIARY_API_KEY")
+    if secret_key and key != secret_key:
+        error(f"Unauthorized attempt to trigger auto-generation (key: {key})")
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    try:
+        current_date_str = datetime.now().date().isoformat()
+        info(f"Auto-generating diary for today: {current_date_str}")
+        
+        # Run background task to actually generate
+        # Note: We return success immediately to Scheduler
+        asyncio.create_task(process_daily_diary(current_date_str))
+        
+        return {
+            "status": "accepted",
+            "date": current_date_str,
+            "message": "Automatic diary generation started"
+        }
+    except Exception as e:
+        error(f"Failed to trigger auto-generation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/diary/generate-manual")
+async def generate_manual_diary_endpoint(
+    request: DiaryGenerateRequest
+):
+    """
+    Trigger manual diary generation for a specific date and stream progress.
+    Now uses GET to avoid proxy buffering issues with POST responses.
+    """
+    if process_daily_diary is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        from datetime import date as date_module
+        
+        # Validate date format
+        try:
+            target_date_obj = date_module.fromisoformat(request.date)
+            target_date_str = request.date
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        
+        async def event_generator():
+            # Initial padding to force proxy flush (some proxies buffer until 2KB or 4KB)
+            # Cloud Run/Load Balancer can be aggressive
+            yield ":" + " " * 4096 + "\n\n"
+            
+            debug("SSE stream: Kickoff")
+            yield f"data: {json.dumps({'status': 'processing', 'message': '生成の準備ができました'})}\n\n"
+            
+            try:
+                pw = ProgressWrapper()
+                
+                async def run_work():
+                    try:
+                        await process_daily_diary(target_date_str, pw.callback)
+                    finally:
+                        await pw.callback("__DONE__")
+
+                work_task = asyncio.create_task(run_work())
+                
+                while True:
+                    try:
+                        # Wait for message or timeout for ping
+                        # Cloud Run idle timeout is often 30-60s, keeping ping frequent
+                        msg = await asyncio.wait_for(pw.queue.get(), timeout=15.0)
+                        if msg == "__DONE__":
+                            debug("SSE stream: Done signal received")
+                            break
+                        debug(f"SSE stream: Yielding message: {msg}")
+                        yield f"data: {json.dumps({'status': 'processing', 'message': msg})}\n\n"
+                    except asyncio.TimeoutError:
+                        debug("SSE stream: Yielding ping")
+                        yield f": ping\n\n"
+                
+                await work_task
+                yield f"data: {json.dumps({'status': 'completed', 'message': '完了しました'})}\n\n"
+            except Exception as e:
+                error(f"Streaming generation failed: {e}", exc_info=True)
+                yield f"data: {json.dumps({'status': 'failed', 'message': str(e)})}\n\n"
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # For Nginx/Proxy
+                "Transfer-Encoding": "chunked",
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error starting manual diary generation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/diary/list")
+async def list_diaries(limit: int = 30, offset: int = 0):
+    if get_all_diaries is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        diaries = get_all_diaries(limit=limit, offset=offset)
+        # Transform plant_image_url to proxy URL if it's a GCS path
+        for diary in diaries:
+            if diary.get("plant_image_url") and diary["plant_image_url"].startswith("gs://"):
+                diary["plant_image_url"] = f"/api/diary/image/{diary['date']}"
+        return {"diaries": diaries}
+    except Exception as e:
+        logging.error(f"Error listing diaries: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/diary/{date}")
+async def get_diary(date: str):
+    if get_diary_by_date is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        diary = get_diary_by_date(date)
+        
+        if diary is None:
+            raise HTTPException(status_code=404, detail="Diary not found")
+        
+        # Transform plant_image_url to proxy URL if it's a GCS path
+        if diary.get("plant_image_url") and diary["plant_image_url"].startswith("gs://"):
+            diary["plant_image_url"] = f"/api/diary/image/{diary['date']}"
+            
+        return diary
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error fetching diary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/diary/image/{date}")
+async def get_diary_image(date: str):
+    """
+    Serve diary image from GCS via proxy.
+    """
+    if get_diary_by_date is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        diary = get_diary_by_date(date)
+        if not diary or not diary.get("plant_image_url") or not diary["plant_image_url"].startswith("gs://"):
+            raise HTTPException(status_code=404, detail="Image not found or not in GCS format")
+        
+        # Parse GCS path (gs://bucket/path/to/blob)
+        gcs_uri = diary["plant_image_url"]
+        path_without_scheme = gcs_uri[5:]
+        parts = path_without_scheme.split("/", 1)
+        if len(parts) < 2:
+            raise HTTPException(status_code=400, detail="Invalid GCS URI")
+        
+        bucket_name = parts[0]
+        blob_name = parts[1]
+        
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+        
+        if not blob.exists():
+            raise HTTPException(status_code=404, detail="Image blob not found in GCS")
+            
+        # Stream the blob content
+        img_bytes = blob.download_as_bytes()
+        from fastapi import Response
+        return Response(content=img_bytes, media_type="image/png")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error serving diary image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/diary/generate-daily")
+async def generate_daily_diary_endpoint(background_tasks: BackgroundTasks):
+    """
+    Trigger daily diary generation.
+    """
+    if process_daily_diary is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        from datetime import datetime, timedelta
+        target_date = (datetime.now() - timedelta(hours=1)).date()
+        background_tasks.add_task(process_daily_diary, target_date.isoformat())
+        return {
+            "status": "accepted",
+            "date": target_date.isoformat(),
+            "message": "Diary generation started"
+        }
+    except Exception as e:
+        logging.error(f"Error starting diary generation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.on_event("startup")
