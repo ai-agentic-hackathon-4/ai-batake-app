@@ -39,12 +39,22 @@ load_dotenv()
 # Imports
 try:
     # Try importing from feature/#3 db functions
-    from .db import init_vegetable_status, update_vegetable_status, get_all_vegetables, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs
+    from .db import (
+        init_vegetable_status, update_vegetable_status, 
+        get_all_vegetables, get_latest_vegetable, 
+        get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs,
+        get_all_seed_guides, save_seed_guide, get_seed_guide
+    )
     from .research_agent import analyze_seed_packet, perform_deep_research
     from .agent import get_weather_from_agent
 except ImportError:
     # When running directly as a script
-    from db import init_vegetable_status, update_vegetable_status, get_all_vegetables, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs
+    from db import (
+        init_vegetable_status, update_vegetable_status, 
+        get_all_vegetables, get_latest_vegetable, 
+        get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs,
+        get_all_seed_guides, save_seed_guide, get_seed_guide
+    )
     from research_agent import analyze_seed_packet, perform_deep_research
     from agent import get_weather_from_agent
 
@@ -534,46 +544,36 @@ class SaveGuideRequest(BaseModel):
 async def save_seed_guide_endpoint(request: SaveGuideRequest):
     """Saves a generated seed guide."""
     try:
-        # Import here to ensure it uses the latest db.py
-        try:
-            from backend.db import save_seed_guide as save_func
-        except ImportError:
-            from db import save_seed_guide as save_func
-            
-        doc_id = await asyncio.to_thread(save_func, request.dict())
+        # Use globally imported save_seed_guide
+        doc_id = await asyncio.to_thread(save_seed_guide, request.dict())
         return {"status": "success", "id": doc_id}
     except Exception as e:
+        error(f"Failed to save guide: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to save guide: {str(e)}")
 
 @app.get("/api/seed-guide/saved")
 async def list_saved_guides():
     """Returns a list of saved seed guides."""
     try:
-        try:
-            from backend.db import get_all_seed_guides as list_func
-        except ImportError:
-            from db import get_all_seed_guides as list_func
-            
-        return await asyncio.to_thread(list_func)
+        # Use globally imported get_all_seed_guides
+        return await asyncio.to_thread(get_all_seed_guides)
     except Exception as e:
+        error(f"Failed to list guides: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to list guides: {str(e)}")
 
 @app.get("/api/seed-guide/saved/{doc_id}")
 async def get_saved_guide(doc_id: str):
     """Returns a specific saved seed guide."""
     try:
-        try:
-            from backend.db import get_seed_guide as get_func
-        except ImportError:
-            from db import get_seed_guide as get_func
-            
-        data = await asyncio.to_thread(get_func, doc_id)
+        # Use globally imported get_seed_guide
+        data = await asyncio.to_thread(get_seed_guide, doc_id)
         if not data:
             raise HTTPException(status_code=404, detail="Guide not found")
         return data
     except HTTPException:
         raise
     except Exception as e:
+        error(f"Failed to get guide: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get guide: {str(e)}")
 # --- Diary Endpoints ---
 
