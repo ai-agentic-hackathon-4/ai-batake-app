@@ -20,7 +20,7 @@ export default function LandingPage() {
                 </div>
 
                 {/* Features Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 w-full animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
 
                     {/* Dashboard Card */}
                     <Link href="/dashboard" className="group">
