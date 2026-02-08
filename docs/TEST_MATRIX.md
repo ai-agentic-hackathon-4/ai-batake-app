@@ -53,6 +53,15 @@
 | BE-API-011 | main.py | /api/register-seed 解析エラー | 異常系 | 500エラーを返却 | ✅ 完了 |
 | BE-API-012 | main.py | /api/seed-guide/jobs 作成成功 | 正常系 | job_idを返却 | ✅ 完了 |
 | BE-API-013 | main.py | /api/seed-guide/jobs/{job_id} 存在しない | 異常系 | 404エラーを返却 | ✅ 完了 |
+| BE-API-014 | main.py | /api/plant-camera/latest 成功 | 正常系 | 画像データとタイムスタンプを返却 | ✅ 完了 |
+| BE-API-015 | main.py | /api/plant-camera/latest 画像なし | 正常系 | エラーメッセージを返却 | ✅ 完了 |
+| BE-API-016 | main.py | /api/diary/auto-generate 成功 | 正常系 | accepted状態を返却 | ✅ 完了 |
+| BE-API-017 | main.py | /api/diary/auto-generate 認証エラー | 異常系 | 403エラーを返却 | ✅ 完了 |
+| BE-API-018 | main.py | /api/diary/auto-generate キー不要 | 正常系 | キー未設定時は認証不要 | ✅ 完了 |
+| BE-API-019 | main.py | /api/diary/image/{date} 日記なし | 異常系 | 404エラーを返却 | ✅ 完了 |
+| BE-API-020 | main.py | /api/diary/image/{date} 画像URLなし | 異常系 | 404エラーを返却 | ✅ 完了 |
+| BE-API-021 | main.py | /api/diary/image/{date} 成功 | 正常系 | 画像バイナリを返却 | ✅ 完了 |
+
 
 ### 4. 種分析サービス（seed_service.py）
 
@@ -71,6 +80,33 @@
 | BE-UTIL-002 | test_utils.py | 基本的なアサーション | 正常系 | 数値演算が正常に動作することを確認 | ✅ 完了 |
 | BE-UTIL-003 | test_utils.py | 文字列操作テスト | 正常系 | Python文字列操作が正常に動作することを確認 | ✅ 完了 |
 | BE-UTIL-004 | test_utils.py | リスト操作テスト | 正常系 | Pythonリスト操作が正常に動作することを確認 | ✅ 完了 |
+
+### 6. 種袋解析・Deep Research（research_agent.py）
+
+| ID | 対象ファイル | テストケース概要 | 区分(正常/異常) | 期待される動作 | 実装ステータス |
+|----|------------|------------------|---------------|--------------|-------------|
+| BE-RA-001 | research_agent.py | ADCで認証ヘッダー取得 | 正常系 | BearerトークンをAuthorizationに含む | ✅ 完了 |
+| BE-RA-002 | research_agent.py | APIキーで認証 | 正常系 | query_paramにキーを含む | ✅ 完了 |
+| BE-RA-003 | research_agent.py | リクエストリトライ成功 | 正常系 | 初回でレスポンスを返却 | ✅ 完了 |
+| BE-RA-004 | research_agent.py | 429エラーでリトライ | 正常系 | リトライ後成功 | ✅ 完了 |
+| BE-RA-005 | research_agent.py | 種袋解析成功 | 正常系 | JSON形式で野菜情報を返却 | ✅ 完了 |
+| BE-RA-006 | research_agent.py | 種袋解析APIエラー | 異常系 | エラーJSONを返却 | ✅ 完了 |
+| BE-RA-007 | research_agent.py | Deep Research成功 | 正常系 | 構造化データを返却 | ✅ 完了 |
+| BE-RA-008 | research_agent.py | Deep Research開始失敗 | 異常系 | エラー情報を含む辞書を返却 | ✅ 完了 |
+| BE-RA-009 | research_agent.py | 5xxエラー時のリトライ | 異常系 | リトライ後成功または失敗 | ✅ 完了 |
+| BE-RA-010 | research_agent.py | リトライ上限到達 | 異常系 | 指定回数リトライ後に最終結果を返却 | ✅ 完了 |
+| BE-RA-011 | research_agent.py | 400エラー時の挙動 | 異常系 | リトライせずに即座にレスポンス返却 | ✅ 完了 |
+
+### 7. 画像サービス（image_service.py）
+
+| ID | 対象ファイル | テストケース概要 | 区分(正常/異常) | 期待される動作 | 実装ステータス |
+|----|------------|------------------|---------------|--------------|-------------|
+| BE-IMG-001 | image_service.py | ストレージクライアント取得 | 正常系 | Clientインスタンスを返却 | ✅ 完了 |
+| BE-IMG-002 | image_service.py | APIキー未設定 | 異常系 | Noneを返却 | ✅ 完了 |
+| BE-IMG-003 | image_service.py | キャラクター画像なし | 異常系 | Noneを返却 | ✅ 完了 |
+| BE-IMG-004 | image_service.py | API呼び出しエラー | 異常系 | Noneを返却 | ✅ 完了 |
+| BE-IMG-005 | image_service.py | 絵日記生成成功 | 正常系 | GCSパスを返却 | ✅ 完了 |
+| BE-IMG-006 | image_service.py | レスポンスに画像なし | 異常系 | Noneを返却 | ✅ 完了 |
 
 ## フロントエンド（TypeScript/Jest）テスト
 
@@ -124,7 +160,29 @@
 | FE-COMP-022 | growth-stage-card.tsx | タイムラインドット表示 | 正常系 | 5つの段階ドットが表示される | ✅ 完了 |
 | FE-COMP-023 | growth-stage-card.tsx | アイコン表示 | 正常系 | SVGアイコンが表示される | ✅ 完了 |
 
-## テスト実行方法
+### 5. PlantCameraコンポーネント
+
+| ID | 対象ファイル | テストケース概要 | 区分(正常/異常) | 期待される動作 | 実装ステータス |
+|----|------------|------------------|---------------|--------------|-------------|
+| FE-COMP-024 | plant-camera.tsx | ローディング状態表示 | 正常系 | "読み込み中"メッセージが表示される | ✅ 完了 |
+| FE-COMP-025 | plant-camera.tsx | タイトルとバッジ表示 | 正常系 | "プラントカメラ"と"ライブ"バッジが表示される | ✅ 完了 |
+| FE-COMP-026 | plant-camera.tsx | 画像取得成功 | 正常系 | 取得した画像が表示される | ✅ 完了 |
+| FE-COMP-027 | plant-camera.tsx | 画像なし時エラー表示 | 異常系 | エラーメッセージが表示される | ✅ 完了 |
+| FE-COMP-028 | plant-camera.tsx | ネットワークエラー時 | 異常系 | エラーメッセージが表示される | ✅ 完了 |
+| FE-COMP-029 | plant-camera.tsx | レスポンスエラー時 | 異常系 | エラーメッセージが表示される | ✅ 完了 |
+
+### 6. EnvironmentChartコンポーネント
+
+| ID | 対象ファイル | テストケース概要 | 区分(正常/異常) | 期待される動作 | 実装ステータス |
+|----|------------|------------------|---------------|--------------|-------------|
+| FE-COMP-030 | environment-chart.tsx | タイトル表示 | 正常系 | "環境データ"が表示される | ✅ 完了 |
+| FE-COMP-031 | environment-chart.tsx | 期間セレクター表示 | 正常系 | コンボボックスが表示される | ✅ 完了 |
+| FE-COMP-032 | environment-chart.tsx | マウント時データ取得 | 正常系 | APIが呼び出される | ✅ 完了 |
+| FE-COMP-033 | environment-chart.tsx | 空データ時表示 | 正常系 | クラッシュせずにレンダリングされる | ✅ 完了 |
+| FE-COMP-034 | environment-chart.tsx | ネットワークエラー時 | 異常系 | クラッシュせずにレンダリングされる | ✅ 完了 |
+| FE-COMP-035 | environment-chart.tsx | アイコン表示 | 正常系 | Activityアイコンが表示される | ✅ 完了 |
+
+
 
 ### バックエンド（Python）
 ```bash
@@ -143,15 +201,15 @@ npm test
 ## テストカバレッジ
 
 ### バックエンド
-- **合計テストケース数**: 42件
-- **正常系テスト**: 31件
-- **異常系テスト**: 11件
+- **合計テストケース数**: 67件（+17件追加）
+- **正常系テスト**: 44件
+- **異常系テスト**: 23件
 - **実装完了率**: 100%
 
 ### フロントエンド
-- **合計テストケース数**: 30件
-- **正常系テスト**: 30件
-- **異常系テスト**: 0件
+- **合計テストケース数**: 42件（+12件追加）
+- **正常系テスト**: 37件
+- **異常系テスト**: 5件
 - **実装完了率**: 100%
 
 ## 備考

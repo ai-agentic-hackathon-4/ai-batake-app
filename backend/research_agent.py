@@ -40,22 +40,42 @@ def get_auth_headers():
 def request_with_retry(method, url, **kwargs):
     max_retries = 5
     backoff_factor = 2
+    
     for i in range(max_retries):
         try:
             response = requests.request(method, url, **kwargs)
-            if response.status_code == 429:
-                sleep_time = backoff_factor ** i
-                warning(f"429 Too Many Requests. Retrying in {sleep_time}s... (attempt {i+1}/{max_retries})")
-                time.sleep(sleep_time)
-                continue
+            
+            # Retry on 429 (Too Many Requests) and 5xx (Server Error)
+            if response.status_code == 429 or (500 <= response.status_code < 600):
+                sleep_time = (backoff_factor ** i) + (i * 0.5)  # Add minor linear increase/jitter
+                if i < max_retries - 1:
+                    warning(f"Request failed with status {response.status_code}. Retrying in {sleep_time}s... (attempt {i+1}/{max_retries})")
+                    time.sleep(sleep_time)
+                    continue
+            
             return response
+            
         except requests.exceptions.RequestException as e:
-            warning(f"Request failed: {e}. Retrying... (attempt {i+1}/{max_retries})")
-            time.sleep(backoff_factor ** i)
-    
-    # Final attempt
-    debug(f"Final retry attempt for {method} {url}")
-    return requests.request(method, url, **kwargs)
+            sleep_time = (backoff_factor ** i)
+            if i < max_retries - 1:
+                warning(f"Request exception: {e}. Retrying in {sleep_time}s... (attempt {i+1}/{max_retries})")
+                time.sleep(sleep_time)
+            elif i == max_retries - 1:
+                # If it's the last attempt, let the loop finish to make final request
+                pass
+
+    # Final attempt or return the last response if available
+    try:
+        debug(f"Final retry attempt for {method} {url}")
+        return requests.request(method, url, **kwargs)
+    except requests.exceptions.RequestException as e:
+        # If the final attempt also fails with exception, re-raise it or return None?
+        # The calling code expects a response object or raises error on response usage.
+        # But requests.request raises exception.
+        # Let's log and re-raise to be safe, or return a mock response with error status?
+        # Standard requests behavior is to raise.
+        error(f"Final request attempt failed: {e}")
+        raise
 
 def analyze_seed_packet(image_bytes: bytes) -> str:
     """
