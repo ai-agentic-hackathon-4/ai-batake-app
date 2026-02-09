@@ -18,81 +18,30 @@ export default function Dashboard() {
         humidity: "--"
     })
 
-    // Track loading status of individual components if needed, or just wait for all initial fetches
-    const [isDataLoaded, setIsDataLoaded] = useState({
-        sensors: false,
-        camera: false,
-        logs: false,
-        weather: false
-    })
-
     useEffect(() => {
-        const fetchAllData = async () => {
-            const safeFetch = async (url: string, options?: RequestInit) => {
-                try {
-                    const res = await fetch(url, options)
-                    if (!res.ok) {
-                        console.warn(`Fetch to ${url} failed with status: ${res.status}`)
-                        return null
-                    }
-                    const text = await res.text()
-                    try {
-                        return JSON.parse(text)
-                    } catch (e) {
-                        console.error(`Failed to parse JSON for ${url}:`, text.slice(0, 100))
-                        return null
-                    }
-                } catch (e) {
-                    console.error(`Network error fetching ${url}:`, e)
-                    return null
-                }
-            }
-
+        const fetchInitialData = async () => {
             try {
-                // We'll perform essential fetches here to gate the loading screen
-                const sensorPromise = safeFetch('/api/sensors/latest')
-                const cameraPromise = safeFetch('/api/plant-camera/latest')
-                const logsPromise = safeFetch('/api/agent-logs')
-                const historyPromise = safeFetch('/api/sensor-history?hours=24')
-                const weatherPromise = safeFetch('/api/weather', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ region: "東京" })
-                })
-
-                const [sensors, camera, logs, history, weather] = await Promise.all([
-                    sensorPromise,
-                    cameraPromise,
-                    logsPromise,
-                    historyPromise,
-                    weatherPromise
-                ])
-
-                if (sensors && sensors.temperature !== undefined) {
-                    setSensorData({
-                        temperature: sensors.temperature,
-                        humidity: sensors.humidity
-                    })
+                // We only need the latest sensor data for the top-level MetricCards
+                // Other components (PlantCamera, WeatherCard, EnvironmentChart, AIActivityLog) fetch their own data
+                const res = await fetch('/api/sensors/latest')
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data && data.temperature !== undefined) {
+                        setSensorData({
+                            temperature: data.temperature,
+                            humidity: data.humidity
+                        })
+                    }
                 }
-
-                // Mark everything as loaded
-                setIsDataLoaded({
-                    sensors: true,
-                    camera: true,
-                    logs: true,
-                    weather: true
-                })
-
-                // Keep the loading screen for a tiny bit longer for a smooth transition
-                setTimeout(() => setIsLoading(false), 500)
             } catch (error) {
-                console.error("Failed to fetch initial dashboard data:", error)
-                // Even on error, we should probably hide the loader eventually
+                console.error("Failed to fetch initial sensor data:", error)
+            } finally {
+                // Hide loading screen as soon as we have the basic stats
                 setIsLoading(false)
             }
         }
 
-        fetchAllData()
+        fetchInitialData()
 
         // Background refresh interval for sensors (keep existing logic)
         const interval = setInterval(async () => {

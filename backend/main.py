@@ -182,7 +182,7 @@ async def get_weather(request: WeatherRequest):
 async def get_latest_sensor_log_endpoint():
     try:
         debug("Fetching latest sensor log")
-        logs = get_recent_sensor_logs(limit=1)
+        logs = await asyncio.to_thread(get_recent_sensor_logs, limit=1)
         if logs and len(logs) > 0:
             debug(f"Sensor log found: temp={logs[0].get('temperature')}, humidity={logs[0].get('humidity')}")
             return logs[0]
@@ -196,7 +196,7 @@ async def get_latest_sensor_log_endpoint():
 async def get_sensor_history_endpoint(hours: int = 24):
     try:
         debug(f"Fetching sensor history for {hours} hours")
-        data = get_sensor_history(hours=hours)
+        data = await asyncio.to_thread(get_sensor_history, hours=hours)
         info(f"Sensor history retrieved: {len(data)} records")
         return {"data": data}
     except Exception as e:
@@ -207,7 +207,7 @@ async def get_sensor_history_endpoint(hours: int = 24):
 async def get_latest_vegetable_endpoint():
     try:
         debug("Fetching latest vegetable")
-        data = get_latest_vegetable()
+        data = await asyncio.to_thread(get_latest_vegetable)
         if data:
             info(f"Latest vegetable found: {data.get('name')}")
             return data
@@ -247,7 +247,7 @@ async def get_oldest_agent_log_endpoint():
 async def get_agent_logs_endpoint():
     try:
         debug("Fetching agent execution logs")
-        logs = get_agent_execution_logs(limit=20)
+        logs = await asyncio.to_thread(get_agent_execution_logs, limit=20)
         info(f"Agent logs retrieved: {len(logs)} entries")
         return {"logs": logs}
     except Exception as e:
@@ -370,30 +370,47 @@ async def list_vegetables():
 async def get_latest_plant_image():
     try:
         debug("Fetching latest plant camera image")
-        storage_client = storage.Client()
-        bucket_name = "ai-agentic-hackathon-4-bk"
-        bucket = storage_client.bucket(bucket_name)
-        prefix = "logger-captures/"
-        blobs = list(bucket.list_blobs(prefix=prefix))
-
-        if not blobs:
-            warning("No plant images found in storage")
-            return {"error": "No images found"}
         
-        image_blobs = [b for b in blobs if not b.name.endswith('/')]
-        if not image_blobs:
-            warning("No image files found in plant camera folder")
-            return {"error": "No image files found"}
+        # Move blocking GCS operations to a thread
+        def _get_image_data():
+            storage_client = storage.Client()
+            bucket_name = "ai-agentic-hackathon-4-bk"
+            bucket = storage_client.bucket(bucket_name)
+            prefix = "logger-captures/"
+            blobs = list(bucket.list_blobs(prefix=prefix))
 
-        latest_blob = max(image_blobs, key=lambda b: b.time_created)
-        info(f"Serving plant image: {latest_blob.name}")
-        image_data = latest_blob.download_as_bytes()
-        b64_image = base64.b64encode(image_data).decode('utf-8')
-        content_type = latest_blob.content_type or "image/jpeg"
+            if not blobs:
+                return None, "No images found"
+            
+            image_blobs = [b for b in blobs if not b.name.endswith('/')]
+            if not image_blobs:
+                return None, "No image files found"
+
+            latest_blob = max(image_blobs, key=lambda b: b.time_created)
+            info(f"Serving plant image: {latest_blob.name}")
+            data = latest_blob.download_as_bytes()
+            return {
+                "content": data,
+                "content_type": latest_blob.content_type or "image/jpeg",
+                "timestamp": latest_blob.time_created.isoformat()
+            }, None
+
+        result, error_msg = await asyncio.to_thread(_get_image_data)
+        
+        if error_msg:
+            warning(error_msg)
+            return {"error": error_msg}
+
+        # Base64 encoding can also be blocking for large data (1.8MB)
+        def _encode_base64(data, content_type):
+            b64 = base64.b64encode(data).decode('utf-8')
+            return f"data:{content_type};base64,{b64}"
+
+        b64_image = await asyncio.to_thread(_encode_base64, result["content"], result["content_type"])
         
         return {
-            "image": f"data:{content_type};base64,{b64_image}",
-            "timestamp": latest_blob.time_created.isoformat()
+            "image": b64_image,
+            "timestamp": result["timestamp"]
         }
     except Exception as e:
         error(f"Error serving plant image: {str(e)}", exc_info=True)
