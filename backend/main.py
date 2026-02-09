@@ -251,9 +251,9 @@ def process_research(doc_id: str, vegetable_name: str, analysis_data: dict):
         if isinstance(research_result, dict):
             research_result["original_analysis"] = analysis_data
         
-        # Update DB to completed
+        # Update DB to completed (UPPERCASE for frontend compatibility)
         debug(f"Updating vegetable status to completed for {doc_id}")
-        update_vegetable_status(doc_id, "completed", research_result)
+        update_vegetable_status(doc_id, "COMPLETED", research_result)
         
         # Update Edge Agent Configuration -> DISABLED per user request (manual selection only)
         # update_edge_agent_config(research_result)
@@ -1383,6 +1383,9 @@ async def get_unified_job_status(job_id: str):
         r_data, g_data, c_data = await asyncio.gather(fetch_research(), fetch_guide(), fetch_char())
         
         if r_data:
+            # Normalize status to uppercase for frontend
+            if "status" in r_data:
+                r_data["status"] = r_data["status"].upper()
             results["research"] = make_serializable(r_data)
         if g_data:
             # Handle guide image proxying like in other endpoints if needed, but for now just raw

@@ -58,6 +58,12 @@ def test_unified_flow(image_path):
                 print("\nALL TASKS COMPLETED!")
                 print(json.dumps(status_data, indent=2, ensure_ascii=False))
                 break
+            
+            if research_status == "failed" or research_status == "FAILED":
+               print("\nResearch FAILED!")
+               print(f"Error: {status_data.get('research', {}).get('error')}")
+               print(json.dumps(status_data, indent=2, ensure_ascii=False))
+               break
                 
             time.sleep(2)
         except Exception as e:
