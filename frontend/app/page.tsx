@@ -74,6 +74,39 @@ export default function LandingPage() {
                     </Link>
                 </div>
 
+                {/* Tools List */}
+                <div className="w-full max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm">
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">ツール一覧</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <Link href="/character" className="group">
+                                <div className="h-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-center hover:shadow-md hover:border-pink-300 transition-all">
+                                    <div className="mx-auto mb-3 p-2 bg-pink-100 rounded-full w-fit">
+                                        <Sparkles className="h-6 w-6 text-pink-600" />
+                                    </div>
+                                    <p className="font-semibold text-slate-900">キャラクター作成</p>
+                                </div>
+                            </Link>
+                            <Link href="/research_agent" className="group">
+                                <div className="h-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-center hover:shadow-md hover:border-purple-300 transition-all">
+                                    <div className="mx-auto mb-3 p-2 bg-purple-100 rounded-full w-fit">
+                                        <Microscope className="h-6 w-6 text-purple-600" />
+                                    </div>
+                                    <p className="font-semibold text-slate-900">リサーチエージェント</p>
+                                </div>
+                            </Link>
+                            <Link href="/seed_guide" className="group">
+                                <div className="h-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-center hover:shadow-md hover:border-emerald-300 transition-all">
+                                    <div className="mx-auto mb-3 p-2 bg-emerald-100 rounded-full w-fit">
+                                        <Sprout className="h-6 w-6 text-emerald-600" />
+                                    </div>
+                                    <p className="font-semibold text-slate-900">栽培ガイド作成</p>
+                                </div>
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+
 
 
                 <footer className="text-sm text-slate-400 pt-8">
