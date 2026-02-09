@@ -22,7 +22,7 @@ logger = get_logger()
 # Configuration
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "ai-agentic-hackathon-4")
 LOCATION =  "us-central1"
-API_ENDPOINT = f"https://{LOCATION}-aiplatform.googleapis.com/v1"
+API_ENDPOINT = "aiplatform.googleapis.com"
 
 def get_access_token():
     credentials, _ = google.auth.default()
@@ -231,9 +231,9 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         ]
     }
 
-    # Endpoint: Use aiplatform.googleapis.com
+    # Endpoint: Use aiplatform.googleapis.com (generateContent)
     url = (
-        f"{API_ENDPOINT}/projects/{PROJECT_ID}/locations/{LOCATION}/publishers/google/"
+        f"https://{API_ENDPOINT}/v1/publishers/google/"
         f"models/{model_id}:generateContent?key={api_key}"
     )
     
@@ -295,7 +295,10 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
     img_model_id = "gemini-3-pro-image-preview" 
     
     # Url: https://aiplatform.googleapis.com/v1/publishers/google/models/{img_model_id}:generateContent?key={API_KEY}
-    img_url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{img_model_id}:generateContent?key={api_key}"
+    img_url = (
+        f"https://{API_ENDPOINT}/v1/publishers/google/"
+        f"models/{img_model_id}:generateContent?key={api_key}"
+    )
     
     # Offload parallel image generation to thread
     final_steps = await asyncio.to_thread(_generate_images_parallel, steps, img_url, headers)
