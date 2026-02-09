@@ -242,11 +242,7 @@ export default function UnifiedPage() {
                                     <p className="text-xs text-slate-500 mt-1">
                                         {status.guide.status === 'COMPLETED' ? '完了' :
                                             status.guide.status === 'FAILED' ? '失敗' :
-                                                status.guide.status === 'PENDING' ? '待機中...' : (
-                                                    <span className="flex items-center gap-1">
-                                                        生成中... <Loader2 className="h-4 w-4 animate-spin" />
-                                                    </span>
-                                                )}
+                                                status.guide.status === 'PENDING' ? '待機中...' : '生成中...'}
                                     </p>
                                 </div>
                             </div>
