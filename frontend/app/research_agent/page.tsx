@@ -95,6 +95,19 @@ export default function ResearchDashboard() {
         }
     };
 
+    const handleDeleteVegetable = async (id: string) => {
+        if (!confirm("このリサーチデータを削除しますか？")) return;
+        try {
+            const res = await fetch(`/api/vegetables/${id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error("Delete failed");
+            if (selectedVeg?.id === id) setSelectedVeg(null);
+            fetchVegetables();
+        } catch (e) {
+            console.error(e);
+            alert("削除に失敗しました");
+        }
+    };
+
     const openModal = () => {
         setIsModalOpen(true);
         setFileName("Click to browse or drag file here");
@@ -256,6 +269,15 @@ export default function ResearchDashboard() {
                                         }`}
                                     onClick={() => !isProcessing && setSelectedVeg(veg)}
                                 >
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteVegetable(veg.id);
+                                        }}
+                                        className="absolute top-3 right-3 text-xs text-red-500 hover:text-red-600"
+                                    >
+                                        削除
+                                    </button>
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="flex items-center gap-3">
                                             <div className={`p-2 rounded-lg ${isProcessing ? "bg-amber-100 text-amber-600" :
