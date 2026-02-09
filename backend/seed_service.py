@@ -162,10 +162,10 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
     if progress_callback: await progress_callback("🌱 AI is analyzing the seed image (Gemini 3 Pro)...")
 
     # API Key Authentication
-    api_key = os.environ.get("SEED_GUIDE_GEMINI_KEY") or os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("SEED_GUIDE_GEMINI_KEY")
     if not api_key:
-        error("SEED_GUIDE_GEMINI_KEY and GEMINI_API_KEY environment variables not set")
-        raise RuntimeError("SEED_GUIDE_GEMINI_KEY/GEMINI_API_KEY environment variable not set")
+        error("SEED_GUIDE_GEMINI_KEY environment variable not set")
+        raise RuntimeError("SEED_GUIDE_GEMINI_KEY environment variable not set")
         
     # Headers: API Key mode does not use Bearer Token usually, but requires Content-Type
     headers = {
@@ -231,9 +231,11 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         ]
     }
 
-    # Endpoint: Use generativelanguage.googleapis.com which supports API keys
-    # The aiplatform.googleapis.com endpoint requires OAuth2 and doesn't support API keys
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key}"
+    # Endpoint: Use aiplatform.googleapis.com
+    url = (
+        f"{API_ENDPOINT}/projects/{PROJECT_ID}/locations/{LOCATION}/publishers/google/"
+        f"models/{model_id}:generateContent?key={api_key}"
+    )
     
     debug(f"Requesting Gemini 3 Pro Analysis: {url.split('?')[0]}?key=***")
     
