@@ -617,7 +617,7 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
     set_request_id(generate_request_id())
     
     info(f"Starting character generation job: {job_id}")
-    doc_ref = db.collection(COLLECTION_NAME).document(job_id)
+    doc_ref = db.collection("character_jobs").document(job_id)
     
     await doc_ref.update({
         "status": "PROCESSING",
@@ -766,7 +766,7 @@ async def create_character_job(background_tasks: BackgroundTasks, file: UploadFi
         
         info(f"Creating character generation job: {job_id}, file: {file.filename}")
         
-        doc_ref = db.collection(COLLECTION_NAME).document(job_id)
+        doc_ref = db.collection("character_jobs").document(job_id)
         await doc_ref.set({
             "job_id": job_id,
             "status": "PENDING",
@@ -1203,7 +1203,7 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
         
         # Character Job Doc
         char_job_id = f"char-{job_id}"
-        char_doc_ref = db.collection("seed_guide_jobs").document(char_job_id)
+        char_doc_ref = db.collection("character_jobs").document(char_job_id)
         await char_doc_ref.set({
             "job_id": char_job_id,
             "status": "PENDING",
@@ -1363,8 +1363,8 @@ async def get_unified_job_status(job_id: str):
             
         async def fetch_char():
             if not char_id: return None
-             # Char jobs also in "seed_guide_jobs"
-            d = await db.collection("seed_guide_jobs").document(char_id).get()
+             # Char jobs in "character_jobs"
+            d = await db.collection("character_jobs").document(char_id).get()
             return d.to_dict() if d.exists else None
         
         r_data, g_data, c_data = await asyncio.gather(fetch_research(), fetch_guide(), fetch_char())
