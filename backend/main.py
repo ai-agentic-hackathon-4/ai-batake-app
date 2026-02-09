@@ -401,7 +401,7 @@ async def process_seed_guide(job_id: str, image_source: str):
     set_session_id(task_session_id)
     set_request_id(generate_request_id())
     
-    info(f"Starting seed guide generation job: {job_id}")
+    info(f"[SeedGuide] start job={job_id}")
     doc_ref = db.collection(COLLECTION_NAME).document(job_id)
     
     await doc_ref.update({
@@ -439,13 +439,16 @@ async def process_seed_guide(job_id: str, image_source: str):
     try:
         # Check if analyze_seed_and_generate_guide is available
         if 'analyze_seed_and_generate_guide' in globals():
-            debug(f"Calling analyze_seed_and_generate_guide for job {job_id}")
+            info(f"[SeedGuide][LLM] analyze start job={job_id}")
+            analyze_start_ts = time.time()
             
             # Unpack the new return values (title, description, steps)
             guide_title, guide_description, steps = await analyze_seed_and_generate_guide(image_bytes, progress_callback)
+            analyze_elapsed_ms = (time.time() - analyze_start_ts) * 1000
+            info(f"[SeedGuide][LLM] analyze done job={job_id} ms={analyze_elapsed_ms:.0f}")
             
             # Post-process steps: Upload generated images to GCS
-            info(f"Uploading {len(steps)} generated images to GCS...")
+            info(f"[SeedGuide] upload_images job={job_id} count={len(steps)}")
             
             for i, step in enumerate(steps):
                 if step.get("image_base64"):
@@ -468,7 +471,7 @@ async def process_seed_guide(job_id: str, image_source: str):
                         del step["image_base64"]
                     except Exception as img_e:
                         warning(f"Failed to upload output image {i}: {img_e}")
-            info(f"Seed guide job {job_id} completed with {len(steps)} steps")
+            info(f"[SeedGuide] completed job={job_id} steps={len(steps)}")
             
             # Update to COMPLETED with result using DB function or manual update
             update_data = {
@@ -487,13 +490,13 @@ async def process_seed_guide(job_id: str, image_source: str):
                  
             await doc_ref.update(update_data)
         else:
-            warning(f"analyze_seed_and_generate_guide not available for job {job_id}")
+            warning(f"[SeedGuide] analyze_unavailable job={job_id}")
             await doc_ref.update({
                 "status": "FAILED",
                 "message": "Analysis service not available"
             })
     except Exception as e:
-        error(f"Seed guide job {job_id} failed: {str(e)}", exc_info=True)
+        error(f"[SeedGuide] failed job={job_id} error={str(e)}", exc_info=True)
         await doc_ref.update({
             "status": "FAILED",
             "message": str(e)
@@ -616,7 +619,7 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
     set_session_id(task_session_id)
     set_request_id(generate_request_id())
     
-    info(f"Starting character generation job: {job_id}")
+    info(f"[Character] start job={job_id}")
     doc_ref = db.collection("character_jobs").document(job_id)
     
     await doc_ref.update({
@@ -627,8 +630,11 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
     try:
         # Check if analyze_seed_and_generate_character is available
         if 'analyze_seed_and_generate_character' in globals():
-            debug(f"Calling analyze_seed_and_generate_character for job {job_id}")
+            info(f"[Character][LLM] analyze start job={job_id}")
+            analyze_start_ts = time.time()
             result = await analyze_seed_and_generate_character(image_bytes)
+            analyze_elapsed_ms = (time.time() - analyze_start_ts) * 1000
+            info(f"[Character][LLM] analyze done job={job_id} ms={analyze_elapsed_ms:.0f}")
             
             # Save image to GCS
             if result.get("image_base64"):
@@ -639,7 +645,7 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
                     blob_name = f"characters/{job_id}_{timestamp}.png"
                     
                     # Upload to GCS
-                    info(f"Uploading character image to GCS: {blob_name}")
+                    info(f"[Character] upload_image job={job_id} blob={blob_name}")
                     image_url = await asyncio.to_thread(
                         _upload_to_gcs_sync, 
                         "ai-agentic-hackathon-4-bk", 
@@ -660,7 +666,9 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
                         "personality": result.get("personality"),
                         "updated_at": firestore.SERVER_TIMESTAMP
                     }, merge=True)
-                    info(f"Saved character to /growing_diaries/Character: {result.get('character_name')}")
+                    info(
+                        f"[Character] saved job={job_id} name={result.get('character_name')}"
+                    )
                     
                     # Remove base64 from result to save space in job doc
                     del result["image_base64"]
@@ -678,13 +686,13 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
                 "message": "Character generated!"
             })
         else:
-            warning(f"analyze_seed_and_generate_character not available for job {job_id}")
+            warning(f"[Character] analyze_unavailable job={job_id}")
             await doc_ref.update({
                 "status": "FAILED",
                 "message": "Analysis service not available"
             })
     except Exception as e:
-        error(f"Character generation job {job_id} failed: {str(e)}", exc_info=True)
+        error(f"[Character] failed job={job_id} error={str(e)}", exc_info=True)
         await doc_ref.update({
             "status": "FAILED",
             "message": str(e)
@@ -1156,8 +1164,8 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
         bucket_name = "ai-agentic-hackathon-4-bk"
         blob_name = f"unified/input/{timestamp}_{job_id}_{safe_filename}"
         
-        info(f"Starting UNIFIED job: {job_id}, file: {file.filename}")
-        info(f"Uploading input image to GCS: {blob_name}")
+        info(f"[Unified] start job={job_id} file={file.filename}")
+        info(f"[Unified] upload_input job={job_id} blob={blob_name}")
         
         image_url = await asyncio.to_thread(
             _upload_to_gcs_sync,
@@ -1225,11 +1233,16 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
             "status": "PROCESSING"
         })
         
+        info(
+            f"[Unified] created docs job={job_id} research={research_doc_id} "
+            f"guide={guide_job_id} char={char_job_id}"
+        )
+
         # 4. Queue Background Tasks (Parallel Execution)
         
         async def unified_runner():
             # Phase 1: Character Generation + Basic Seed Analysis (Parallel)
-            info(f"Starting unified runner for job {job_id}: Phase 1 - Character & Basic Analysis")
+            info(f"[Unified] phase1 start job={job_id} (character + basic_analysis)")
             
             # We need to run analyze_seed_packet and store the result for Phase 2
             # We'll use a local helper for the research part to extract data first
@@ -1237,8 +1250,14 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
             async def phase1_basic_analysis():
                 set_session_id(f"uni-res-{job_id[:8]}")
                 try:
-                    info(f"[Unified] Analyzing seed packet for {research_doc_id}")
+                    info(f"[Unified][LLM] analyze_seed_packet start job={job_id} research={research_doc_id}")
+                    start_ts = time.time()
                     packet_analysis_json = await asyncio.to_thread(analyze_seed_packet, content) # content is image bytes
+                    elapsed_ms = (time.time() - start_ts) * 1000
+                    info(
+                        f"[Unified][LLM] analyze_seed_packet done job={job_id} "
+                        f"research={research_doc_id} ms={elapsed_ms:.0f}"
+                    )
                     
                     try:
                         clean_text = packet_analysis_json.replace("```json", "").replace("```", "")
@@ -1247,7 +1266,10 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
                         # Check if "unknown"
                         if vegetable_name.lower() == "unknown":
                             error_msg = analysis_data.get("visible_instructions", "野菜の種類を特定できませんでした。")
-                            info(f"[Unified] Unknown vegetable detected. Aborting. Message: {error_msg}")
+                            warning(
+                                f"[Unified] unknown_vegetable job={job_id} "
+                                f"research={research_doc_id} msg={error_msg}"
+                            )
                             await db.collection("vegetables").document(research_doc_id).set({
                                 "status": "failed",
                                 "error": error_msg,
@@ -1268,7 +1290,10 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
                             "status": "researching", 
                             "updated_at": firestore.SERVER_TIMESTAMP
                         }, merge=True)
-                        info(f"[Unified] Saved basic analysis for {vegetable_name}")
+                        info(
+                            f"[Unified] basic_analysis_saved job={job_id} "
+                            f"research={research_doc_id} veg={vegetable_name}"
+                        )
                         
                     except:
                         vegetable_name = "Unknown Vegetable"
@@ -1276,7 +1301,7 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
                         
                     return vegetable_name, analysis_data
                 except Exception as e:
-                    error(f"[Unified] Basic analysis failed: {e}")
+                    error(f"[Unified] basic_analysis_failed job={job_id} error={e}")
                     update_vegetable_status(research_doc_id, "failed", {"error": str(e)})
                     return None, None
 
@@ -1298,7 +1323,9 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
             veg_name, analysis_data = results[1]
             
             if not veg_name:
-                warn(f"[Unified] Aborting job {job_id} due to basic analysis failure or unknown vegetable")
+                warning(
+                    f"[Unified] abort job={job_id} reason=basic_analysis_failed_or_unknown"
+                )
                 # Ensure research job is marked as failed if not already (handled in phase1_basic_analysis but good to be safe)
                 # Also, we should probably mark unified job as failed?
                 # But individual status is what frontend checks.
@@ -1306,10 +1333,11 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
 
             # Phase 2 & 3: Deep Research + Cultivation Guide (Parallel)
             info(
-                f"Starting unified runner for job {job_id}: "
-                f"Phase 2 - Deep Research for {veg_name} & Phase 3 - Cultivation Guide"
+                f"[Unified] phase2_3 start job={job_id} veg={veg_name}"
             )
 
+            info(f"[Unified][LLM] deep_research start job={job_id} research={research_doc_id}")
+            research_start_ts = time.time()
             research_task = asyncio.to_thread(process_research, research_doc_id, veg_name, analysis_data)
             guide_task = process_seed_guide(guide_job_id, blob_name)
             research_result, guide_result = await asyncio.gather(
@@ -1318,12 +1346,18 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
                 return_exceptions=True
             )
 
+            research_elapsed_ms = (time.time() - research_start_ts) * 1000
+            info(
+                f"[Unified][LLM] deep_research done job={job_id} "
+                f"research={research_doc_id} ms={research_elapsed_ms:.0f}"
+            )
+
             if isinstance(research_result, Exception):
-                error(f"[Unified] Phase 2 Research failed: {research_result}")
+                error(f"[Unified] phase2_failed job={job_id} error={research_result}")
             if isinstance(guide_result, Exception):
-                error(f"[Unified] Phase 3 Guide failed: {guide_result}")
-            
-            info(f"Unified runner finished for job {job_id}")
+                error(f"[Unified] phase3_failed job={job_id} error={guide_result}")
+
+            info(f"[Unified] done job={job_id}")
 
         # Add single orchestrator task
         background_tasks.add_task(unified_runner)
