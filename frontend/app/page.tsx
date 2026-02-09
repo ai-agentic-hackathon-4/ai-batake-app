@@ -19,8 +19,33 @@ export default function LandingPage() {
                     </p>
                 </div>
 
+                <div className="w-full max-w-4xl mx-auto mb-12 animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-100">
+                    <Link href="/unified" className="group block">
+                        <div className="relative overflow-hidden bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl p-8 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+                            <div className="absolute top-0 right-0 p-4 opacity-10">
+                                <Sparkles className="w-64 h-64 text-white" />
+                            </div>
+                            <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
+                                <div className="p-4 bg-white/20 rounded-full backdrop-blur-sm group-hover:bg-white/30 transition-colors">
+                                    <Sparkles className="w-12 h-12 text-white" />
+                                </div>
+                                <div className="text-left flex-1">
+                                    <h2 className="text-2xl md:text-3xl font-bold mb-2">野菜を育て始める</h2>
+                                    <p className="text-green-50 text-lg">
+                                        種袋の画像ひとつで、キャラクター・栽培ガイド・詳細リサーチを一括生成。
+                                        あなたの農業ライフをここから始めましょう。
+                                    </p>
+                                </div>
+                                <div className="bg-white text-green-600 px-6 py-2 rounded-full font-bold text-sm shadow-md group-hover:scale-105 transition-transform">
+                                    スタート
+                                </div>
+                            </div>
+                        </div>
+                    </Link>
+                </div>
+
                 {/* Features Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 w-full animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
 
                     {/* Dashboard Card */}
                     <Link href="/dashboard" className="group">
@@ -35,51 +60,6 @@ export default function LandingPage() {
                         </div>
                     </Link>
 
-                    {/* Character Creation Card */}
-                    <Link href="/character" className="group">
-                        <div className="h-full bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-primary/50 transition-all duration-300">
-                            <div className="mb-4 p-3 bg-pink-50 rounded-lg w-fit mx-auto group-hover:scale-110 transition-transform">
-                                <Sparkles className="h-8 w-8 text-pink-600" />
-                            </div>
-                            <h2 className="text-xl font-semibold mb-2 text-slate-900">AIキャラクター作成</h2>
-                            <p className="text-slate-500 text-sm">
-                                種や野菜の写真から、あなただけの妖精キャラクターを生み出します。
-                            </p>
-                            <div className="mt-4 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-pink-100 text-pink-800">
-                                New
-                            </div>
-                        </div>
-                    </Link>
-
-                    {/* Research Agent Card */}
-                    <Link href="/research_agent" className="group">
-                        <div className="h-full bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-primary/50 transition-all duration-300">
-                            <div className="mb-4 p-3 bg-purple-50 rounded-lg w-fit mx-auto group-hover:scale-110 transition-transform">
-                                <Microscope className="h-8 w-8 text-purple-600" />
-                            </div>
-                            <h2 className="text-xl font-semibold mb-2 text-slate-900">リサーチエージェント</h2>
-                            <p className="text-slate-500 text-sm">
-                                AIによる種袋分析と、最適な栽培条件の詳細調査を行います。
-                            </p>
-                        </div>
-                    </Link>
-
-                    {/* Seed Guide Card (Feature #5) */}
-                    <Link href="/seed_guide" className="group">
-                        <div className="h-full bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-primary/50 transition-all duration-300">
-                            <div className="mb-4 p-3 bg-green-50 rounded-lg w-fit mx-auto group-hover:scale-110 transition-transform">
-                                <Sprout className="h-8 w-8 text-green-600" />
-                            </div>
-                            <h2 className="text-xl font-semibold mb-2 text-slate-900">栽培ガイド生成</h2>
-                            <p className="text-slate-500 text-sm">
-                                写真をアップロードして、AIがステップバイステップの栽培ガイドを作成します。
-                            </p>
-                            <div className="mt-4 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                新機能
-                            </div>
-                        </div>
-                    </Link>
-
                     {/* Growing Diary Card */}
                     <Link href="/diary" className="group">
                         <div className="h-full bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-primary/50 transition-all duration-300">
@@ -88,15 +68,13 @@ export default function LandingPage() {
                             </div>
                             <h2 className="text-xl font-semibold mb-2 text-slate-900">育成日記</h2>
                             <p className="text-slate-500 text-sm">
-                                センサーデータやログからAIが生成する日々の栽培記録を確認します。
+                                日々の栽培記録とAIからのメッセージを確認します。
                             </p>
-                            <div className="mt-4 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                                新機能
-                            </div>
                         </div>
                     </Link>
-
                 </div>
+
+
 
                 <footer className="text-sm text-slate-400 pt-8">
                     © 2025 Smart Farm AI チーム

@@ -59,6 +59,9 @@ async def analyze_seed_and_generate_character(image_bytes: bytes):
     prompt_text = """
     このタネの画像を分析し、何の植物か特定してください。
     そして、その植物をモチーフにした「ゆるキャラ」の設定を考えてください。
+    背景は必ず白にしてください。
+    キャラクターは必ず1体のみ表示してください。
+    
     
     以下のJSON形式で出力してください:
     {

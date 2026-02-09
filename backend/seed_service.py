@@ -22,7 +22,7 @@ logger = get_logger()
 # Configuration
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "ai-agentic-hackathon-4")
 LOCATION =  "us-central1"
-API_ENDPOINT = f"https://{LOCATION}-aiplatform.googleapis.com/v1"
+API_ENDPOINT = "aiplatform.googleapis.com"
 
 def get_access_token():
     credentials, _ = google.auth.default()
@@ -30,36 +30,59 @@ def get_access_token():
     return credentials.token
 
 # Helper for Exponential Backoff (Sync)
-def call_api_with_backoff(url, payload, headers, max_retries=10):
-    base_delay = 2
-    
+def call_api_with_backoff(
+    url,
+    payload,
+    headers,
+    max_retries=5,
+    max_elapsed_seconds=30,
+    base_delay=1.0,
+    max_delay=6.0,
+):
+    start_time = time.time()
+
     for attempt in range(max_retries):
+        elapsed = time.time() - start_time
+        if elapsed >= max_elapsed_seconds:
+            error(f"Retry budget exceeded ({max_elapsed_seconds}s).")
+            raise RuntimeError("Retry budget exceeded")
+
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=120)
-            
+            response = requests.post(url, headers=headers, json=payload, timeout=60)
+
             if response.status_code == 200:
                 return response
-            elif response.status_code == 429:
-                # 429 Resource Exhausted
-                delay = (base_delay * (2 ** attempt)) + random.uniform(0, 1)
-                warning(f"API 429 (Resource Exhausted). Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
+            if response.status_code in (429,) or response.status_code >= 500:
+                # Honor Retry-After when present
+                retry_after = response.headers.get("Retry-After")
+                if retry_after is not None:
+                    try:
+                        delay = min(float(retry_after), max_delay)
+                    except ValueError:
+                        delay = min(base_delay * (2 ** attempt), max_delay)
+                else:
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+
+                # Add small jitter
+                delay += random.uniform(0, 0.5)
+                warning(
+                    f"API {response.status_code}. Retrying in {delay:.2f}s... "
+                    f"(Attempt {attempt+1}/{max_retries})"
+                )
                 time.sleep(delay)
                 continue
-            elif response.status_code >= 500:
-                # Server Error - also retry
-                delay = (base_delay * (2 ** attempt)) + random.uniform(0, 1)
-                warning(f"API {response.status_code}. Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
-                time.sleep(delay)
-                continue
-            else:
-                # Other errors (400, 403, etc) - do not retry
-                return response
+
+            # Other errors (400, 403, etc) - do not retry
+            return response
         except requests.exceptions.RequestException as e:
             # Network error - retry
-            delay = (base_delay * (2 ** attempt)) + random.uniform(0, 1)
-            warning(f"Network Error: {e}. Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
+            delay = min(base_delay * (2 ** attempt), max_delay) + random.uniform(0, 0.5)
+            warning(
+                f"Network Error: {e}. Retrying in {delay:.2f}s... "
+                f"(Attempt {attempt+1}/{max_retries})"
+            )
             time.sleep(delay)
-    
+
     error(f"Max retries ({max_retries}) exceeded.")
     raise RuntimeError(f"Max retries ({max_retries}) exceeded.")
 
@@ -231,8 +254,11 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         ]
     }
 
-    # Endpoint: https://aiplatform.googleapis.com/v1/publishers/google/models/{model_id}:generateContent?key={API_KEY}
-    url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{model_id}:generateContent?key={api_key}"
+    # Endpoint: Use aiplatform.googleapis.com (generateContent)
+    url = (
+        f"https://{API_ENDPOINT}/v1/publishers/google/"
+        f"models/{model_id}:generateContent?key={api_key}"
+    )
     
     debug(f"Requesting Gemini 3 Pro Analysis: {url.split('?')[0]}?key=***")
     
@@ -292,7 +318,10 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
     img_model_id = "gemini-3-pro-image-preview" 
     
     # Url: https://aiplatform.googleapis.com/v1/publishers/google/models/{img_model_id}:generateContent?key={API_KEY}
-    img_url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{img_model_id}:generateContent?key={api_key}"
+    img_url = (
+        f"https://{API_ENDPOINT}/v1/publishers/google/"
+        f"models/{img_model_id}:generateContent?key={api_key}"
+    )
     
     # Offload parallel image generation to thread
     final_steps = await asyncio.to_thread(_generate_images_parallel, steps, img_url, headers)

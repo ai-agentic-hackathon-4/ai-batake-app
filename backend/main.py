@@ -276,9 +276,9 @@ def process_research(doc_id: str, vegetable_name: str, analysis_data: dict):
         if isinstance(research_result, dict):
             research_result["original_analysis"] = analysis_data
         
-        # Update DB to completed
+        # Update DB to completed (UPPERCASE for frontend compatibility)
         debug(f"Updating vegetable status to completed for {doc_id}")
-        update_vegetable_status(doc_id, "completed", research_result)
+        update_vegetable_status(doc_id, "COMPLETED", research_result)
         
         # Update Edge Agent Configuration -> DISABLED per user request (manual selection only)
         # update_edge_agent_config(research_result)
@@ -443,17 +443,17 @@ async def process_seed_guide(job_id: str, image_source: str):
     set_session_id(task_session_id)
     set_request_id(generate_request_id())
     
-    info(f"Starting seed guide generation job: {job_id}")
+    info(f"[SeedGuide] start job={job_id}")
     doc_ref = db.collection(COLLECTION_NAME).document(job_id)
     
-    await doc_ref.update({
+    await doc_ref.set({
         "status": "PROCESSING",
         "message": "Starting analysis..."
-    })
+    }, merge=True)
     
     async def progress_callback(msg: str):
         debug(f"[Job {job_id}] Progress: {msg}")
-        await doc_ref.update({"message": msg})
+        await doc_ref.set({"message": msg}, merge=True)
 
     # Download image if source is a path/URL
     image_bytes = None
@@ -475,19 +475,22 @@ async def process_seed_guide(job_id: str, image_source: str):
              
     except Exception as e:
         error(f"Failed to download input image: {e}")
-        await doc_ref.update({"status": "FAILED", "message": "Failed to retrieve input image"})
+        await doc_ref.set({"status": "FAILED", "message": "Failed to retrieve input image"}, merge=True)
         return
 
     try:
         # Check if analyze_seed_and_generate_guide is available
         if 'analyze_seed_and_generate_guide' in globals():
-            debug(f"Calling analyze_seed_and_generate_guide for job {job_id}")
+            info(f"[SeedGuide][LLM] analyze start job={job_id}")
+            analyze_start_ts = time.time()
             
             # Unpack the new return values (title, description, steps)
             guide_title, guide_description, steps = await analyze_seed_and_generate_guide(image_bytes, progress_callback)
+            analyze_elapsed_ms = (time.time() - analyze_start_ts) * 1000
+            info(f"[SeedGuide][LLM] analyze done job={job_id} ms={analyze_elapsed_ms:.0f}")
             
             # Post-process steps: Upload generated images to GCS
-            info(f"Uploading {len(steps)} generated images to GCS...")
+            info(f"[SeedGuide] upload_images job={job_id} count={len(steps)}")
             
             for i, step in enumerate(steps):
                 if step.get("image_base64"):
@@ -510,7 +513,7 @@ async def process_seed_guide(job_id: str, image_source: str):
                         del step["image_base64"]
                     except Exception as img_e:
                         warning(f"Failed to upload output image {i}: {img_e}")
-            info(f"Seed guide job {job_id} completed with {len(steps)} steps")
+            info(f"[SeedGuide] completed job={job_id} steps={len(steps)}")
             
             # Update to COMPLETED with result using DB function or manual update
             update_data = {
@@ -527,19 +530,19 @@ async def process_seed_guide(job_id: str, image_source: str):
             if guide_description:
                  update_data["description"] = guide_description
                  
-            await doc_ref.update(update_data)
+            await doc_ref.set(update_data, merge=True)
         else:
-            warning(f"analyze_seed_and_generate_guide not available for job {job_id}")
-            await doc_ref.update({
+            warning(f"[SeedGuide] analyze_unavailable job={job_id}")
+            await doc_ref.set({
                 "status": "FAILED",
                 "message": "Analysis service not available"
-            })
+            }, merge=True)
     except Exception as e:
-        error(f"Seed guide job {job_id} failed: {str(e)}", exc_info=True)
-        await doc_ref.update({
+        error(f"[SeedGuide] failed job={job_id} error={str(e)}", exc_info=True)
+        await doc_ref.set({
             "status": "FAILED",
             "message": str(e)
-        })
+        }, merge=True)
 
 @app.post("/api/seed-guide/generate")
 async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
@@ -658,8 +661,8 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
     set_session_id(task_session_id)
     set_request_id(generate_request_id())
     
-    info(f"Starting character generation job: {job_id}")
-    doc_ref = db.collection(COLLECTION_NAME).document(job_id)
+    info(f"[Character] start job={job_id}")
+    doc_ref = db.collection("character_jobs").document(job_id)
     
     await doc_ref.update({
         "status": "PROCESSING",
@@ -669,8 +672,11 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
     try:
         # Check if analyze_seed_and_generate_character is available
         if 'analyze_seed_and_generate_character' in globals():
-            debug(f"Calling analyze_seed_and_generate_character for job {job_id}")
+            info(f"[Character][LLM] analyze start job={job_id}")
+            analyze_start_ts = time.time()
             result = await analyze_seed_and_generate_character(image_bytes)
+            analyze_elapsed_ms = (time.time() - analyze_start_ts) * 1000
+            info(f"[Character][LLM] analyze done job={job_id} ms={analyze_elapsed_ms:.0f}")
             
             # Save image to GCS
             if result.get("image_base64"):
@@ -681,7 +687,7 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
                     blob_name = f"characters/{job_id}_{timestamp}.png"
                     
                     # Upload to GCS
-                    info(f"Uploading character image to GCS: {blob_name}")
+                    info(f"[Character] upload_image job={job_id} blob={blob_name}")
                     image_url = await asyncio.to_thread(
                         _upload_to_gcs_sync, 
                         "ai-agentic-hackathon-4-bk", 
@@ -702,7 +708,9 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
                         "personality": result.get("personality"),
                         "updated_at": firestore.SERVER_TIMESTAMP
                     }, merge=True)
-                    info(f"Saved character to /growing_diaries/Character: {result.get('character_name')}")
+                    info(
+                        f"[Character] saved job={job_id} name={result.get('character_name')}"
+                    )
                     
                     # Remove base64 from result to save space in job doc
                     del result["image_base64"]
@@ -720,13 +728,13 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
                 "message": "Character generated!"
             })
         else:
-            warning(f"analyze_seed_and_generate_character not available for job {job_id}")
+            warning(f"[Character] analyze_unavailable job={job_id}")
             await doc_ref.update({
                 "status": "FAILED",
                 "message": "Analysis service not available"
             })
     except Exception as e:
-        error(f"Character generation job {job_id} failed: {str(e)}", exc_info=True)
+        error(f"[Character] failed job={job_id} error={str(e)}", exc_info=True)
         await doc_ref.update({
             "status": "FAILED",
             "message": str(e)
@@ -808,7 +816,7 @@ async def create_character_job(background_tasks: BackgroundTasks, file: UploadFi
         
         info(f"Creating character generation job: {job_id}, file: {file.filename}")
         
-        doc_ref = db.collection(COLLECTION_NAME).document(job_id)
+        doc_ref = db.collection("character_jobs").document(job_id)
         await doc_ref.set({
             "job_id": job_id,
             "status": "PENDING",
@@ -1181,6 +1189,337 @@ async def get_character_image_endpoint(path: str):
         error(f"Error serving character image: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# --- Unified Seed Feature Endpoints ---
+
+@app.post("/api/unified/start")
+async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """
+    Unified endpoint to start Research, Guide, and Character generation from a single image.
+    """
+    try:
+        # 1. Read and Upload Image to GCS (Standardize on one upload)
+        content = await file.read()
+        job_id = str(uuid.uuid4())
+        timestamp = int(time.time())
+        safe_filename = file.filename.replace(" ", "_").replace("/", "_")
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        blob_name = f"unified/input/{timestamp}_{job_id}_{safe_filename}"
+        
+        info(f"[Unified] start job={job_id} file={file.filename}")
+        info(f"[Unified] upload_input job={job_id} blob={blob_name}")
+        
+        image_url = await asyncio.to_thread(
+            _upload_to_gcs_sync,
+            bucket_name,
+            blob_name,
+            content,
+            file.content_type
+        )
+        
+        # 2. Initialize Sub-Jobs
+        
+        # A. Research (Vegetable Status)
+        # We need to do a quick analysis first to get the name, OR just use "Unknown" and let the background task refine it.
+        # process_research expects doc_id, vegetable_name, analysis_data.
+        # Let's do a quick analysis here synchronously? Or is it too slow?
+        # analyze_seed_packet is relatively fast (Gemini Flash). 
+        # But for "Unified" experience, maybe we return immediately.
+        # However, init_vegetable_status needs a name.
+        # Let's use "Pending Analysis" as name and let the background task update it?
+        # Actually checking process_research: it takes vegetable_name arg but also analysis_data.
+        # Let's run the analysis in background too? 
+        # existing /api/register-seed runs analyze_seed_packet synchronously... 
+        # For better UX (speed), let's push it to background. But we need a doc ID.
+        
+        # Let's create the documents first.
+        
+        # Research Doc
+        research_doc_id = init_vegetable_status("Analyzing...")
+        
+        # Guide Job Doc
+        guide_job_id = f"guide-{job_id}"
+        guide_doc_ref = db.collection("seed_guide_jobs").document(guide_job_id)
+        await guide_doc_ref.set({
+            "job_id": guide_job_id,
+            "title": "Unified Seed Guide",
+            "status": "PENDING",
+            "message": "Waiting for unified worker...",
+            "input_image_url": image_url,
+            "result": None,
+            "steps": [],
+            "created_at": firestore.SERVER_TIMESTAMP
+        })
+        
+        # Character Job Doc
+        char_job_id = f"char-{job_id}"
+        char_doc_ref = db.collection("character_jobs").document(char_job_id)
+        await char_doc_ref.set({
+            "job_id": char_job_id,
+            "status": "PENDING",
+            "message": "Waiting for unified worker...",
+            "result": None,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "type": "character"
+        })
+        
+        # 3. Create Unified Job Tracker
+        unified_doc_ref = db.collection("unified_jobs").document(job_id)
+        await unified_doc_ref.set({
+            "job_id": job_id,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "research_doc_id": research_doc_id,
+            "guide_job_id": guide_job_id,
+            "char_job_id": char_job_id,
+            "image_url": image_url,
+            "status": "PROCESSING"
+        })
+        
+        info(
+            f"[Unified] created docs job={job_id} research={research_doc_id} "
+            f"guide={guide_job_id} char={char_job_id}"
+        )
+
+        # 4. Queue Background Tasks (Parallel Execution)
+        
+        async def unified_runner():
+            # Phase 1: Character Generation + Basic Seed Analysis (Parallel)
+            info(f"[Unified] phase1 start job={job_id} (character + basic_analysis)")
+            
+            # We need to run analyze_seed_packet and store the result for Phase 2
+            # We'll use a local helper for the research part to extract data first
+            
+            async def phase1_basic_analysis():
+                set_session_id(f"uni-res-{job_id[:8]}")
+                try:
+                    info(f"[Unified][LLM] analyze_seed_packet start job={job_id} research={research_doc_id}")
+                    start_ts = time.time()
+                    packet_analysis_json = await asyncio.to_thread(analyze_seed_packet, content) # content is image bytes
+                    elapsed_ms = (time.time() - start_ts) * 1000
+                    info(
+                        f"[Unified][LLM] analyze_seed_packet done job={job_id} "
+                        f"research={research_doc_id} ms={elapsed_ms:.0f}"
+                    )
+                    
+                    try:
+                        clean_text = packet_analysis_json.replace("```json", "").replace("```", "")
+                        analysis_data = json.loads(clean_text)
+                        vegetable_name = analysis_data.get("name", "Unknown Vegetable")
+                        # Check if "unknown"
+                        if vegetable_name.lower() == "unknown":
+                            error_msg = analysis_data.get("visible_instructions", "野菜の種類を特定できませんでした。")
+                            warning(
+                                f"[Unified] unknown_vegetable job={job_id} "
+                                f"research={research_doc_id} msg={error_msg}"
+                            )
+                            await db.collection("vegetables").document(research_doc_id).set({
+                                "status": "failed",
+                                "error": error_msg,
+                                "updated_at": firestore.SERVER_TIMESTAMP
+                            }, merge=True)
+                            return None, None
+
+                        # SAVE IMMEDIATELY to Firestore so frontend sees it
+                        # We use the research_doc_id in "vegetables" collection
+                        # Structure it inside 'result' so frontend checks pass
+                        await db.collection("vegetables").document(research_doc_id).set({
+                            "result": {
+                                "name": vegetable_name,
+                                "difficulty_level": analysis_data.get("difficulty_level"),
+                                "optimal_temp_range": analysis_data.get("optimal_temp_range"),
+                                "basic_analysis": analysis_data # Keep raw data here too
+                            },
+                            "status": "researching", 
+                            "updated_at": firestore.SERVER_TIMESTAMP
+                        }, merge=True)
+                        info(
+                            f"[Unified] basic_analysis_saved job={job_id} "
+                            f"research={research_doc_id} veg={vegetable_name}"
+                        )
+                        
+                    except:
+                        vegetable_name = "Unknown Vegetable"
+                        analysis_data = {"raw": packet_analysis_json}
+                        
+                    return vegetable_name, analysis_data
+                except Exception as e:
+                    error(f"[Unified] basic_analysis_failed job={job_id} error={e}")
+                    update_vegetable_status(research_doc_id, "failed", {"error": str(e)})
+                    return None, None
+
+            # Run Phase 1
+            # Character runs in background (fire and forget? No, we await it if we want to ensure it completes, 
+            # but user said order is Char -> Research -> Guide, so maybe Char should finish before Research?
+            # User said: "Character Creation & Overview -> Detailed Research -> Guide"
+            # So Char and Overview (Basic Analysis) are first.
+            
+            char_task = process_character_generation(char_job_id, content)
+            basic_analysis_task = phase1_basic_analysis()
+            
+            # Wait for both? Or just wait for Basic Analysis to start Research?
+            # If we wait for both, Character timing affects Research start.
+            # "Character Creation... -> Detailed Research" implies sequence or at least grouping.
+            # Let's await both to be safe and clean.
+            
+            results = await asyncio.gather(char_task, basic_analysis_task)
+            veg_name, analysis_data = results[1]
+            
+            if not veg_name:
+                warning(
+                    f"[Unified] abort job={job_id} reason=basic_analysis_failed_or_unknown"
+                )
+                # Ensure research job is marked as failed if not already (handled in phase1_basic_analysis but good to be safe)
+                # Also, we should probably mark unified job as failed?
+                # But individual status is what frontend checks.
+                return
+
+            # Phase 2 & 3: Deep Research + Cultivation Guide (Parallel)
+            info(
+                f"[Unified] phase2_3 start job={job_id} veg={veg_name}"
+            )
+
+            info(f"[Unified][LLM] deep_research start job={job_id} research={research_doc_id}")
+            research_start_ts = time.time()
+            research_task = asyncio.to_thread(process_research, research_doc_id, veg_name, analysis_data)
+            guide_task = process_seed_guide(guide_job_id, blob_name)
+            research_result, guide_result = await asyncio.gather(
+                research_task,
+                guide_task,
+                return_exceptions=True
+            )
+
+            research_elapsed_ms = (time.time() - research_start_ts) * 1000
+            info(
+                f"[Unified][LLM] deep_research done job={job_id} "
+                f"research={research_doc_id} ms={research_elapsed_ms:.0f}"
+            )
+
+            if isinstance(research_result, Exception):
+                error(f"[Unified] phase2_failed job={job_id} error={research_result}")
+            if isinstance(guide_result, Exception):
+                error(f"[Unified] phase3_failed job={job_id} error={guide_result}")
+
+            info(f"[Unified] done job={job_id}")
+
+        # Add single orchestrator task
+        background_tasks.add_task(unified_runner)
+        
+        return {
+            "status": "accepted", 
+            "job_id": job_id,
+            "research_id": research_doc_id,
+            "guide_id": guide_job_id,
+            "character_id": char_job_id
+        }
+
+    except Exception as e:
+        error(f"Unified start failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/unified/jobs/{job_id}")
+async def get_unified_job_status(job_id: str):
+    """
+    Returns the consolidated status of a unified job.
+    """
+    try:
+        # 1. Get Unified Doc
+        doc_ref = db.collection("unified_jobs").document(job_id)
+        doc = await doc_ref.get()
+        if not doc.exists:
+             raise HTTPException(status_code=404, detail="Unified Job not found")
+        
+        data = doc.to_dict()
+        
+        # 2. Fetch Sub-Job Statuses in Parallel
+        research_id = data.get("research_doc_id")
+        guide_id = data.get("guide_job_id")
+        char_id = data.get("char_job_id")
+        
+        results = {
+            "job_id": job_id,
+            "created_at": data.get("created_at"),
+            "image_url": data.get("image_url"),
+            "research": {"status": "PENDING"},
+            "guide": {"status": "PENDING"},
+            "character": {"status": "PENDING"}
+        }
+        
+        async def fetch_research():
+            if not research_id: return None
+            # Research docs are in "vegetables" collection
+            d = await db.collection("vegetables").document(research_id).get()
+            return d.to_dict() if d.exists else None
+
+        async def fetch_guide():
+            if not guide_id: return None
+            # Guide jobs in "seed_guide_jobs"
+            d = await db.collection("seed_guide_jobs").document(guide_id).get()
+            return d.to_dict() if d.exists else None
+            
+        async def fetch_char():
+            if not char_id: return None
+             # Char jobs in "character_jobs"
+            d = await db.collection("character_jobs").document(char_id).get()
+            return d.to_dict() if d.exists else None
+        
+        r_data, g_data, c_data = await asyncio.gather(fetch_research(), fetch_guide(), fetch_char())
+        
+        if r_data:
+            # Normalize status to uppercase for frontend
+            if "status" in r_data:
+                r_data["status"] = r_data["status"].upper()
+            results["research"] = make_serializable(r_data)
+        if g_data:
+            # Handle guide image proxying like in other endpoints if needed, but for now just raw
+            # Guide endpoint logic:
+            if g_data.get("result") and isinstance(g_data["result"], list):
+                 pass
+            results["guide"] = make_serializable(g_data)
+        if c_data:
+            # Transform image_uri to proxy URL if it's a GCS URL
+            # The character document saves 'image_uri' but the result might have 'image_url' or 'image_uri'
+            # Let's check 'image_url' in result or 'image_uri' in top level
+            
+            # The structure in process_character_generation saves:
+            # result = { ... "image_url": "https://..." }
+            # So c_data["result"]["image_url"] should be the target if it exists
+            
+            if c_data.get("result") and isinstance(c_data["result"], dict):
+                char_result = c_data["result"]
+                gcs_uri = char_result.get("image_url")
+                
+                if gcs_uri and gcs_uri.startswith("https://storage.googleapis.com/"):
+                    bucket_name = "ai-agentic-hackathon-4-bk"
+                    prefix = f"https://storage.googleapis.com/{bucket_name}/"
+                    
+                    if gcs_uri.startswith(prefix):
+                        blob_path = gcs_uri[len(prefix):]
+                        import urllib.parse
+                        encoded_path = urllib.parse.quote(blob_path)
+                        char_result["image_url"] = f"/api/character/image?path={encoded_path}"
+                        
+            results["character"] = make_serializable(c_data)
+            
+        return results
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error(f"Unified status fetch failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+def make_serializable(obj):
+    if isinstance(obj, dict):
+        return {k: make_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [make_serializable(v) for v in obj]
+    elif hasattr(obj, 'isoformat'):
+        return obj.isoformat()
+    elif isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    else:
+        return str(obj)
+
 @app.on_event("startup")
 async def startup_event():
     """Log application startup."""
@@ -1193,3 +1532,4 @@ async def startup_event():
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8081)
+

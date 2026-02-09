@@ -56,6 +56,17 @@ def update_vegetable_status(doc_id: str, status: str, data: dict = None):
         }
         if data:
             update_data["instructions"] = data
+            # Also merge into result field for frontend access
+            # Get existing result first to preserve basic_analysis
+            existing_doc = doc_ref.get()
+            existing_result = {}
+            if existing_doc.exists:
+                existing_data = existing_doc.to_dict()
+                existing_result = existing_data.get("result", {}) if existing_data else {}
+            
+            # Merge deep research into existing result
+            merged_result = {**existing_result, **data}
+            update_data["result"] = merged_result
             
         doc_ref.update(update_data)
         info(f"Updated doc {doc_id} to status {status}")
