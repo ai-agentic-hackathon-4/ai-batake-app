@@ -519,7 +519,7 @@ export default function UnifiedPage() {
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
-                                        {status.research.status === 'completed' && status.research.result ? (
+                                        {status.research.status?.toLowerCase() === 'completed' && status.research.result ? (
                                             <div className="space-y-6">
                                                 {/* Name */}
                                                 {status.research.result.name && (
@@ -591,7 +591,7 @@ export default function UnifiedPage() {
                                             </div>
                                         ) : (
                                             <div className="py-12 flex flex-col items-center justify-center text-slate-400 space-y-4">
-                                                {status.research.status === 'failed' ? (
+                                                {status.research.status?.toLowerCase() === 'failed' ? (
                                                     <div className="text-center space-y-4">
                                                         <AlertCircle className="h-16 w-16 text-red-400 mx-auto" />
                                                         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
