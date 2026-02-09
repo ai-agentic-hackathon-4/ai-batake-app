@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Thermometer, Droplets, Leaf } from "lucide-react"
+import { Thermometer, Droplets, Leaf, ArrowLeft } from "lucide-react"
+import Link from "next/link"
 import { PlantCamera } from "@/components/plant-camera"
 import { MetricCard } from "@/components/metric-card"
 import { EnvironmentChart } from "@/components/environment-chart"
@@ -113,12 +114,11 @@ export default function Dashboard() {
     }, [])
 
     return (
-        <div className="min-h-screen bg-background relative">
+        <>
             <LoadingOverlay isVisible={isLoading} />
-
-            <div className={`transition-all duration-700 ${isLoading ? "opacity-0 blur-sm scale-95" : "opacity-100 blur-0 scale-100"}`}>
+            <div className="min-h-screen bg-background">
                 {/* Header */}
-                <header className="border-b border-border bg-card sticky top-0 z-10 backdrop-blur-md bg-card/80">
+                <header className="border-b border-border bg-card">
                     <div className="max-w-7xl mx-auto px-6 py-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-primary/10">
@@ -162,7 +162,7 @@ export default function Dashboard() {
                     </div>
                 </footer>
             </div>
-        </div>
+        </>
     )
 }
 

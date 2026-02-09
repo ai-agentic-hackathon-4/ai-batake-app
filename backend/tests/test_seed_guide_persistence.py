@@ -29,8 +29,7 @@ def test_save_seed_guide():
     payload = {
         "title": "Test Guide",
         "description": "A test guide for verification.",
-        "steps": mock_steps,
-        "original_image": "mock_original_image_b64"
+        "steps": mock_steps
     }
     
     response = client.post("/api/seed-guide/save", json=payload)

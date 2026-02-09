@@ -171,6 +171,7 @@ def update_edge_agent_config(research_data: dict):
         doc_ref = db.collection("configurations").document("edge_agent")
         doc_ref.set({
             "instruction": support_prompt,
+            "vegetable_name": research_data.get("name", "Unknown Plant"),
             "updated_at": datetime.now()
         }, merge=True)
         info(f"Updated edge_agent configuration with new research data for: {research_data.get('name', 'Unknown')}")
@@ -330,23 +331,21 @@ def save_seed_guide(data: dict, doc_id: str = None) -> str:
         warning("Firestore is not available. Skipping save.")
         return "mock-id-firestore-unavailable"
 
-    collection_name = "saved_guides"
+    collection_name = "seed_guide_jobs"
     
     try:
+        save_data = data.copy()
+        
         if doc_id:
             doc_ref = db.collection(collection_name).document(doc_id)
-            save_data = data.copy()
-            # Don't overwrite created_at if updating
-            save_data["updated_at"] = datetime.now()
+            save_data["updated_at"] = firestore.SERVER_TIMESTAMP
             doc_ref.set(save_data, merge=True)
             info(f"Updated seed guide with ID: {doc_id}")
             return doc_id
         else:
-            doc_ref = db.collection(collection_name).document()
-            save_data = data.copy()
-            save_data["created_at"] = datetime.now()
-            save_data["updated_at"] = datetime.now()
-            doc_ref.set(save_data)
+            save_data["created_at"] = firestore.SERVER_TIMESTAMP
+            save_data["updated_at"] = firestore.SERVER_TIMESTAMP
+            update_time, doc_ref = db.collection(collection_name).add(save_data)
             info(f"Created seed guide with ID: {doc_ref.id}")
             return doc_ref.id
         
@@ -359,7 +358,7 @@ def update_seed_guide_status(doc_id: str, status: str, message: str = None, resu
     if db is None: return
 
     try:
-        doc_ref = db.collection("saved_guides").document(doc_id)
+        doc_ref = db.collection("seed_guide_jobs").document(doc_id)
         update_data = {
             "status": status,
             "updated_at": datetime.now()
@@ -379,7 +378,7 @@ def get_all_seed_guides():
     if db is None: return []
 
     try:
-        docs = db.collection("saved_guides").order_by("created_at", direction=firestore.Query.DESCENDING).stream()
+        docs = db.collection("seed_guide_jobs").order_by("created_at", direction=firestore.Query.DESCENDING).stream()
         results = []
         for doc in docs:
             d = doc.to_dict()
@@ -397,21 +396,21 @@ def get_all_seed_guides():
 def get_seed_guide(doc_id: str):
     """Retrieves a specific seed guide by ID."""
     if db is None: return None
-
+    
     try:
-        doc = db.collection("saved_guides").document(doc_id).get()
-        if not doc.exists:
-            return None
-            
-        data = doc.to_dict()
-        data['id'] = doc.id
-        if 'created_at' in data and isinstance(data['created_at'], datetime):
-            data['created_at'] = data['created_at'].isoformat()
-        if 'updated_at' in data and isinstance(data['updated_at'], datetime):
-            data['updated_at'] = data['updated_at'].isoformat()
-        return data
+        doc_ref = db.collection("seed_guide_jobs").document(doc_id)
+        doc = doc_ref.get()
+        if doc.exists:
+            d = doc.to_dict()
+            d['id'] = doc.id
+            if 'created_at' in d and isinstance(d['created_at'], datetime):
+                d['created_at'] = d['created_at'].isoformat()
+            if 'updated_at' in d and isinstance(d['updated_at'], datetime):
+                d['updated_at'] = d['updated_at'].isoformat()
+            return d
+        return None
     except Exception as e:
-        error(f"Error getting seed guide {doc_id}: {e}")
+        error(f"Error fetching seed guide {doc_id}: {e}")
         return None
 
 
@@ -427,3 +426,21 @@ if __name__ == "__main__":
 
     else:
         print("Firestore client is not initialized.")
+
+def get_edge_agent_config() -> dict:
+    """
+    Retrieves the current edge agent configuration from Firestore.
+    """
+    if db is None:
+        warning("Firestore is not available.")
+        return {}
+
+    try:
+        doc_ref = db.collection("configurations").document("edge_agent")
+        doc = doc_ref.get()
+        if doc.exists:
+            return doc.to_dict()
+        return {}
+    except Exception as e:
+        error(f"Error fetching edge agent config: {e}", exc_info=True)
+        return {}
