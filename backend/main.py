@@ -8,6 +8,7 @@ import os
 import time
 import base64
 import json
+import asyncio
 from google.cloud import storage
 from google.cloud import firestore
 from dotenv import load_dotenv
@@ -38,14 +39,12 @@ load_dotenv()
 # Imports
 try:
     # Try importing from feature/#3 db functions
-    from .db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs
-    # Also old ones just in case
-    from .db import save_growing_instructions 
+    from .db import init_vegetable_status, update_vegetable_status, get_all_vegetables, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs
     from .research_agent import analyze_seed_packet, perform_deep_research
     from .agent import get_weather_from_agent
 except ImportError:
     # When running directly as a script
-    from db import init_vegetable_status, update_vegetable_status, get_all_vegetables, update_edge_agent_config, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, save_growing_instructions, get_agent_execution_logs
+    from db import init_vegetable_status, update_vegetable_status, get_all_vegetables, get_latest_vegetable, get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs
     from research_agent import analyze_seed_packet, perform_deep_research
     from agent import get_weather_from_agent
 
@@ -58,6 +57,26 @@ except ImportError:
     except ImportError as e:
         warning(f"Failed to import seed_service: {e}")
         pass
+
+# Imports for Diary Service
+try:
+    from .diary_service import (
+        process_daily_diary,
+        get_all_diaries,
+        get_diary_by_date
+    )
+except ImportError:
+    try:
+        from diary_service import (
+            process_daily_diary,
+            get_all_diaries,
+            get_diary_by_date
+        )
+    except ImportError as e:
+        logging.warning(f"Failed to import diary_service: {e}")
+        process_daily_diary = None
+        get_all_diaries = None
+        get_diary_by_date = None
 
 app = FastAPI()
 
@@ -361,74 +380,82 @@ async def get_latest_plant_image():
 
 # --- feature/#5 Endpoints (Async Firestore Jobs) ---
 
-async def process_seed_guide(job_id: str, image_bytes: bytes):
-    """Background task to process seed guide generation (Feature #5)."""
-    # Set session ID for background task tracing
-    task_session_id = f"job-{job_id[:8]}"
+async def process_seed_guide(doc_id: str, image_bytes: bytes):
+    """Background task to process seed guide generation."""
+    # Set session ID for background task tracing (from dev)
+    task_session_id = f"job-{doc_id[:8]}"
     set_session_id(task_session_id)
     set_request_id(generate_request_id())
     
-    info(f"Starting seed guide generation job: {job_id}")
-    doc_ref = db.collection(COLLECTION_NAME).document(job_id)
+    info(f"Starting seed guide generation job: {doc_id}")
     
-    await doc_ref.update({
-        "status": "PROCESSING",
-        "message": "Starting analysis..."
-    })
+    # Import locally to ensure access to latest db functions if needed
+    try:
+        from backend.db import update_seed_guide_status as update_func
+    except ImportError:
+        from db import update_seed_guide_status as update_func
+
+    # Update status to PROCESSING
+    update_func(doc_id, "PROCESSING", "Starting analysis...")
     
     async def progress_callback(msg: str):
-        debug(f"[Job {job_id}] Progress: {msg}")
-        await doc_ref.update({"message": msg})
+        debug(f"[Guide {doc_id}] {msg}")
+        update_func(doc_id, "PROCESSING", msg)
 
     try:
         # Check if analyze_seed_and_generate_guide is available
         if 'analyze_seed_and_generate_guide' in globals():
-            debug(f"Calling analyze_seed_and_generate_guide for job {job_id}")
+            debug(f"Calling analyze_seed_and_generate_guide for job {doc_id}")
             steps = await analyze_seed_and_generate_guide(image_bytes, progress_callback)
-            info(f"Seed guide job {job_id} completed with {len(steps)} steps")
-            await doc_ref.update({
-                "status": "COMPLETED",
-                "result": steps,
-                "message": "Complete!"
-            })
+            
+            # Update to COMPLETED with result using DB function
+            info(f"Seed guide job {doc_id} completed with {len(steps)} steps")
+            update_func(doc_id, "COMPLETED", "Complete!", steps)
+            
         else:
-            warning(f"analyze_seed_and_generate_guide not available for job {job_id}")
-            await doc_ref.update({
-                "status": "FAILED",
-                "message": "Analysis service not available"
-            })
-    except Exception as e:
-        error(f"Seed guide job {job_id} failed: {str(e)}", exc_info=True)
-        await doc_ref.update({
-            "status": "FAILED",
-            "message": str(e)
-        })
+            warning(f"analyze_seed_and_generate_guide not available for job {doc_id}")
+            update_func(doc_id, "FAILED", "Analysis service not available")
 
-@app.post("/api/seed-guide/jobs")
-async def create_seed_guide_job(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    """Starts an async job using feature/#5 architecture."""
+    except Exception as e:
+        error(f"Seed guide job {doc_id} failed: {str(e)}", exc_info=True)
+        update_func(doc_id, "FAILED", str(e))
+
+@app.post("/api/seed-guide/generate")
+async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """Starts an async seed guide generation, persisting immediately to Saved Guides."""
     try:
         content = await file.read()
-        job_id = str(uuid.uuid4())
+        info(f"Received seed guide request, file: {file.filename}, size: {len(content)} bytes")
         
-        info(f"Creating seed guide job: {job_id}, file: {file.filename}, size: {len(content)} bytes")
-        
-        doc_ref = db.collection(COLLECTION_NAME).document(job_id)
-        await doc_ref.set({
-            "job_id": job_id,
+        # Prepare initial data
+        image_b64 = base64.b64encode(content).decode('utf-8')
+        initial_data = {
+            "title": "New Seed Guide", # Placeholder, updated later?
             "status": "PENDING",
-            "message": "Job created, waiting for worker...",
-            "result": None,
-            "created_at": firestore.SERVER_TIMESTAMP
-        })
+            "message": "Queued for analysis...",
+            "original_image": image_b64,
+            "steps": []
+        }
         
-        background_tasks.add_task(process_seed_guide, job_id, content)
-        debug(f"Background task queued for job {job_id}")
+        # Create persistent document immediately
+        try:
+            from backend.db import save_seed_guide as save_func
+        except ImportError:
+            from db import save_seed_guide as save_func
+            
+        doc_id = await asyncio.to_thread(save_func, initial_data)
+        info(f"Created persistent seed guide record: {doc_id}")
         
-        return {"job_id": job_id}
+        # Start background task
+        background_tasks.add_task(process_seed_guide, doc_id, content)
+        
+        return {"job_id": doc_id, "status": "PENDING"}
+        
     except Exception as e:
-        error(f"Failed to create seed guide job: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to start job: {str(e)}")
+        error(f"Failed to start generation: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to start generation: {str(e)}")
+
+# Legacy job endpoints removed/deprecated in favor of unified flow
 
 @app.get("/api/seed-guide/jobs/{job_id}")
 async def get_seed_guide_job(job_id: str):
@@ -450,6 +477,186 @@ async def get_seed_guide_job(job_id: str):
     except Exception as e:
         error(f"Failed to fetch job {job_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+class SaveGuideRequest(BaseModel):
+    title: str
+    description: Optional[str] = None
+    steps: list
+    original_image: Optional[str] = None # Base64 string of the original image
+
+@app.post("/api/seed-guide/save")
+async def save_seed_guide_endpoint(request: SaveGuideRequest):
+    """Saves a generated seed guide."""
+    try:
+        # Import here to ensure it uses the latest db.py
+        try:
+            from backend.db import save_seed_guide as save_func
+        except ImportError:
+            from db import save_seed_guide as save_func
+            
+        doc_id = await asyncio.to_thread(save_func, request.dict())
+        return {"status": "success", "id": doc_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save guide: {str(e)}")
+
+@app.get("/api/seed-guide/saved")
+async def list_saved_guides():
+    """Returns a list of saved seed guides."""
+    try:
+        try:
+            from backend.db import get_all_seed_guides as list_func
+        except ImportError:
+            from db import get_all_seed_guides as list_func
+            
+        return await asyncio.to_thread(list_func)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list guides: {str(e)}")
+
+@app.get("/api/seed-guide/saved/{doc_id}")
+async def get_saved_guide(doc_id: str):
+    """Returns a specific saved seed guide."""
+    try:
+        try:
+            from backend.db import get_seed_guide as get_func
+        except ImportError:
+            from db import get_seed_guide as get_func
+            
+        data = await asyncio.to_thread(get_func, doc_id)
+        if not data:
+            raise HTTPException(status_code=404, detail="Guide not found")
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get guide: {str(e)}")
+
+
+# --- Diary Endpoints ---
+
+class DiaryGenerateRequest(BaseModel):
+    date: str  # ISO format date string (YYYY-MM-DD)
+
+@app.get("/api/diary/list")
+async def list_diaries(limit: int = 30, offset: int = 0):
+    """
+    Get list of all completed growing diaries.
+    
+    Args:
+        limit: Maximum number of diaries to return (default 30).
+        offset: Number of diaries to skip for pagination.
+    
+    Returns:
+        Dictionary with list of diaries.
+    """
+    if get_all_diaries is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        diaries = get_all_diaries(limit=limit, offset=offset)
+        return {"diaries": diaries}
+    except Exception as e:
+        logging.error(f"Error listing diaries: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/diary/{date}")
+async def get_diary(date: str):
+    """
+    Get a specific diary by date.
+    
+    Args:
+        date: Date in ISO format (YYYY-MM-DD).
+    
+    Returns:
+        Diary data for the specified date.
+    """
+    if get_diary_by_date is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        diary = get_diary_by_date(date)
+        
+        if diary is None:
+            raise HTTPException(status_code=404, detail="Diary not found")
+        
+        return diary
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error fetching diary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/diary/generate-daily")
+async def generate_daily_diary_endpoint(background_tasks: BackgroundTasks):
+    """
+    Trigger daily diary generation.
+    This endpoint is designed to be called by Cloud Scheduler at 23:50 JST.
+    Generates a diary for the previous day's data.
+    
+    Returns:
+        Status message with the target date.
+    """
+    if process_daily_diary is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        from datetime import datetime, timedelta
+        
+        # Generate for today (this runs at 23:50, so we capture all of today's data)
+        target_date = (datetime.now() - timedelta(hours=1)).date()
+        
+        background_tasks.add_task(process_daily_diary, target_date.isoformat())
+        
+        return {
+            "status": "accepted",
+            "date": target_date.isoformat(),
+            "message": "Diary generation started"
+        }
+    except Exception as e:
+        logging.error(f"Error starting diary generation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/diary/generate-manual")
+async def generate_manual_diary_endpoint(
+    background_tasks: BackgroundTasks,
+    request: DiaryGenerateRequest
+):
+    """
+    Manually trigger diary generation for a specific date.
+    Useful for testing or regenerating failed diaries.
+    
+    Args:
+        request: DiaryGenerateRequest with target date.
+    
+    Returns:
+        Status message with the target date.
+    """
+    if process_daily_diary is None:
+        raise HTTPException(status_code=503, detail="Diary service not available")
+    
+    try:
+        from datetime import date as date_module
+        
+        # Validate date format
+        try:
+            target_date = date_module.fromisoformat(request.date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        
+        background_tasks.add_task(process_daily_diary, request.date)
+        
+        return {
+            "status": "accepted",
+            "date": request.date,
+            "message": "Manual diary generation started"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error starting manual diary generation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.on_event("startup")
