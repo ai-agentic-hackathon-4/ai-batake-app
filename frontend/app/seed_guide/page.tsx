@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { Upload, ArrowLeft, ArrowRight, Sprout, AlertCircle, Loader2, BookOpen, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Upload, ArrowLeft, ArrowRight, Sprout, AlertCircle, Loader2, BookOpen, Clock, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from 'next/link';
@@ -244,16 +244,17 @@ export default function SeedGuidePage() {
                                     <Card key={guide.id} className="hover:shadow-md transition-shadow cursor-pointer border-border" onClick={() => handleSelectGuide(guide)}>
                                         <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
                                             <CardTitle className="text-lg truncate pr-2">{guide.title || "無題のガイド"}</CardTitle>
-                                            <div className="shrink-0 flex items-center gap-3">
+                                            <div className="shrink-0 flex items-center gap-2">
                                                 {getStatusBadge(guide.status)}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         handleDeleteGuide(guide.id);
                                                     }}
-                                                    className="text-xs text-red-500 hover:text-red-600"
+                                                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                    aria-label="削除"
                                                 >
-                                                    削除
+                                                    <Trash2 className="h-3.5 w-3.5" />
                                                 </button>
                                             </div>
                                         </CardHeader>
@@ -441,9 +442,9 @@ export default function SeedGuidePage() {
                                             <div className="flex gap-3">
                                                 <button
                                                     onClick={() => handleDeleteGuide(selectedGuide.id)}
-                                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-red-200 text-red-600 bg-white shadow-sm hover:bg-red-50 h-10 px-4 py-2"
+                                                    className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-red-200 text-red-600 bg-red-50 shadow-sm hover:bg-red-100 h-10 px-4 py-2"
                                                 >
-                                                    削除
+                                                    <Trash2 className="h-4 w-4" /> 削除
                                                 </button>
                                                 <button
                                                     onClick={() => setViewMode('list')}

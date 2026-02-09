@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical, Droplets, Thermometer, Sun, Sprout, Check, Send, AlertCircle, ArrowRight, ArrowLeft, Search, ExternalLink } from "lucide-react";
+import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical, Droplets, Thermometer, Sun, Sprout, Check, Send, AlertCircle, ArrowRight, ArrowLeft, Search, ExternalLink, Trash2 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import Link from "next/link";
 
@@ -274,9 +274,10 @@ export default function ResearchDashboard() {
                                             e.stopPropagation();
                                             handleDeleteVegetable(veg.id);
                                         }}
-                                        className="absolute top-3 right-3 text-xs text-red-500 hover:text-red-600"
+                                        className="absolute top-3 right-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                        aria-label="削除"
                                     >
-                                        削除
+                                        <Trash2 className="h-4 w-4" />
                                     </button>
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="flex items-center gap-3">
