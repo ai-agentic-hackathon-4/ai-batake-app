@@ -592,10 +592,27 @@ export default function UnifiedPage() {
                                         ) : (
                                             <div className="py-12 flex flex-col items-center justify-center text-slate-400 space-y-4">
                                                 {status.research.status === 'failed' ? (
-                                                    <>
-                                                        <AlertCircle className="h-12 w-12 text-red-300" />
-                                                        <p>リサーチに失敗しました</p>
-                                                    </>
+                                                    <div className="text-center space-y-4">
+                                                        <AlertCircle className="h-16 w-16 text-red-400 mx-auto" />
+                                                        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
+                                                            <h3 className="text-lg font-bold text-red-800 mb-2">読み取りエラー</h3>
+                                                            <p className="text-red-700 font-medium">
+                                                                {status.research.error || "リサーチに失敗しました"}
+                                                            </p>
+                                                        </div>
+                                                        <Button
+                                                            onClick={() => {
+                                                                setJobId(null);
+                                                                setFile(null);
+                                                                setPreview(null);
+                                                                setStatus(null);
+                                                            }}
+                                                            variant="default"
+                                                            className="bg-red-500 hover:bg-red-600 text-white"
+                                                        >
+                                                            <Upload className="mr-2 h-4 w-4" /> もう一度撮影・アップロードする
+                                                        </Button>
+                                                    </div>
                                                 ) : (
                                                     <>
                                                         <Loader2 className="h-10 w-10 animate-spin text-purple-300" />

@@ -1244,7 +1244,17 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
                         clean_text = packet_analysis_json.replace("```json", "").replace("```", "")
                         analysis_data = json.loads(clean_text)
                         vegetable_name = analysis_data.get("name", "Unknown Vegetable")
-                        
+                        # Check if "unknown"
+                        if vegetable_name.lower() == "unknown":
+                            error_msg = analysis_data.get("visible_instructions", "野菜の種類を特定できませんでした。")
+                            info(f"[Unified] Unknown vegetable detected. Aborting. Message: {error_msg}")
+                            await db.collection("vegetables").document(research_doc_id).set({
+                                "status": "failed",
+                                "error": error_msg,
+                                "updated_at": firestore.SERVER_TIMESTAMP
+                            }, merge=True)
+                            return None, None
+
                         # SAVE IMMEDIATELY to Firestore so frontend sees it
                         # We use the research_doc_id in "vegetables" collection
                         # Structure it inside 'result' so frontend checks pass
@@ -1288,7 +1298,10 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
             veg_name, analysis_data = results[1]
             
             if not veg_name:
-                error(f"[Unified] Aborting job {job_id} due to basic analysis failure")
+                warn(f"[Unified] Aborting job {job_id} due to basic analysis failure or unknown vegetable")
+                # Ensure research job is marked as failed if not already (handled in phase1_basic_analysis but good to be safe)
+                # Also, we should probably mark unified job as failed?
+                # But individual status is what frontend checks.
                 return
 
             # Phase 2: Deep Research
