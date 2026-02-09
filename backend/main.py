@@ -1139,6 +1139,289 @@ async def get_character_image_endpoint(path: str):
         error(f"Error serving character image: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# --- Unified Seed Feature Endpoints ---
+
+@app.post("/api/unified/start")
+async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """
+    Unified endpoint to start Research, Guide, and Character generation from a single image.
+    """
+    try:
+        # 1. Read and Upload Image to GCS (Standardize on one upload)
+        content = await file.read()
+        job_id = str(uuid.uuid4())
+        timestamp = int(time.time())
+        safe_filename = file.filename.replace(" ", "_").replace("/", "_")
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        blob_name = f"unified/input/{timestamp}_{job_id}_{safe_filename}"
+        
+        info(f"Starting UNIFIED job: {job_id}, file: {file.filename}")
+        info(f"Uploading input image to GCS: {blob_name}")
+        
+        image_url = await asyncio.to_thread(
+            _upload_to_gcs_sync,
+            bucket_name,
+            blob_name,
+            content,
+            file.content_type
+        )
+        
+        # 2. Initialize Sub-Jobs
+        
+        # A. Research (Vegetable Status)
+        # We need to do a quick analysis first to get the name, OR just use "Unknown" and let the background task refine it.
+        # process_research expects doc_id, vegetable_name, analysis_data.
+        # Let's do a quick analysis here synchronously? Or is it too slow?
+        # analyze_seed_packet is relatively fast (Gemini Flash). 
+        # But for "Unified" experience, maybe we return immediately.
+        # However, init_vegetable_status needs a name.
+        # Let's use "Pending Analysis" as name and let the background task update it?
+        # Actually checking process_research: it takes vegetable_name arg but also analysis_data.
+        # Let's run the analysis in background too? 
+        # existing /api/register-seed runs analyze_seed_packet synchronously... 
+        # For better UX (speed), let's push it to background. But we need a doc ID.
+        
+        # Let's create the documents first.
+        
+        # Research Doc
+        research_doc_id = init_vegetable_status("Analyzing...")
+        
+        # Guide Job Doc
+        guide_job_id = f"guide-{job_id}"
+        guide_doc_ref = db.collection("seed_guide_jobs").document(guide_job_id)
+        await guide_doc_ref.set({
+            "job_id": guide_job_id,
+            "title": "Unified Seed Guide",
+            "status": "PENDING",
+            "message": "Waiting for unified worker...",
+            "input_image_url": image_url,
+            "result": None,
+            "steps": [],
+            "created_at": firestore.SERVER_TIMESTAMP
+        })
+        
+        # Character Job Doc
+        char_job_id = f"char-{job_id}"
+        char_doc_ref = db.collection("seed_guide_jobs").document(char_job_id)
+        await char_doc_ref.set({
+            "job_id": char_job_id,
+            "status": "PENDING",
+            "message": "Waiting for unified worker...",
+            "result": None,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "type": "character"
+        })
+        
+        # 3. Create Unified Job Tracker
+        unified_doc_ref = db.collection("unified_jobs").document(job_id)
+        await unified_doc_ref.set({
+            "job_id": job_id,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "research_doc_id": research_doc_id,
+            "guide_job_id": guide_job_id,
+            "char_job_id": char_job_id,
+            "image_url": image_url,
+            "status": "PROCESSING"
+        })
+        
+        # 4. Queue Background Tasks (Parallel Execution)
+        
+        async def unified_runner():
+            # Phase 1: Character Generation + Basic Seed Analysis (Parallel)
+            info(f"Starting unified runner for job {job_id}: Phase 1 - Character & Basic Analysis")
+            
+            # We need to run analyze_seed_packet and store the result for Phase 2
+            # We'll use a local helper for the research part to extract data first
+            
+            async def phase1_basic_analysis():
+                set_session_id(f"uni-res-{job_id[:8]}")
+                try:
+                    info(f"[Unified] Analyzing seed packet for {research_doc_id}")
+                    packet_analysis_json = await asyncio.to_thread(analyze_seed_packet, content) # content is image bytes
+                    
+                    try:
+                        clean_text = packet_analysis_json.replace("```json", "").replace("```", "")
+                        analysis_data = json.loads(clean_text)
+                        vegetable_name = analysis_data.get("name", "Unknown Vegetable")
+                        
+                        # SAVE IMMEDIATELY to Firestore so frontend sees it
+                        # We use the research_doc_id in "vegetables" collection
+                        # Structure it inside 'result' so frontend checks pass
+                        await db.collection("vegetables").document(research_doc_id).set({
+                            "result": {
+                                "name": vegetable_name,
+                                "difficulty_level": analysis_data.get("difficulty_level"),
+                                "optimal_temp_range": analysis_data.get("optimal_temp_range"),
+                                "basic_analysis": analysis_data # Keep raw data here too
+                            },
+                            "status": "researching", 
+                            "updated_at": firestore.SERVER_TIMESTAMP
+                        }, merge=True)
+                        info(f"[Unified] Saved basic analysis for {vegetable_name}")
+                        
+                    except:
+                        vegetable_name = "Unknown Vegetable"
+                        analysis_data = {"raw": packet_analysis_json}
+                        
+                    return vegetable_name, analysis_data
+                except Exception as e:
+                    error(f"[Unified] Basic analysis failed: {e}")
+                    update_vegetable_status(research_doc_id, "failed", {"error": str(e)})
+                    return None, None
+
+            # Run Phase 1
+            # Character runs in background (fire and forget? No, we await it if we want to ensure it completes, 
+            # but user said order is Char -> Research -> Guide, so maybe Char should finish before Research?
+            # User said: "Character Creation & Overview -> Detailed Research -> Guide"
+            # So Char and Overview (Basic Analysis) are first.
+            
+            char_task = process_character_generation(char_job_id, content)
+            basic_analysis_task = phase1_basic_analysis()
+            
+            # Wait for both? Or just wait for Basic Analysis to start Research?
+            # If we wait for both, Character timing affects Research start.
+            # "Character Creation... -> Detailed Research" implies sequence or at least grouping.
+            # Let's await both to be safe and clean.
+            
+            results = await asyncio.gather(char_task, basic_analysis_task)
+            veg_name, analysis_data = results[1]
+            
+            if not veg_name:
+                error(f"[Unified] Aborting job {job_id} due to basic analysis failure")
+                return
+
+            # Phase 2: Deep Research
+            info(f"Starting unified runner for job {job_id}: Phase 2 - Deep Research for {veg_name}")
+            try:
+                await asyncio.to_thread(process_research, research_doc_id, veg_name, analysis_data)
+            except Exception as e:
+                 error(f"[Unified] Phase 2 Research failed: {e}")
+                 # We might still want to try guide? But Guide needs research... 
+                 # Let's proceed to Guide but it might be generic.
+            
+            # Phase 3: Cultivation Guide
+            info(f"Starting unified runner for job {job_id}: Phase 3 - Cultivation Guide")
+            await process_seed_guide(guide_job_id, blob_name)
+            
+            info(f"Unified runner finished for job {job_id}")
+
+        # Add single orchestrator task
+        background_tasks.add_task(unified_runner)
+        
+        return {
+            "status": "accepted", 
+            "job_id": job_id,
+            "research_id": research_doc_id,
+            "guide_id": guide_job_id,
+            "character_id": char_job_id
+        }
+
+    except Exception as e:
+        error(f"Unified start failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/unified/jobs/{job_id}")
+async def get_unified_job_status(job_id: str):
+    """
+    Returns the consolidated status of a unified job.
+    """
+    try:
+        # 1. Get Unified Doc
+        doc_ref = db.collection("unified_jobs").document(job_id)
+        doc = await doc_ref.get()
+        if not doc.exists:
+             raise HTTPException(status_code=404, detail="Unified Job not found")
+        
+        data = doc.to_dict()
+        
+        # 2. Fetch Sub-Job Statuses in Parallel
+        research_id = data.get("research_doc_id")
+        guide_id = data.get("guide_job_id")
+        char_id = data.get("char_job_id")
+        
+        results = {
+            "job_id": job_id,
+            "created_at": data.get("created_at"),
+            "image_url": data.get("image_url"),
+            "research": {"status": "PENDING"},
+            "guide": {"status": "PENDING"},
+            "character": {"status": "PENDING"}
+        }
+        
+        async def fetch_research():
+            if not research_id: return None
+            # Research docs are in "vegetables" collection
+            d = await db.collection("vegetables").document(research_id).get()
+            return d.to_dict() if d.exists else None
+
+        async def fetch_guide():
+            if not guide_id: return None
+            # Guide jobs in "seed_guide_jobs"
+            d = await db.collection("seed_guide_jobs").document(guide_id).get()
+            return d.to_dict() if d.exists else None
+            
+        async def fetch_char():
+            if not char_id: return None
+             # Char jobs also in "seed_guide_jobs"
+            d = await db.collection("seed_guide_jobs").document(char_id).get()
+            return d.to_dict() if d.exists else None
+        
+        r_data, g_data, c_data = await asyncio.gather(fetch_research(), fetch_guide(), fetch_char())
+        
+        if r_data:
+            results["research"] = make_serializable(r_data)
+        if g_data:
+            # Handle guide image proxying like in other endpoints if needed, but for now just raw
+            # Guide endpoint logic:
+            if g_data.get("result") and isinstance(g_data["result"], list):
+                 pass
+            results["guide"] = make_serializable(g_data)
+        if c_data:
+            # Transform image_uri to proxy URL if it's a GCS URL
+            # The character document saves 'image_uri' but the result might have 'image_url' or 'image_uri'
+            # Let's check 'image_url' in result or 'image_uri' in top level
+            
+            # The structure in process_character_generation saves:
+            # result = { ... "image_url": "https://..." }
+            # So c_data["result"]["image_url"] should be the target if it exists
+            
+            if c_data.get("result") and isinstance(c_data["result"], dict):
+                char_result = c_data["result"]
+                gcs_uri = char_result.get("image_url")
+                
+                if gcs_uri and gcs_uri.startswith("https://storage.googleapis.com/"):
+                    bucket_name = "ai-agentic-hackathon-4-bk"
+                    prefix = f"https://storage.googleapis.com/{bucket_name}/"
+                    
+                    if gcs_uri.startswith(prefix):
+                        blob_path = gcs_uri[len(prefix):]
+                        import urllib.parse
+                        encoded_path = urllib.parse.quote(blob_path)
+                        char_result["image_url"] = f"/api/character/image?path={encoded_path}"
+                        
+            results["character"] = make_serializable(c_data)
+            
+        return results
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error(f"Unified status fetch failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+def make_serializable(obj):
+    if isinstance(obj, dict):
+        return {k: make_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [make_serializable(v) for v in obj]
+    elif hasattr(obj, 'isoformat'):
+        return obj.isoformat()
+    elif isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    else:
+        return str(obj)
+
 @app.on_event("startup")
 async def startup_event():
     """Log application startup."""
@@ -1151,3 +1434,4 @@ async def startup_event():
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8081)
+
