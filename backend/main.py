@@ -404,14 +404,14 @@ async def process_seed_guide(job_id: str, image_source: str):
     info(f"[SeedGuide] start job={job_id}")
     doc_ref = db.collection(COLLECTION_NAME).document(job_id)
     
-    await doc_ref.update({
+    await doc_ref.set({
         "status": "PROCESSING",
         "message": "Starting analysis..."
-    })
+    }, merge=True)
     
     async def progress_callback(msg: str):
         debug(f"[Job {job_id}] Progress: {msg}")
-        await doc_ref.update({"message": msg})
+        await doc_ref.set({"message": msg}, merge=True)
 
     # Download image if source is a path/URL
     image_bytes = None
@@ -433,7 +433,7 @@ async def process_seed_guide(job_id: str, image_source: str):
              
     except Exception as e:
         error(f"Failed to download input image: {e}")
-        await doc_ref.update({"status": "FAILED", "message": "Failed to retrieve input image"})
+        await doc_ref.set({"status": "FAILED", "message": "Failed to retrieve input image"}, merge=True)
         return
 
     try:
@@ -488,19 +488,19 @@ async def process_seed_guide(job_id: str, image_source: str):
             if guide_description:
                  update_data["description"] = guide_description
                  
-            await doc_ref.update(update_data)
+            await doc_ref.set(update_data, merge=True)
         else:
             warning(f"[SeedGuide] analyze_unavailable job={job_id}")
-            await doc_ref.update({
+            await doc_ref.set({
                 "status": "FAILED",
                 "message": "Analysis service not available"
-            })
+            }, merge=True)
     except Exception as e:
         error(f"[SeedGuide] failed job={job_id} error={str(e)}", exc_info=True)
-        await doc_ref.update({
+        await doc_ref.set({
             "status": "FAILED",
             "message": str(e)
-        })
+        }, merge=True)
 
 @app.post("/api/seed-guide/generate")
 async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
