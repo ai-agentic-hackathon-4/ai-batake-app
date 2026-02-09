@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Thermometer, Droplets, Leaf, ArrowLeft } from "lucide-react"
+import { Thermometer, Droplets, Leaf, ArrowLeft, Sun, Sprout } from "lucide-react"
 import Link from "next/link"
 import { PlantCamera } from "@/components/plant-camera"
 import { MetricCard } from "@/components/metric-card"
@@ -13,9 +13,16 @@ import { LoadingOverlay } from "@/components/loading-overlay"
 
 export default function Dashboard() {
     const [isLoading, setIsLoading] = useState(true)
-    const [sensorData, setSensorData] = useState<{ temperature: number | string; humidity: number | string }>({
+    const [sensorData, setSensorData] = useState<{
+        temperature: number | string;
+        humidity: number | string;
+        soil_moisture: number | string;
+        illuminance: number | string;
+    }>({
         temperature: "--",
-        humidity: "--"
+        humidity: "--",
+        soil_moisture: "--",
+        illuminance: "--"
     })
 
     useEffect(() => {
@@ -29,7 +36,9 @@ export default function Dashboard() {
                     if (data && data.temperature !== undefined) {
                         setSensorData({
                             temperature: data.temperature,
-                            humidity: data.humidity
+                            humidity: data.humidity,
+                            soil_moisture: data.soil_moisture ?? "--",
+                            illuminance: data.illuminance ?? "--"
                         })
                     }
                 }
@@ -51,7 +60,9 @@ export default function Dashboard() {
                 if (data && data.temperature !== undefined) {
                     setSensorData({
                         temperature: data.temperature,
-                        humidity: data.humidity
+                        humidity: data.humidity,
+                        soil_moisture: data.soil_moisture ?? "--",
+                        illuminance: data.illuminance ?? "--"
                     })
                 }
             } catch (e) {
@@ -92,9 +103,11 @@ export default function Dashboard() {
                     </div>
 
                     {/* Metrics Section */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <MetricCard title="現在の気温" value={String(sensorData.temperature)} unit="°C" icon={Thermometer} status="normal" />
                         <MetricCard title="現在の湿度" value={String(sensorData.humidity)} unit="%" icon={Droplets} status="normal" />
+                        <MetricCard title="土壌水分" value={String(sensorData.soil_moisture)} unit="%" icon={Sprout} status="normal" />
+                        <MetricCard title="現在の照度" value={String(sensorData.illuminance)} unit="lx" icon={Sun} status="normal" />
                     </div>
 
                     {/* Chart Section */}
