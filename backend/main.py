@@ -1304,18 +1304,24 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
                 # But individual status is what frontend checks.
                 return
 
-            # Phase 2: Deep Research
-            info(f"Starting unified runner for job {job_id}: Phase 2 - Deep Research for {veg_name}")
-            try:
-                await asyncio.to_thread(process_research, research_doc_id, veg_name, analysis_data)
-            except Exception as e:
-                 error(f"[Unified] Phase 2 Research failed: {e}")
-                 # We might still want to try guide? But Guide needs research... 
-                 # Let's proceed to Guide but it might be generic.
-            
-            # Phase 3: Cultivation Guide
-            info(f"Starting unified runner for job {job_id}: Phase 3 - Cultivation Guide")
-            await process_seed_guide(guide_job_id, blob_name)
+            # Phase 2 & 3: Deep Research + Cultivation Guide (Parallel)
+            info(
+                f"Starting unified runner for job {job_id}: "
+                f"Phase 2 - Deep Research for {veg_name} & Phase 3 - Cultivation Guide"
+            )
+
+            research_task = asyncio.to_thread(process_research, research_doc_id, veg_name, analysis_data)
+            guide_task = process_seed_guide(guide_job_id, blob_name)
+            research_result, guide_result = await asyncio.gather(
+                research_task,
+                guide_task,
+                return_exceptions=True
+            )
+
+            if isinstance(research_result, Exception):
+                error(f"[Unified] Phase 2 Research failed: {research_result}")
+            if isinstance(guide_result, Exception):
+                error(f"[Unified] Phase 3 Guide failed: {guide_result}")
             
             info(f"Unified runner finished for job {job_id}")
 
