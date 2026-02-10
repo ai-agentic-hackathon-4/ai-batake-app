@@ -454,7 +454,7 @@ def _upload_to_gcs_sync(bucket_name, blob_name, content, content_type):
 
 # --- feature/#5 Endpoints (Async Firestore Jobs) ---
 
-async def process_seed_guide(job_id: str, image_source: str, image_model: str = "pro", guide_image_mode: str = "single"):
+async def process_seed_guide(job_id: str, image_source: str, guide_image_mode: str = "single"):
     """Background task to process seed guide generation (Feature #5)."""
     # Set session ID for background task tracing
     task_session_id = f"job-{job_id[:8]}"
@@ -503,7 +503,7 @@ async def process_seed_guide(job_id: str, image_source: str, image_model: str = 
             analyze_start_ts = time.time()
             
             # Unpack the new return values (title, description, steps)
-            guide_title, guide_description, steps = await analyze_seed_and_generate_guide(image_bytes, progress_callback, image_model=image_model, guide_image_mode=guide_image_mode)
+            guide_title, guide_description, steps = await analyze_seed_and_generate_guide(image_bytes, progress_callback, guide_image_mode=guide_image_mode)
             analyze_elapsed_ms = (time.time() - analyze_start_ts) * 1000
             info(f"[SeedGuide][LLM] analyze done job={job_id} ms={analyze_elapsed_ms:.0f}")
             
@@ -564,7 +564,7 @@ async def process_seed_guide(job_id: str, image_source: str, image_model: str = 
         }, merge=True)
 
 @app.post("/api/seed-guide/generate")
-async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: UploadFile = File(...), image_model: str = "pro", guide_image_mode: str = "single"):
+async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: UploadFile = File(...), guide_image_mode: str = "single"):
     """Starts an async seed guide generation, persisting immediately to Saved Guides."""
     try:
         # Upload to GCS (streaming)
@@ -608,7 +608,7 @@ async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: 
         })
         
         # Pass blob_name (str) instead of content (bytes)
-        background_tasks.add_task(process_seed_guide, job_id, blob_name, image_model=image_model, guide_image_mode=guide_image_mode)
+        background_tasks.add_task(process_seed_guide, job_id, blob_name, guide_image_mode=guide_image_mode)
         info(f"Background task queued for job {job_id}")
 
         return {"job_id": job_id, "status": "PENDING"}
@@ -1350,7 +1350,7 @@ async def get_character_image_endpoint(path: str):
 # --- Unified Seed Feature Endpoints ---
 
 @app.post("/api/unified/start")
-async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile = File(...), research_mode: str = "agent", image_model: str = "pro", guide_image_mode: str = "single"):
+async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile = File(...), research_mode: str = "agent", guide_image_mode: str = "single"):
     """
     Unified endpoint to start Research, Guide, and Character generation from a single image.
     """
@@ -1539,7 +1539,7 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
             info(f"[Unified][LLM] deep_research start job={job_id} research={research_doc_id} mode={research_mode}")
             research_start_ts = time.time()
             research_task = asyncio.to_thread(process_research, research_doc_id, veg_name, analysis_data, mode=research_mode)
-            guide_task = process_seed_guide(guide_job_id, blob_name, image_model=image_model, guide_image_mode=guide_image_mode)
+            guide_task = process_seed_guide(guide_job_id, blob_name, guide_image_mode=guide_image_mode)
             research_result, guide_result = await asyncio.gather(
                 research_task,
                 guide_task,

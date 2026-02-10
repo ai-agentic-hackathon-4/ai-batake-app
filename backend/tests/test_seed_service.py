@@ -256,7 +256,7 @@ class TestProcessStep:
     @patch('seed_service.time.sleep')
     @patch('seed_service.call_api_with_backoff')
     def test_process_step_success_primary(self, mock_api, mock_sleep, mock_rand):
-        """Test successful image generation with primary model."""
+        """Test successful image generation with pro model (no fallback)."""
         from seed_service import process_step
         mock_resp = Mock()
         mock_resp.status_code = 200
@@ -265,63 +265,20 @@ class TestProcessStep:
         }
         mock_api.return_value = mock_resp
         step = {"step_title": "Plant", "description": "Plant seeds", "image_prompt": "planting"}
-        result = process_step((step, "http://primary", "http://fallback", {}))
+        result = process_step((step, "http://pro", {}))
         assert result["image_base64"] == "imgb64"
         assert result["title"] == "Plant"
 
-    @patch('seed_service.random.uniform', return_value=0.5)
-    @patch('seed_service.time.sleep')
-    @patch('seed_service.call_api_with_backoff')
-    def test_process_step_fallback_success(self, mock_api, mock_sleep, mock_rand):
-        """Test fallback model success when primary fails."""
-        from seed_service import process_step
-
-        primary_fail = Mock()
-        primary_fail.status_code = 500
-
-        fallback_ok = Mock()
-        fallback_ok.status_code = 200
-        fallback_ok.json.return_value = {
-            "candidates": [{"content": {"parts": [{"inlineData": {"data": "fallback_img"}}]}}]
-        }
-
-        mock_api.side_effect = [primary_fail, fallback_ok]
-        step = {"step_title": "Water", "description": "Water plants", "image_prompt": "watering"}
-        result = process_step((step, "http://primary", "http://fallback", {}))
-        assert result["image_base64"] == "fallback_img"
-
-    @patch('seed_service.random.uniform', return_value=0.5)
-    @patch('seed_service.time.sleep')
-    @patch('seed_service.call_api_with_backoff')
-    def test_process_step_tertiary_success(self, mock_api, mock_sleep, mock_rand):
-        """Test tertiary fallback with simplified prompt."""
-        from seed_service import process_step
-
-        primary_fail = Mock()
-        primary_fail.status_code = 500
-        fallback_fail = Mock()
-        fallback_fail.status_code = 500
-        tertiary_ok = Mock()
-        tertiary_ok.status_code = 200
-        tertiary_ok.json.return_value = {
-            "candidates": [{"content": {"parts": [{"inlineData": {"data": "tertiary_img"}}]}}]
-        }
-
-        mock_api.side_effect = [primary_fail, fallback_fail, tertiary_ok]
-        step = {"step_title": "Harvest", "description": "Harvest crops", "image_prompt": "harvest"}
-        result = process_step((step, "http://primary", "http://fallback", {}))
-        assert result["image_base64"] == "tertiary_img"
 
     @patch('seed_service.random.uniform', return_value=0.5)
     @patch('seed_service.time.sleep')
     @patch('seed_service.call_api_with_backoff')
     def test_process_step_all_fail_placeholder(self, mock_api, mock_sleep, mock_rand):
-        """Test all attempts fail, returns placeholder."""
+        """Test all attempts fail, returns placeholder (no fallback)."""
         from seed_service import process_step, DEFAULT_PLACEHOLDER_B64
-
         mock_api.side_effect = Exception("all fail")
         step = {"step_title": "Grow", "description": "Growing", "image_prompt": "growing"}
-        result = process_step((step, "http://primary", "http://fallback", {}))
+        result = process_step((step, "http://pro", {}))
         assert result["image_base64"] == DEFAULT_PLACEHOLDER_B64
         assert "error" in result
 
@@ -329,17 +286,13 @@ class TestProcessStep:
     @patch('seed_service.time.sleep')
     @patch('seed_service.call_api_with_backoff')
     def test_process_step_primary_exception(self, mock_api, mock_sleep, mock_rand):
-        """Test primary model raises exception, fallback succeeds."""
-        from seed_service import process_step
-        fallback_ok = Mock()
-        fallback_ok.status_code = 200
-        fallback_ok.json.return_value = {
-            "candidates": [{"content": {"parts": [{"inlineData": {"data": "fb"}}]}}]
-        }
-        mock_api.side_effect = [RuntimeError("primary error"), fallback_ok]
+        """Test exception in pro model returns placeholder (no fallback)."""
+        from seed_service import process_step, DEFAULT_PLACEHOLDER_B64
+        mock_api.side_effect = RuntimeError("pro error")
         step = {"step_title": "Soil", "description": "Prep soil", "image_prompt": "soil"}
-        result = process_step((step, "http://primary", "http://fallback", {}))
-        assert result["image_base64"] == "fb"
+        result = process_step((step, "http://pro", {}))
+        assert result["image_base64"] == DEFAULT_PLACEHOLDER_B64
+        assert "error" in result
 
     @patch('seed_service.random.uniform', return_value=0.5)
     @patch('seed_service.time.sleep')
@@ -354,7 +307,7 @@ class TestProcessStep:
         }
         mock_api.return_value = mock_resp
         step = {"step_title": "Sun", "description": "Sunlight", "image_prompt": "sun"}
-        result = process_step((step, "http://primary", None, {}))
+        result = process_step((step, "http://pro", {}))
         assert result["image_base64"] == DEFAULT_PLACEHOLDER_B64
 
 
@@ -363,14 +316,14 @@ class TestGenerateImagesParallel:
 
     @patch('seed_service.process_step')
     def test_generate_images_parallel(self, mock_process):
-        """Test parallel image generation."""
+        """Test parallel image generation (no fallback)."""
         from seed_service import _generate_images_parallel
         mock_process.side_effect = lambda args: {"title": args[0]["step_title"], "image_base64": "img"}
         steps = [
             {"step_title": "S1", "description": "D1", "image_prompt": "P1"},
             {"step_title": "S2", "description": "D2", "image_prompt": "P2"},
         ]
-        result = _generate_images_parallel(steps, "http://primary", "http://fallback", {})
+        result = _generate_images_parallel(steps, "http://pro", {})
         assert len(result) == 2
         assert result[0]["title"] == "S1"
 
@@ -378,9 +331,10 @@ class TestGenerateImagesParallel:
 class TestGenerateSingleGuideImage:
     """Tests for _generate_single_guide_image (lines 297-361)"""
 
+
     @patch('seed_service.call_api_with_backoff')
-    def test_primary_success(self, mock_api):
-        """Test primary model generates image successfully."""
+    def test_success(self, mock_api):
+        """Test pro model generates image successfully."""
         from seed_service import _generate_single_guide_image
         mock_resp = Mock()
         mock_resp.status_code = 200
@@ -391,20 +345,6 @@ class TestGenerateSingleGuideImage:
         result = _generate_single_guide_image("Tomato Guide", [{"step_title": "S1", "description": "D1"}], "key", {})
         assert result == "guide_img"
 
-    @patch('seed_service.call_api_with_backoff')
-    def test_primary_fail_fallback_success(self, mock_api):
-        """Test fallback when primary fails."""
-        from seed_service import _generate_single_guide_image
-        primary_fail = Mock()
-        primary_fail.status_code = 500
-        fallback_ok = Mock()
-        fallback_ok.status_code = 200
-        fallback_ok.json.return_value = {
-            "candidates": [{"content": {"parts": [{"inlineData": {"data": "fb_img"}}]}}]
-        }
-        mock_api.side_effect = [primary_fail, fallback_ok]
-        result = _generate_single_guide_image("Guide", [{"step_title": "S1", "description": "D1"}], "key", {})
-        assert result == "fb_img"
 
     @patch('seed_service.call_api_with_backoff')
     def test_all_fail_returns_none(self, mock_api):
@@ -417,32 +357,13 @@ class TestGenerateSingleGuideImage:
         assert result is None
 
     @patch('seed_service.call_api_with_backoff')
-    def test_primary_exception_fallback_success(self, mock_api):
-        """Test primary raises exception, fallback succeeds."""
+    def test_primary_exception_returns_none(self, mock_api):
+        """Test exception in pro model returns None (no fallback)."""
         from seed_service import _generate_single_guide_image
-        fallback_ok = Mock()
-        fallback_ok.status_code = 200
-        fallback_ok.json.return_value = {
-            "candidates": [{"content": {"parts": [{"inlineData": {"data": "ok"}}]}}]
-        }
-        mock_api.side_effect = [RuntimeError("err"), fallback_ok]
+        mock_api.side_effect = RuntimeError("pro error")
         result = _generate_single_guide_image("Guide", [{"step_title": "S1", "description": "D1"}], "key", {})
-        assert result == "ok"
+        assert result is None
 
-    @patch('seed_service.call_api_with_backoff')
-    def test_tertiary_fallback_success(self, mock_api):
-        """Test tertiary simple prompt fallback."""
-        from seed_service import _generate_single_guide_image
-        fail_resp = Mock()
-        fail_resp.status_code = 500
-        tertiary_ok = Mock()
-        tertiary_ok.status_code = 200
-        tertiary_ok.json.return_value = {
-            "candidates": [{"content": {"parts": [{"inlineData": {"data": "tert"}}]}}]
-        }
-        mock_api.side_effect = [fail_resp, fail_resp, tertiary_ok]
-        result = _generate_single_guide_image("Guide", [{"step_title": "S1", "description": "D1"}], "key", {})
-        assert result == "tert"
 
     @patch('seed_service.call_api_with_backoff')
     def test_all_exceptions(self, mock_api):
@@ -488,6 +409,7 @@ class TestExtractImageFromResponse:
 class TestAnalyzeSeedGuidePerStepMode:
     """Tests for per-step image mode in analyze_seed_and_generate_guide (lines 537-577)"""
 
+
     @pytest.mark.asyncio
     @patch.dict(os.environ, {"SEED_GUIDE_GEMINI_KEY": "test-api-key"})
     @patch('seed_service._generate_images_parallel')
@@ -523,34 +445,7 @@ class TestAnalyzeSeedGuidePerStepMode:
         assert title == "Tomato Guide"
         assert steps[0]["image_base64"] == "step_img"
 
-    @pytest.mark.asyncio
-    @patch.dict(os.environ, {"SEED_GUIDE_GEMINI_KEY": "test-api-key"})
-    @patch('seed_service._generate_images_parallel')
-    @patch('seed_service.requests.post')
-    async def test_per_step_flash_model(self, mock_post, mock_parallel):
-        """Test per-step mode with flash model selection."""
-        from seed_service import analyze_seed_and_generate_guide
-
-        analysis_resp = Mock()
-        analysis_resp.status_code = 200
-        analysis_resp.json.return_value = {
-            "candidates": [{
-                "content": {
-                    "parts": [{
-                        "text": json.dumps({
-                            "title": "Guide",
-                            "description": "Desc",
-                            "steps": [{"step_title": "S1", "description": "D1", "image_prompt": "P1"}]
-                        })
-                    }]
-                }
-            }]
-        }
-        mock_post.return_value = analysis_resp
-        mock_parallel.return_value = [{"title": "S1", "description": "D1", "image_base64": "img"}]
-
-        title, desc, steps = await analyze_seed_and_generate_guide(b"img", image_model="flash", guide_image_mode="per_step")
-        assert title == "Guide"
+    # 削除: test_per_step_flash_model（image_model引数は廃止）
 
 
 class TestAnalyzeSeedGuideSingleModeNoImage:
@@ -670,19 +565,15 @@ class TestProcessStepAdditional:
     @patch('seed_service.random.uniform', return_value=0.5)
     @patch('seed_service.time.sleep')
     @patch('seed_service.call_api_with_backoff')
-    def test_tertiary_non200_sets_none(self, mock_api, mock_sleep, mock_rand):
-        """Cover L187-188: tertiary returns non-200 -> warning + img_response = None -> placeholder."""
+    def test_pro_non200_returns_placeholder(self, mock_api, mock_sleep, mock_rand):
+        """Pro model returns non-200 -> placeholder."""
         from seed_service import process_step, DEFAULT_PLACEHOLDER_B64
-        primary_fail = Mock()
-        primary_fail.status_code = 500
-        fallback_fail = Mock()
-        fallback_fail.status_code = 500
-        tertiary_fail = Mock()
-        tertiary_fail.status_code = 429  # non-200 but not exception
+        fail_resp = Mock()
+        fail_resp.status_code = 429
 
-        mock_api.side_effect = [primary_fail, fallback_fail, tertiary_fail]
+        mock_api.return_value = fail_resp
         step = {"step_title": "Prune", "description": "Prune plant", "image_prompt": "pruning"}
-        result = process_step((step, "http://primary", "http://fallback", {}))
+        result = process_step((step, "http://pro", {}))
         assert result["image_base64"] == DEFAULT_PLACEHOLDER_B64
         assert "error" in result
 
@@ -699,20 +590,7 @@ class TestProcessStepAdditional:
         }
         mock_api.return_value = mock_resp
         step = {"step_title": "Sun", "description": "Sunlight", "image_prompt": "sun"}
-        result = process_step((step, "http://primary", "http://fallback", {}))
-        assert result["image_base64"] == DEFAULT_PLACEHOLDER_B64
-
-    @patch('seed_service.random.uniform', return_value=0.5)
-    @patch('seed_service.time.sleep')
-    @patch('seed_service.call_api_with_backoff')
-    def test_all_attempts_exhausted_warning(self, mock_api, mock_sleep, mock_rand):
-        """Cover L225-227: all models fail with non-200 -> warning 'All AI generation attempts exhausted'."""
-        from seed_service import process_step, DEFAULT_PLACEHOLDER_B64
-        fail_resp = Mock()
-        fail_resp.status_code = 500
-        mock_api.return_value = fail_resp
-        step = {"step_title": "Feed", "description": "Feed plants", "image_prompt": "feeding"}
-        result = process_step((step, "http://primary", "http://fallback", {}))
+        result = process_step((step, "http://pro", {}))
         assert result["image_base64"] == DEFAULT_PLACEHOLDER_B64
         assert "error" in result
 
@@ -721,28 +599,20 @@ class TestGenerateSingleGuideImageAdditional:
     """Cover L297 and L326 in _generate_single_guide_image."""
 
     @patch('seed_service.call_api_with_backoff')
-    def test_primary_non200_warning(self, mock_api):
-        """Cover L297: primary model returns non-200 status."""
+    def test_pro_non200_returns_none(self, mock_api):
+        """Pro model returns non-200 status -> None."""
         from seed_service import _generate_single_guide_image
-        primary_fail = Mock()
-        primary_fail.status_code = 429
-        fallback_fail = Mock()
-        fallback_fail.status_code = 503
-        tertiary_fail = Mock()
-        tertiary_fail.status_code = 500
-        mock_api.side_effect = [primary_fail, fallback_fail, tertiary_fail]
+        fail_resp = Mock()
+        fail_resp.status_code = 429
+        mock_api.return_value = fail_resp
         result = _generate_single_guide_image("Guide", [{"step_title": "S1", "description": "D1"}], "key", {})
         assert result is None
 
     @patch('seed_service.call_api_with_backoff')
-    def test_fallback_non200_warning(self, mock_api):
-        """Cover L326: fallback model returns non-200 status."""
+    def test_pro_exception_returns_none(self, mock_api):
+        """Pro model raises exception -> None."""
         from seed_service import _generate_single_guide_image
-        fallback_fail = Mock()
-        fallback_fail.status_code = 503
-        tertiary_fail = Mock()
-        tertiary_fail.status_code = 500
-        mock_api.side_effect = [RuntimeError("primary err"), fallback_fail, tertiary_fail]
+        mock_api.side_effect = RuntimeError("pro error")
         result = _generate_single_guide_image("Guide", [{"step_title": "S1", "description": "D1"}], "key", {})
         assert result is None
 

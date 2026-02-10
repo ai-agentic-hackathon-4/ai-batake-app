@@ -105,9 +105,9 @@ UNIFIED_STYLE = "soft digital illustration, warm sunlight, gentle pastel colors,
 DEFAULT_PLACEHOLDER_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==" # 1x1 green pixel as safe failover
 
 def process_step(args):
-    """Generates image for a single step (Parallel Execution Helper)"""
+    """Generates image for a single step using Pro model only (Parallel Execution Helper)"""
     # args tuple unpacking needed because map passes one argument
-    step, primary_img_url, fallback_img_url, headers = args
+    step, img_url, headers = args
     
     # Small start jitter to avoid hitting rate limit exactly simultaneously
     time.sleep(random.uniform(0.5, 1.5))
@@ -124,73 +124,25 @@ def process_step(args):
     img_response = None
     
     try:
-        # --- Primary Model ---
         try:
             img_response = call_api_with_backoff(
-                primary_img_url,
+                img_url,
                 img_payload,
                 headers,
-                max_retries=6,
-                max_elapsed_seconds=300,
+                max_retries=100,
+                max_elapsed_seconds=1800,
                 base_delay=1.5,
-                max_delay=8.0,
+                max_delay=15.0,
                 request_timeout=180,
             )
             if img_response.status_code != 200:
-                warning(f"Image generation failed for '{step['step_title']}' (primary): {img_response.status_code}")
+                warning(f"Image generation failed for '{step['step_title']}': {img_response.status_code}")
                 img_response = None
         except Exception as e:
-            warning(f"Primary model exception for '{step['step_title']}': {e}")
+            warning(f"Pro model exception for '{step['step_title']}': {e}")
             img_response = None
 
-        # --- Fallback Model ---
-        if img_response is None and fallback_img_url:
-            try:
-                warning(f"Retrying with fallback model for '{step['step_title']}'")
-                img_response = call_api_with_backoff(
-                    fallback_img_url,
-                    img_payload,
-                    headers,
-                    max_retries=4,
-                    max_elapsed_seconds=240,
-                    base_delay=1.5,
-                    max_delay=8.0,
-                    request_timeout=180,
-                )
-                if img_response.status_code != 200:
-                    warning(f"Fallback also failed for '{step['step_title']}': {img_response.status_code}")
-                    img_response = None
-            except Exception as e:
-                warning(f"Fallback image generation failed for '{step['step_title']}': {e}")
-                img_response = None
-
-        # --- Tertiary Fallback: Flash with Simplified Prompt ---
-        if img_response is None and fallback_img_url:
-            try:
-                warning(f"Trying Tertiary (Flash + Simple Prompt) for '{step['step_title']}'")
-                simple_prompt = f"A simple digital illustration of gardening, {step['step_title']}, clean white background"
-                simple_payload = {
-                    "contents": [{ "role": "user", "parts": [{"text": simple_prompt}] }],
-                    "generationConfig": {}
-                }
-                img_response = call_api_with_backoff(
-                    fallback_img_url,
-                    simple_payload,
-                    headers,
-                    max_retries=3,
-                    max_elapsed_seconds=180,
-                    base_delay=1.0,
-                    max_delay=5.0,
-                    request_timeout=180,
-                )
-                if img_response.status_code != 200:
-                    warning(f"Tertiary also failed for '{step['step_title']}': {img_response.status_code}")
-                    img_response = None
-            except Exception as e:
-                warning(f"Tertiary fallback failed for '{step['step_title']}': {e}")
-                img_response = None
-
-        # --- Parse the successful response (whichever model succeeded) ---
+        # --- Parse the successful response ---
         if img_response is not None and img_response.status_code == 200:
             img_resp_json = img_response.json()
             try:
@@ -231,13 +183,13 @@ def process_step(args):
             "error": f"Request Failed: {str(e)}"
         }
 
-def _generate_images_parallel(steps, primary_img_url, fallback_img_url, headers):
+def _generate_images_parallel(steps, img_url, headers):
     """Sync function to handle parallel execution waiting."""
     info(f"Starting parallel image generation for {len(steps)} steps...")
     
     # Prepare args for map
     # We need to pass img_url and headers to each thread
-    map_args = [(step, primary_img_url, fallback_img_url, headers) for step in steps]
+    map_args = [(step, img_url, headers) for step in steps]
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         # map preserves the order of results corresponding to 'steps'
@@ -271,63 +223,34 @@ def _generate_single_guide_image(guide_title, steps, api_key, headers):
         "generationConfig": {}
     }
     
-    # --- Primary: gemini-3-pro-image-preview ---
-    primary_model = "gemini-3-pro-image-preview"
-    primary_url = (
+    # --- gemini-3-pro-image-preview only ---
+    model = "gemini-3-pro-image-preview"
+    url = (
         f"https://{API_ENDPOINT}/v1/publishers/google/"
-        f"models/{primary_model}:generateContent?key={api_key}"
+        f"models/{model}:generateContent?key={api_key}"
     )
     
     try:
-        info(f"Trying primary model ({primary_model}) for single guide image")
+        info(f"Generating single guide image with {model} for: {guide_title}")
         response = call_api_with_backoff(
-            primary_url, payload, headers,
-            max_retries=4,
-            max_elapsed_seconds=300,
+            url, payload, headers,
+            max_retries=100,
+            max_elapsed_seconds=1800,
             base_delay=2.0,
-            max_delay=10.0,
+            max_delay=15.0,
             request_timeout=180,
         )
         
         if response.status_code == 200:
             b64_data = _extract_image_from_response(response)
             if b64_data:
-                info(f"Single guide image generated successfully (primary) for: {guide_title}")
+                info(f"Single guide image generated successfully for: {guide_title}")
                 return b64_data
-            warning(f"No inline image data in primary response for: {guide_title}")
+            warning(f"No inline image data in response for: {guide_title}")
         else:
-            warning(f"Primary model failed for single guide image: {response.status_code}")
+            warning(f"Pro model failed for single guide image: {response.status_code}")
     except Exception as e:
-        warning(f"Primary model exception for single guide image: {e}")
-    
-    # --- Fallback: gemini-2.5-flash-image ---
-    fallback_model = "gemini-2.5-flash-image"
-    fallback_url = (
-        f"https://{API_ENDPOINT}/v1/publishers/google/"
-        f"models/{fallback_model}:generateContent?key={api_key}"
-    )
-    
-    try:
-        warning(f"Retrying with fallback model ({fallback_model}) for single guide image")
-        response = call_api_with_backoff(
-            fallback_url, payload, headers,
-            max_retries=3,
-            max_elapsed_seconds=240,
-            base_delay=2.0,
-            max_delay=8.0,
-            request_timeout=180,
-        )
-        
-        if response.status_code == 200:
-            b64_data = _extract_image_from_response(response)
-            if b64_data:
-                info(f"Single guide image generated successfully (fallback) for: {guide_title}")
-                return b64_data
-            warning(f"No inline image data in fallback response for: {guide_title}")
-        else:
-            warning(f"Fallback model also failed for single guide image: {response.status_code}")
-    except Exception as e:
-        warning(f"Fallback model exception for single guide image: {e}")
+        warning(f"Pro model exception for single guide image: {e}")
     
     # --- Tertiary: Flash with simplified prompt ---
     try:
@@ -373,16 +296,16 @@ def _extract_image_from_response(response):
         warning(f"Failed to extract image from response: {e}")
     return None
 
-async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=None, image_model: str = "pro", guide_image_mode: str = "single"):
+async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=None, guide_image_mode: str = "single"):
     """
     Analyzes a seed image and generates a step-by-step planting guide with images using Vertex AI REST API.
+    Always uses gemini-3-pro-image-preview for image generation.
     Args:
         image_bytes: The image content.
         progress_callback: Optional async function(message: str) to report progress.
-        image_model: "pro" for gemini-3-pro-image-preview or "flash" for gemini-2.5-flash-image
         guide_image_mode: "single" for one infographic image (NanoBanana Pro), "per_step" for per-step images
     """
-    info(f"Starting seed analysis and guide generation ({len(image_bytes)} bytes, model={image_model})")
+    info(f"Starting seed analysis and guide generation ({len(image_bytes)} bytes, model=pro)")
     if progress_callback: await progress_callback("🌱 AI is analyzing the seed image (Gemini 3 Pro)...")
     
     # ... (rest of authentication and analysis logic stays same)
@@ -536,36 +459,20 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         # --- Per-Step Image Mode (Original): Generate image for each step ---
         if progress_callback: await progress_callback(f"🎨 Generating illustrations for {len(steps)} steps...")
 
-        # 2. Generate Images based on selected model
-        if image_model == "flash":
-            primary_img_model_id = "gemini-2.5-flash-image"
-            fallback_img_model_id = "gemini-3-pro-image-preview"  # Fallback to Pro if Flash fails
-            model_name_for_log = "Gemini 2.5 Flash Image (with Pro fallback)"
-        else:
-            # Default to pro
-            primary_img_model_id = "gemini-3-pro-image-preview"
-            fallback_img_model_id = "gemini-2.5-flash-image"
-            model_name_for_log = "Gemini 3 Pro Image (with Flash fallback)"
-            
-        info(f"Using {model_name_for_log} for image generation")
+        # 2. Generate Images with Pro model only
+        img_model_id = "gemini-3-pro-image-preview"
+        info(f"Using {img_model_id} for image generation")
         
-        primary_img_url = (
+        img_url = (
             f"https://{API_ENDPOINT}/v1/publishers/google/"
-            f"models/{primary_img_model_id}:generateContent?key={api_key}"
+            f"models/{img_model_id}:generateContent?key={api_key}"
         )
-        fallback_img_url = None
-        if fallback_img_model_id:
-            fallback_img_url = (
-                f"https://{API_ENDPOINT}/v1/publishers/google/"
-                f"models/{fallback_img_model_id}:generateContent?key={api_key}"
-            )
         
         # Offload parallel image generation to thread
         final_steps = await asyncio.to_thread(
             _generate_images_parallel,
             steps,
-            primary_img_url,
-            fallback_img_url,
+            img_url,
             headers
         )
         
