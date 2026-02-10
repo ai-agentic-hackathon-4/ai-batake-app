@@ -185,18 +185,18 @@ export default function UnifiedPage() {
                     <Link href="/" className="mr-2 p-1 hover:bg-accent rounded-full transition-colors">
                         <ArrowLeft className="h-5 w-5 text-muted-foreground" />
                     </Link>
-                    <div className="p-2 rounded-lg bg-primary/10">
-                        <Sparkles className="h-6 w-6 text-primary" />
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
+                        <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                     </div>
-                    <div>
-                        <h1 className="text-xl font-semibold text-card-foreground">野菜を育て始める</h1>
-                        <p className="text-sm text-muted-foreground">種袋スキャンで栽培ガイド・キャラクターを一括生成</p>
+                    <div className="min-w-0">
+                        <h1 className="text-base sm:text-xl font-semibold text-card-foreground truncate">野菜を育て始める</h1>
+                        <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">種袋スキャンで栽培ガイド・キャラクターを一括生成</p>
                     </div>
                 </div>
             </header>
 
             {/* Main Content */}
-            <main className="max-w-6xl mx-auto px-4 py-3">
+            <main className="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-3">
 
             {/* Upload Section */}
             {!jobId && (
@@ -327,28 +327,30 @@ export default function UnifiedPage() {
 
             {/* Progress & Results Section */}
             {jobId && status && (
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                     {/* Sidebar Status */}
                     <Card className="lg:col-span-1 h-fit">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base">進行状況</CardTitle>
+                        <CardHeader className="pb-2 px-3 sm:px-6">
+                            <CardTitle className="text-sm sm:text-base">進行状況</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+                            {/* Mobile: horizontal, Desktop: vertical */}
+                            <div className="flex flex-row lg:flex-col gap-3 sm:gap-4 overflow-x-auto lg:overflow-x-visible">
 
                             {/* CAHARCTER Status (First) */}
-                            <div className="flex items-start gap-3">
-                                <div className="mt-1">{getStatusIcon(status.character.status)}</div>
-                                <div>
-                                    <p className="font-medium flex items-center gap-2">
-                                        <Sparkles className="h-4 w-4" /> キャラクター
+                            <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                                <div className="mt-1 shrink-0">{getStatusIcon(status.character.status)}</div>
+                                <div className="min-w-0">
+                                    <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                                        <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">キャラクター</span>
                                     </p>
-                                    <p className="text-xs text-slate-500 mt-1">
+                                    <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
                                         {status.character.status === 'COMPLETED' ? '完了' :
                                             status.character.status === 'FAILED' ? '失敗' :
                                                 status.character.status === 'PENDING' ? '待機中...' : (
                                                     <span className="flex items-center gap-1">
-                                                        芽吹き中... <Loader2 className="h-4 w-4 animate-spin" />
+                                                        芽吹き中... <Loader2 className="h-3 w-3 animate-spin" />
                                                     </span>
                                                 )}
                                     </p>
@@ -356,17 +358,17 @@ export default function UnifiedPage() {
                             </div>
 
                             {/* RESEARCH Status (Second) */}
-                            <div className="flex items-start gap-3">
-                                <div className="mt-1">
+                            <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                                <div className="mt-1 shrink-0">
                                     {(status.research.status === 'COMPLETED' || status.research.status === 'FAILED')
                                         ? getStatusIcon(status.research.status)
                                         : <Loader2 className="h-4 w-4 animate-spin text-purple-500" />}
                                 </div>
-                                <div>
-                                    <p className="font-medium flex items-center gap-2">
-                                        <Microscope className="h-4 w-4" /> 詳細リサーチ
+                                <div className="min-w-0">
+                                    <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                                        <Microscope className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">リサーチ</span>
                                     </p>
-                                    <p className="text-xs text-slate-500 mt-1">
+                                    <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
                                         {status.research.status === 'COMPLETED' ? '完了' :
                                             status.research.status === 'FAILED' ? '失敗' : '調査中...'}
                                     </p>
@@ -374,22 +376,23 @@ export default function UnifiedPage() {
                             </div>
 
                             {/* GUIDE Status (Third) */}
-                            <div className="flex items-start gap-3">
-                                <div className="mt-1">{getStatusIcon(status.guide.status)}</div>
-                                <div>
-                                    <p className="font-medium flex items-center gap-2">
-                                        <Sprout className="h-4 w-4" /> 栽培ガイド
+                            <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                                <div className="mt-1 shrink-0">{getStatusIcon(status.guide.status)}</div>
+                                <div className="min-w-0">
+                                    <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                                        <Sprout className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">栽培ガイド</span>
                                     </p>
-                                    <p className="text-xs text-slate-500 mt-1">
+                                    <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
                                         {status.guide.status === 'COMPLETED' ? '完了' :
                                             status.guide.status === 'FAILED' ? '失敗' :
                                                 status.guide.status === 'PENDING' ? '待機中...' : '生成中...'}
                                     </p>
                                 </div>
                             </div>
+                            </div>
 
                             {/* Dashboard Link (Enabled only when all done) */}
-                            <div className="pt-4 border-t border-slate-100">
+                            <div className="pt-3 sm:pt-4 mt-3 sm:mt-0 border-t border-slate-100">
                                 <Button
                                     className="w-full justify-between"
                                     variant={isAllCompleted ? "default" : "outline"}
@@ -416,13 +419,13 @@ export default function UnifiedPage() {
                         {status.research.result && (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <Card className="bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-100">
-                                    <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-white rounded-full shadow-sm">
-                                                <Sprout className="h-6 w-6 text-green-600" />
+                                    <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
+                                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                            <div className="p-1.5 sm:p-2 bg-white rounded-full shadow-sm shrink-0">
+                                                <Sprout className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
                                             </div>
-                                            <div>
-                                                <h2 className="text-lg font-bold text-slate-800">
+                                            <div className="min-w-0">
+                                                <h2 className="text-base sm:text-lg font-bold text-slate-800 truncate">
                                                     {status.research.result.name}
                                                 </h2>
                                             </div>
@@ -435,9 +438,9 @@ export default function UnifiedPage() {
 
                         <Tabs defaultValue="summary" className="w-full">
                             <TabsList className="grid w-full grid-cols-3">
-                                <TabsTrigger value="summary">キャラクター & 概要</TabsTrigger>
-                                <TabsTrigger value="research">詳細リサーチ</TabsTrigger>
-                                <TabsTrigger value="guide">栽培ガイド</TabsTrigger>
+                                <TabsTrigger value="summary" className="text-[11px] sm:text-sm px-1 sm:px-3">キャラクター</TabsTrigger>
+                                <TabsTrigger value="research" className="text-[11px] sm:text-sm px-1 sm:px-3">リサーチ</TabsTrigger>
+                                <TabsTrigger value="guide" className="text-[11px] sm:text-sm px-1 sm:px-3">栽培ガイド</TabsTrigger>
                             </TabsList>
 
                             {/* Summary Tab */}
@@ -446,33 +449,33 @@ export default function UnifiedPage() {
                                 {/* Refined Character Display - Horizontal Layout */}
                                 <div className="flex items-center justify-center">
                                     {status.character.result ? (
-                                        <div className="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 items-center animate-in fade-in duration-700">
+                                        <div className="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-center animate-in fade-in duration-700">
 
                                             {/* Left: Character Image */}
                                             <div className="flex justify-center items-center">
                                                 {status.character.result.image_url ? (
-                                                    <div className="relative inline-block">
+                                                    <div className="relative inline-block w-full max-w-[200px] sm:max-w-md">
                                                         <div className="absolute inset-0 bg-yellow-100 rounded-full blur-2xl opacity-50 -z-10 transform scale-110"></div>
                                                         <img
                                                             src={status.character.result.image_url.startsWith('http') && !status.character.result.image_url.includes('/api/') ? status.character.result.image_url : `${status.character.result.image_url}`}
                                                             alt="Character"
-                                                            className="w-full max-w-md mx-auto object-contain z-0 hover:scale-105 transition-transform duration-500 rounded-2xl border-4 border-white shadow-[0_0_0_4px_rgba(255,182,193,0.4)] bg-white"
-                                                            style={{ maxHeight: '280px' }}
+                                                            className="w-full mx-auto object-contain z-0 hover:scale-105 transition-transform duration-500 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-white shadow-[0_0_0_2px_rgba(255,182,193,0.4)] sm:shadow-[0_0_0_4px_rgba(255,182,193,0.4)] bg-white"
+                                                            style={{ maxHeight: '200px' }}
                                                         />
                                                     </div>
                                                 ) : status.character.result.image_base64 ? (
-                                                    <div className="relative inline-block">
+                                                    <div className="relative inline-block w-full max-w-[200px] sm:max-w-md">
                                                         <div className="absolute inset-0 bg-yellow-100 rounded-full blur-2xl opacity-50 -z-10 transform scale-110"></div>
                                                         <img
                                                             src={`data:image/png;base64,${status.character.result.image_base64}`}
                                                             alt="Character"
-                                                            className="w-full max-w-md mx-auto object-contain z-0 rounded-2xl border-4 border-white shadow-[0_0_0_4px_rgba(255,182,193,0.4)] bg-white"
-                                                            style={{ maxHeight: '280px' }}
+                                                            className="w-full mx-auto object-contain z-0 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-white shadow-[0_0_0_2px_rgba(255,182,193,0.4)] sm:shadow-[0_0_0_4px_rgba(255,182,193,0.4)] bg-white"
+                                                            style={{ maxHeight: '200px' }}
                                                         />
                                                     </div>
                                                 ) : (
-                                                    <div className="w-64 h-64 bg-emerald-50 rounded-full flex items-center justify-center mx-auto animate-pulse">
-                                                        <Sparkles className="h-16 w-16 text-emerald-200" />
+                                                    <div className="w-40 h-40 sm:w-64 sm:h-64 bg-emerald-50 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                                                        <Sparkles className="h-10 w-10 sm:h-16 sm:w-16 text-emerald-200" />
                                                     </div>
                                                 )}
                                             </div>
@@ -480,27 +483,27 @@ export default function UnifiedPage() {
                                             {/* Right: Character Profile - Notebook Style */}
                                             <div className="space-y-3">
                                                 {/* Profile Notebook Card */}
-                                                <div className="relative bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-5 rounded-lg shadow-xl border-2 border-amber-900/20"
+                                                <div className="relative bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-3 sm:p-5 rounded-lg shadow-xl border-2 border-amber-900/20"
                                                     style={{
                                                         backgroundImage: `repeating-linear-gradient(transparent, transparent 31px, #f59e0b15 31px, #f59e0b15 32px)`,
                                                         backgroundSize: '100% 32px'
                                                     }}>
-                                                    {/* Notebook Binding Holes */}
-                                                    <div className="absolute left-4 top-0 bottom-0 flex flex-col justify-around py-8">
+                                                    {/* Notebook Binding Holes - hidden on very small screens */}
+                                                    <div className="absolute left-2 sm:left-4 top-0 bottom-0 hidden sm:flex flex-col justify-around py-8">
                                                         <div className="w-3 h-3 rounded-full bg-slate-300 shadow-inner"></div>
                                                         <div className="w-3 h-3 rounded-full bg-slate-300 shadow-inner"></div>
                                                         <div className="w-3 h-3 rounded-full bg-slate-300 shadow-inner"></div>
                                                     </div>
 
-                                                    {/* Red Margin Line */}
-                                                    <div className="absolute left-12 top-0 bottom-0 w-0.5 bg-red-300/40"></div>
+                                                    {/* Red Margin Line - hidden on very small screens */}
+                                                    <div className="absolute left-12 top-0 bottom-0 w-0.5 bg-red-300/40 hidden sm:block"></div>
 
                                                     {/* Content */}
-                                                    <div className="ml-8 space-y-3">
+                                                    <div className="sm:ml-8 space-y-2 sm:space-y-3">
                                                         {/* Title Banner */}
                                                         <div className="relative inline-block">
                                                             <div className="absolute -top-1 -left-1 w-full h-full bg-emerald-400/20 transform rotate-1 rounded"></div>
-                                                            <h3 className="relative text-xl font-bold text-emerald-800 px-3 py-1.5 bg-white/60 rounded border-2 border-emerald-300 shadow-sm"
+                                                            <h3 className="relative text-base sm:text-xl font-bold text-emerald-800 px-2 sm:px-3 py-1 sm:py-1.5 bg-white/60 rounded border-2 border-emerald-300 shadow-sm"
                                                                 style={{ fontFamily: '"Noto Sans JP", sans-serif' }}>
                                                                 🌱 {status.character.result.character_name || "名無しさん"}
                                                             </h3>
@@ -519,7 +522,7 @@ export default function UnifiedPage() {
                                                             <div className="relative">
                                                                 <div className="absolute inset-0 bg-yellow-300 transform rotate-2 rounded-lg"></div>
                                                                 <div className="relative bg-gradient-to-br from-yellow-200 to-yellow-300 px-4 py-2 rounded-lg shadow-lg border-2 border-yellow-400 transform -rotate-1">
-                                                                    <p className="text-sm font-bold text-yellow-900 text-center">
+                                                                    <p className="text-xs sm:text-sm font-bold text-yellow-900 text-center">
                                                                         ✨ {status.character.result.catchphrase || "あなたの栽培パートナー"} ✨
                                                                     </p>
                                                                 </div>
@@ -575,22 +578,22 @@ export default function UnifiedPage() {
                                 {status.research.result && (
                                     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
                                         <Card className="bg-white/50 backdrop-blur border-emerald-100/50 shadow-sm">
-                                            <CardHeader>
-                                                <CardTitle className="flex items-center gap-2 text-emerald-700">
-                                                    <Info className="h-5 w-5" /> 基本情報
+                                            <CardHeader className="px-3 sm:px-6">
+                                                <CardTitle className="flex items-center gap-2 text-emerald-700 text-sm sm:text-base">
+                                                    <Info className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" /> 基本情報
                                                 </CardTitle>
                                             </CardHeader>
-                                            <CardContent className="space-y-4">
-                                                <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100">
-                                                    <p className="text-sm text-emerald-600 mb-1 font-medium">野菜の名前</p>
-                                                    <p className="text-lg font-bold text-slate-800">{status.research.result.name}</p>
+                                            <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
+                                                <div className="p-3 sm:p-4 bg-emerald-50/50 rounded-xl border border-emerald-100">
+                                                    <p className="text-xs sm:text-sm text-emerald-600 mb-1 font-medium">野菜の名前</p>
+                                                    <p className="text-base sm:text-lg font-bold text-slate-800">{status.research.result.name}</p>
                                                 </div>
 
                                                 {/* Visible Instructions (if available) */}
                                                 {status.research.result.basic_analysis?.visible_instructions && status.research.result.basic_analysis.visible_instructions !== "unknown" && (
-                                                    <div className="md:col-span-3 p-4 bg-slate-50/50 rounded-xl border border-slate-100">
-                                                        <p className="text-sm text-slate-600 mb-1 font-medium">📋 種袋の育て方ポイント</p>
-                                                        <p className="text-base text-slate-800 whitespace-pre-wrap">{status.research.result.basic_analysis.visible_instructions}</p>
+                                                    <div className="p-3 sm:p-4 bg-slate-50/50 rounded-xl border border-slate-100">
+                                                        <p className="text-xs sm:text-sm text-slate-600 mb-1 font-medium">📋 種袋の育て方ポイント</p>
+                                                        <p className="text-sm sm:text-base text-slate-800 whitespace-pre-wrap">{status.research.result.basic_analysis.visible_instructions}</p>
                                                     </div>
                                                 )}
                                             </CardContent>
@@ -661,11 +664,11 @@ export default function UnifiedPage() {
                                                                             const isSingleImageMode = stepsWithImages.length <= 1;
                                                                             if (isSingleImageMode && idx === 0) return null; // Already shown above
                                                                             return (
-                                                                                <div className="mt-4">
+                                                                                <div className="mt-3">
                                                                                     <img
                                                                                         src={getProxiedImageUrl(step.image_url)}
                                                                                         alt={step.title}
-                                                                                        className="rounded-lg max-h-80 w-full object-contain border-2 border-green-200 shadow-md bg-white"
+                                                                                        className="rounded-lg max-h-48 sm:max-h-80 w-full object-contain border-2 border-green-200 shadow-md bg-white"
                                                                                     />
                                                                                 </div>
                                                                             );
@@ -715,30 +718,30 @@ export default function UnifiedPage() {
                             {/* Research Tab */}
                             <TabsContent value="research" className="mt-3">
                                 <Card>
-                                    <CardHeader className="pb-2">
-                                        <div className="flex items-center justify-between">
-                                            <CardTitle className="flex items-center gap-2 text-purple-600">
-                                                <Microscope className="h-5 w-5" /> 詳細リサーチデータ
+                                    <CardHeader className="pb-2 px-3 sm:px-6">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                            <CardTitle className="flex items-center gap-2 text-purple-600 text-sm sm:text-base">
+                                                <Microscope className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" /> リサーチデータ
                                             </CardTitle>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
+                                                className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200 text-xs sm:text-sm w-full sm:w-auto"
                                                 onClick={handleApplyToAgent}
                                                 disabled={isApplying || !status.research.id || status.research.status?.toLowerCase() !== 'completed'}
                                             >
                                                 {isApplying ? (
-                                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                                    <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin mr-1.5" />
                                                 ) : (
-                                                    <Sparkles className="h-4 w-4 mr-2" />
+                                                    <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
                                                 )}
                                                 エージェントに適応
                                             </Button>
                                         </div>
                                     </CardHeader>
-                                    <CardContent>
+                                    <CardContent className="px-3 sm:px-6">
                                         {status.research.status?.toLowerCase() === 'completed' && status.research.result ? (
-                                            <div className="space-y-3">
+                                            <div className="space-y-2 sm:space-y-3">
                                                 {/* Name */}
                                                 {status.research.result.name && (
                                                     <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
@@ -826,8 +829,8 @@ export default function UnifiedPage() {
                                                         </button>
 
                                                         {showRawReport && (
-                                                            <div className="mt-4 p-5 bg-slate-900 rounded-xl overflow-x-auto border border-slate-800 shadow-inner animate-in fade-in slide-in-from-top-2 duration-300">
-                                                                <pre className="text-xs text-slate-300 font-mono leading-relaxed whitespace-pre-wrap">
+                                                            <div className="mt-3 p-3 sm:p-5 bg-slate-900 rounded-xl overflow-x-auto border border-slate-800 shadow-inner animate-in fade-in slide-in-from-top-2 duration-300">
+                                                                <pre className="text-[10px] sm:text-xs text-slate-300 font-mono leading-relaxed whitespace-pre-wrap break-all sm:break-normal">
                                                                     {status.research.result.raw_report}
                                                                 </pre>
                                                             </div>
