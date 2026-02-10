@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search } from 'lucide-react';
+import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search, LayoutDashboard } from 'lucide-react';
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -13,7 +13,7 @@ interface UnifiedJobStatus {
     job_id: string
     created_at: string
     image_url?: string
-    research: { status: string; result?: any; error?: string }
+    research: { status: string; id?: string; result?: any; error?: string }
     guide: { status: string; result?: any; steps?: any[]; error?: string }
     character: { status: string; result?: any; error?: string }
 }
@@ -28,6 +28,7 @@ export default function UnifiedPage() {
     const [currentStep, setCurrentStep] = useState(0); // For carousel navigation
     const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
     const [showRawReport, setShowRawReport] = useState(false);
+    const [isApplying, setIsApplying] = useState(false);
 
     // Poll for status
     useEffect(() => {
@@ -92,6 +93,26 @@ export default function UnifiedPage() {
         }
     }
 
+    const handleApplyToAgent = async () => {
+        if (!status?.research?.id) return;
+        setIsApplying(true);
+        try {
+            const res = await fetch(`/api/vegetables/${status.research.id}/select`, {
+                method: "POST",
+            });
+            if (res.ok) {
+                alert("エージェントへの設定を更新しました。");
+            } else {
+                alert("設定の更新に失敗しました。");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("エラーが発生しました。");
+        } finally {
+            setIsApplying(false);
+        }
+    };
+
     // Helper to determine step status color
     const getStatusColor = (s?: string) => {
         if (!s) return "text-slate-400"
@@ -108,6 +129,11 @@ export default function UnifiedPage() {
         if (s.toLowerCase() === "failed") return <AlertCircle className="h-5 w-5 text-red-500" />
         return <div className="h-5 w-5 rounded-full border-2 border-slate-200" />
     }
+
+    const isAllCompleted = status &&
+        status.research.status.toLowerCase() === "completed" &&
+        status.guide.status.toLowerCase() === "completed" &&
+        status.character.status.toLowerCase() === "completed";
 
     return (
         <div className="container mx-auto p-6 max-w-6xl">
@@ -264,6 +290,24 @@ export default function UnifiedPage() {
                                                 status.guide.status === 'PENDING' ? '待機中...' : '生成中...'}
                                     </p>
                                 </div>
+                            </div>
+
+                            {/* Dashboard Link (Enabled only when all done) */}
+                            <div className="pt-4 border-t border-slate-100">
+                                <Button
+                                    className="w-full justify-between"
+                                    variant={isAllCompleted ? "default" : "outline"}
+                                    disabled={!isAllCompleted}
+                                    onClick={() => window.location.href = '/dashboard'}
+                                >
+                                    <span>ダッシュボードへ</span>
+                                    <LayoutDashboard className="h-4 w-4" />
+                                </Button>
+                                {!isAllCompleted && jobId && (
+                                    <p className="text-[10px] text-slate-400 text-center mt-2 italic">
+                                        全ての解析が完了すると移動できます
+                                    </p>
+                                )}
                             </div>
 
                         </CardContent>
@@ -529,9 +573,25 @@ export default function UnifiedPage() {
                             <TabsContent value="research" className="mt-6">
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle className="flex items-center gap-2 text-purple-600">
-                                            <Microscope className="h-5 w-5" /> 詳細リサーチデータ
-                                        </CardTitle>
+                                        <div className="flex items-center justify-between">
+                                            <CardTitle className="flex items-center gap-2 text-purple-600">
+                                                <Microscope className="h-5 w-5" /> 詳細リサーチデータ
+                                            </CardTitle>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
+                                                onClick={handleApplyToAgent}
+                                                disabled={isApplying || !status.research.id}
+                                            >
+                                                {isApplying ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                                ) : (
+                                                    <Sparkles className="h-4 w-4 mr-2" />
+                                                )}
+                                                エージェントに適応
+                                            </Button>
+                                        </div>
                                     </CardHeader>
                                     <CardContent>
                                         {status.research.status?.toLowerCase() === 'completed' && status.research.result ? (

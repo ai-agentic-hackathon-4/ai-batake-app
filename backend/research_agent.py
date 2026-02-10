@@ -232,7 +232,7 @@ def perform_web_grounding_research(vegetable_name: str, packet_info: str) -> dic
     model_id = "gemini-3-flash-preview"
     url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{model_id}:generateContent{query_param}"
 
-    research_topic = f"「{vegetable_name}」の育て方について、家庭菜園や農業の専門的な情報を詳しく調べてください。特に最適な気温、湿度、土壌水分量、水やり頻度、日照条件について数値を含めて調査してください。"
+    research_topic = f"「{vegetable_name}」の育て方について、WEBの情報調査を行い家庭菜園や農業の専門的な情報を詳しく調べてください。特に最適な気温、湿度、土壌水分量、水やり頻度、日照条件について数値を含めて調査してください。"
     if packet_info:
         research_topic += f" また、種の袋には以下の情報がありました: {packet_info}"
 
