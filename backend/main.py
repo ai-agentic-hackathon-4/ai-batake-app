@@ -45,7 +45,8 @@ try:
         init_vegetable_status, update_vegetable_status, 
         get_all_vegetables, get_latest_vegetable, 
         get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs,
-        get_all_seed_guides, save_seed_guide, get_seed_guide
+        get_all_seed_guides, save_seed_guide, get_seed_guide,
+        col
     )
     from .research_agent import analyze_seed_packet, perform_deep_research, perform_web_grounding_research
     from .agent import get_weather_from_agent
@@ -55,7 +56,8 @@ except ImportError:
         init_vegetable_status, update_vegetable_status, 
         get_all_vegetables, get_latest_vegetable, 
         get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs,
-        get_all_seed_guides, save_seed_guide, get_seed_guide
+        get_all_seed_guides, save_seed_guide, get_seed_guide,
+        col
     )
     from research_agent import analyze_seed_packet, perform_deep_research, perform_web_grounding_research
     from agent import get_weather_from_agent
@@ -162,7 +164,7 @@ app.add_middleware(
 # Firestore Client (Async)
 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
 db = firestore.AsyncClient(project=project_id, database="ai-agentic-hackathon-4-db")
-COLLECTION_NAME = "seed_guide_jobs"
+COLLECTION_NAME = col("seed_guide_jobs")
 
 class WeatherRequest(BaseModel):
     region: str
@@ -224,7 +226,7 @@ async def get_oldest_agent_log_endpoint():
     """Get the oldest agent log to calculate days since planting"""
     try:
         debug("Fetching oldest agent execution log")
-        collection_name = "agent_execution_logs"
+        collection_name = col("agent_execution_logs")
         
         # Using the global async db client
         from google.cloud import firestore as fs
@@ -375,7 +377,7 @@ async def list_vegetables():
 async def delete_vegetable(doc_id: str):
     """Deletes a vegetable research document."""
     try:
-        await db.collection("vegetables").document(doc_id).delete()
+        await db.collection(col("vegetables")).document(doc_id).delete()
         info(f"Deleted vegetable doc: {doc_id}")
         return {"status": "success", "id": doc_id}
     except Exception as e:
@@ -679,7 +681,7 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
     set_request_id(generate_request_id())
     
     info(f"[Character] start job={job_id}")
-    doc_ref = db.collection("character_jobs").document(job_id)
+    doc_ref = db.collection(col("character_jobs")).document(job_id)
     
     await doc_ref.update({
         "status": "PROCESSING",
@@ -753,7 +755,7 @@ async def get_character_job_status(job_id: str):
     """Polls the status of a character generation job from Firestore."""
     try:
         debug(f"Fetching character job status: {job_id}")
-        doc_ref = db.collection("character_jobs").document(job_id)
+        doc_ref = db.collection(col("character_jobs")).document(job_id)
         doc = await doc_ref.get()
         
         if not doc.exists:
@@ -855,7 +857,7 @@ async def get_character():
     The image_uri is transformed to a local proxy URL.
     """
     try:
-        doc_ref = db.collection("growing_diaries").document("Character")
+        doc_ref = db.collection(col("growing_diaries")).document("Character")
         doc = await doc_ref.get()
         
         if not doc.exists:
@@ -924,7 +926,7 @@ async def create_character_job(background_tasks: BackgroundTasks, file: UploadFi
         
         info(f"Creating character generation job: {job_id}, file: {file.filename}")
         
-        doc_ref = db.collection("character_jobs").document(job_id)
+        doc_ref = db.collection(col("character_jobs")).document(job_id)
         await doc_ref.set({
             "job_id": job_id,
             "status": "PENDING",
@@ -1287,7 +1289,7 @@ async def get_character_metadata():
     Proxies the GCS image URL to a local API URL.
     """
     try:
-        doc_ref = db.collection("growing_diaries").document("Character")
+        doc_ref = db.collection(col("growing_diaries")).document("Character")
         doc = await doc_ref.get()
         
         if not doc.exists:
@@ -1394,7 +1396,7 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
         
         # Guide Job Doc
         guide_job_id = f"guide-{job_id}"
-        guide_doc_ref = db.collection("seed_guide_jobs").document(guide_job_id)
+        guide_doc_ref = db.collection(col("seed_guide_jobs")).document(guide_job_id)
         await guide_doc_ref.set({
             "job_id": guide_job_id,
             "title": "Unified Seed Guide",
@@ -1408,7 +1410,7 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
         
         # Character Job Doc
         char_job_id = f"char-{job_id}"
-        char_doc_ref = db.collection("character_jobs").document(char_job_id)
+        char_doc_ref = db.collection(col("character_jobs")).document(char_job_id)
         await char_doc_ref.set({
             "job_id": char_job_id,
             "status": "PENDING",
@@ -1419,7 +1421,7 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
         })
         
         # 3. Create Unified Job Tracker
-        unified_doc_ref = db.collection("unified_jobs").document(job_id)
+        unified_doc_ref = db.collection(col("unified_jobs")).document(job_id)
         await unified_doc_ref.set({
             "job_id": job_id,
             "created_at": firestore.SERVER_TIMESTAMP,
@@ -1467,7 +1469,7 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
                                 f"[Unified] unknown_vegetable job={job_id} "
                                 f"research={research_doc_id} msg={error_msg}"
                             )
-                            await db.collection("vegetables").document(research_doc_id).set({
+                            await db.collection(col("vegetables")).document(research_doc_id).set({
                                 "status": "failed",
                                 "error": error_msg,
                                 "updated_at": firestore.SERVER_TIMESTAMP
@@ -1477,7 +1479,7 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
                         # SAVE IMMEDIATELY to Firestore so frontend sees it
                         # We use the research_doc_id in "vegetables" collection
                         # Structure it inside 'result' so frontend checks pass
-                        await db.collection("vegetables").document(research_doc_id).set({
+                        await db.collection(col("vegetables")).document(research_doc_id).set({
                             "name": vegetable_name,
                             "result": {
                                 "name": vegetable_name,
@@ -1579,7 +1581,7 @@ async def get_unified_job_status(job_id: str):
     """
     try:
         # 1. Get Unified Doc
-        doc_ref = db.collection("unified_jobs").document(job_id)
+        doc_ref = db.collection(col("unified_jobs")).document(job_id)
         doc = await doc_ref.get()
         if not doc.exists:
              raise HTTPException(status_code=404, detail="Unified Job not found")
@@ -1603,19 +1605,19 @@ async def get_unified_job_status(job_id: str):
         async def fetch_research():
             if not research_id: return None
             # Research docs are in "vegetables" collection
-            d = await db.collection("vegetables").document(research_id).get()
+            d = await db.collection(col("vegetables")).document(research_id).get()
             return d.to_dict() if d.exists else None
 
         async def fetch_guide():
             if not guide_id: return None
             # Guide jobs in "seed_guide_jobs"
-            d = await db.collection("seed_guide_jobs").document(guide_id).get()
+            d = await db.collection(col("seed_guide_jobs")).document(guide_id).get()
             return d.to_dict() if d.exists else None
             
         async def fetch_char():
             if not char_id: return None
              # Char jobs in "character_jobs"
-            d = await db.collection("character_jobs").document(char_id).get()
+            d = await db.collection(col("character_jobs")).document(char_id).get()
             return d.to_dict() if d.exists else None
         
         r_data, g_data, c_data = await asyncio.gather(fetch_research(), fetch_guide(), fetch_char())

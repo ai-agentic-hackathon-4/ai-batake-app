@@ -102,14 +102,14 @@ def generate_picture_diary(date_str: str, summary: str):
         # Use the shared db client from db.py which has the correct project/database config
         character_image_path = DEFAULT_CHARACTER_IMAGE_PATH
         try:
-            from .db import db as firestore_db
+            from .db import db as firestore_db, col
         except ImportError:
-            from db import db as firestore_db
+            from db import db as firestore_db, col
         try:
             if firestore_db is None:
                 info("Firestore not available, using default character image.")
             else:
-                char_doc = firestore_db.collection("growing_diaries").document("Character").get()
+                char_doc = firestore_db.collection(col("growing_diaries")).document("Character").get()
                 if char_doc.exists:
                     char_data = char_doc.to_dict()
                     image_uri = char_data.get("image_uri", "")

@@ -19,10 +19,10 @@ except ImportError:
     from logger import info, debug, error, warning
 
 try:
-    from .db import db, get_agent_execution_logs, get_sensor_history, get_latest_vegetable, get_edge_agent_config
+    from .db import db, get_agent_execution_logs, get_sensor_history, get_latest_vegetable, get_edge_agent_config, col
     from .image_service import generate_picture_diary
 except ImportError:
-    from db import db, get_agent_execution_logs, get_sensor_history, get_latest_vegetable, get_edge_agent_config
+    from db import db, get_agent_execution_logs, get_sensor_history, get_latest_vegetable, get_edge_agent_config, col
     from image_service import generate_picture_diary
 
 
@@ -170,7 +170,7 @@ async def get_selected_character_async() -> Optional[Dict]:
         return None
     try:
         doc = await asyncio.to_thread(
-            lambda: db.collection("growing_diaries").document("Character").get()
+            lambda: db.collection(col("growing_diaries")).document("Character").get()
         )
         if doc.exists:
             data = doc.to_dict()
@@ -420,7 +420,7 @@ async def init_diary_status_async(diary_id: str):
     """Initialize diary generation status in Firestore (async)."""
     if db is None: return
     try:
-        await asyncio.to_thread(db.collection("growing_diaries").document(diary_id).set, {
+        await asyncio.to_thread(db.collection(col("growing_diaries")).document(diary_id).set, {
             "generation_status": "processing",
             "created_at": datetime.now()
         })
@@ -432,7 +432,7 @@ async def save_diary_async(diary_id: str, data: Dict):
     """Save the generated diary to Firestore (async)."""
     if db is None: return
     try:
-        await asyncio.to_thread(db.collection("growing_diaries").document(diary_id).set, data)
+        await asyncio.to_thread(db.collection(col("growing_diaries")).document(diary_id).set, data)
         info(f"Diary saved: {diary_id}")
     except Exception as e:
         error(f"Error saving diary: {e}")
@@ -442,7 +442,7 @@ async def mark_diary_failed_async(diary_id: str, error_msg: str):
     """Mark diary generation as failed (async)."""
     if db is None: return
     try:
-        await asyncio.to_thread(db.collection("growing_diaries").document(diary_id).update, {
+        await asyncio.to_thread(db.collection(col("growing_diaries")).document(diary_id).update, {
             "generation_status": "failed",
             "error_message": error_msg,
             "updated_at": datetime.now()
@@ -524,7 +524,7 @@ def get_all_diaries(limit: int = 30, offset: int = 0) -> List[Dict]:
     """Get all diaries from Firestore (sync)."""
     if db is None: return []
     try:
-        query = db.collection("growing_diaries").where(filter=FieldFilter("generation_status", "==", "completed")).limit(limit)
+        query = db.collection(col("growing_diaries")).where(filter=FieldFilter("generation_status", "==", "completed")).limit(limit)
         if offset > 0: query = query.offset(offset)
         docs = query.stream()
         diaries = []
@@ -545,7 +545,7 @@ def get_diary_by_date(date_str: str) -> Optional[Dict]:
     """Get a specific diary by date (sync)."""
     if db is None: return None
     try:
-        doc = db.collection("growing_diaries").document(date_str).get()
+        doc = db.collection(col("growing_diaries")).document(date_str).get()
         if not doc.exists: return None
         diary = doc.to_dict()
         diary['id'] = doc.id
