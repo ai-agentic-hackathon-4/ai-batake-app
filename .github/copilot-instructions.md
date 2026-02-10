@@ -58,6 +58,10 @@ AI Batake App is a smart gardening application that uses AI agents to analyze se
 - Use Firestore for all persistent data
 - Collections:
   - `vegetables`: Stores seed analysis results and growing instructions
+  - `character_jobs`: Character generation job status and results
+  - `growing_diaries`: Daily diary entries and active character (`Character` document stores name, vegetable_name, personality, image_uri)
+  - `seed_guide_jobs`: Seed guide generation jobs
+  - `unified_jobs`: Unified analysis jobs
 - Always check if `db` is None before database operations (handles offline/dev mode)
 
 ### API Design
