@@ -1452,9 +1452,21 @@ async def get_unified_job_status(job_id: str):
         if g_data:
             # Handle guide image proxying like in other endpoints if needed, but for now just raw
             # Guide endpoint logic:
-            if g_data.get("result") and isinstance(g_data["result"], list):
-                 pass
             results["guide"] = make_serializable(g_data)
+            
+            # Transform Step Image URLs to Proxy URLs
+            if results["guide"].get("result") and isinstance(results["guide"]["result"], list):
+                bucket_name = "ai-agentic-hackathon-4-bk"
+                prefix = f"https://storage.googleapis.com/{bucket_name}/"
+                
+                for step in results["guide"]["result"]:
+                    if isinstance(step, dict) and step.get("image_url"):
+                        gcs_uri = step["image_url"]
+                        if gcs_uri.startswith(prefix):
+                            blob_path = gcs_uri[len(prefix):]
+                            import urllib.parse
+                            encoded_path = urllib.parse.quote(blob_path)
+                            step["image_url"] = f"/api/character/image?path={encoded_path}"
         if c_data:
             # Transform image_uri to proxy URL if it's a GCS URL
             # The character document saves 'image_uri' but the result might have 'image_url' or 'image_uri'
