@@ -613,7 +613,7 @@ export default function UnifiedPage() {
                                                 size="sm"
                                                 className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
                                                 onClick={handleApplyToAgent}
-                                                disabled={isApplying || !status.research.id}
+                                                disabled={isApplying || !status.research.id || status.research.status?.toLowerCase() !== 'completed'}
                                             >
                                                 {isApplying ? (
                                                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
