@@ -1061,6 +1061,7 @@ class TestSelectCharacterForDiary:
         mock_job_doc.to_dict.return_value = {
             "status": "COMPLETED",
             "result": {
+                "name": "トマト",
                 "character_name": "Tomatoちゃん",
                 "image_url": "gs://bucket/image.png",
                 "personality": "cheerful"

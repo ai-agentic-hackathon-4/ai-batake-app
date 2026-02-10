@@ -1196,6 +1196,7 @@ class TestProcessCharacterGeneration:
 
         with patch('main.analyze_seed_and_generate_character', new_callable=AsyncMock) as mock_analyze:
             mock_analyze.return_value = {
+                "name": "Tomato",
                 "character_name": "Tomato-kun",
                 "personality": "cheerful",
                 "image_base64": base64.b64encode(b"pngdata").decode()
@@ -1232,6 +1233,7 @@ class TestProcessCharacterGeneration:
 
         with patch('main.analyze_seed_and_generate_character', new_callable=AsyncMock) as mock_analyze:
             mock_analyze.return_value = {
+                "name": "Tomato",
                 "character_name": "T",
                 "personality": "p",
                 "image_base64": base64.b64encode(b"png").decode()
@@ -1251,7 +1253,7 @@ class TestProcessCharacterGeneration:
         mock_db.collection.return_value.document.return_value = mock_doc_ref
 
         with patch('main.analyze_seed_and_generate_character', new_callable=AsyncMock) as mock_analyze:
-            mock_analyze.return_value = {"character_name": "T", "personality": "p"}
+            mock_analyze.return_value = {"name": "Tomato", "character_name": "T", "personality": "p"}
             await process_character_generation("job1", b"seed")
 
         update_calls = mock_doc_ref.update.call_args_list

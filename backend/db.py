@@ -496,6 +496,7 @@ def select_character_for_diary(job_id: str) -> bool:
         char_doc_ref = db.collection("growing_diaries").document("Character")
         char_doc_ref.set({
             "name": result.get("character_name"),
+            "vegetable_name": result.get("name"),
             "image_uri": result.get("image_url"), # Note: image_url in result is the GCS URL
             "personality": result.get("personality"),
             "updated_at": firestore.SERVER_TIMESTAMP,
