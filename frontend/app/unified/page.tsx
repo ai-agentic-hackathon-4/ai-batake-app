@@ -25,6 +25,8 @@ export default function UnifiedPage() {
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState<string>('');
     const [currentStep, setCurrentStep] = useState(0); // For carousel navigation
+    const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
+
     // Poll for status
     useEffect(() => {
         if (!jobId) return
@@ -72,7 +74,7 @@ export default function UnifiedPage() {
         formData.append("file", file)
 
         try {
-            const res = await fetch("/api/unified/start", {
+            const res = await fetch(`/api/unified/start?research_mode=${researchMode}`, {
                 method: "POST",
                 body: formData,
             })
@@ -137,6 +139,21 @@ export default function UnifiedPage() {
                                     accept="image/*"
                                     onChange={handleFileChange}
                                 />
+                            </div>
+
+                            <div className="space-y-3 pb-2">
+                                <p className="text-sm font-medium text-slate-700">リサーチモードの選択</p>
+                                <Tabs value={researchMode} onValueChange={(val) => setResearchMode(val as any)} className="w-full">
+                                    <TabsList className="grid w-full grid-cols-2">
+                                        <TabsTrigger value="agent" className="text-xs">Deep Research</TabsTrigger>
+                                        <TabsTrigger value="grounding" className="text-xs">Web Grounding</TabsTrigger>
+                                    </TabsList>
+                                </Tabs>
+                                <p className="text-[10px] text-slate-400 text-center italic">
+                                    {researchMode === "agent"
+                                        ? "Deep Research: AIが時間をかけて徹底的に調査します (約2-3分)"
+                                        : "Web Grounding: 最新のGoogle検索結果を元に素早く回答します (約1分)"}
+                                </p>
                             </div>
 
                             {error && (

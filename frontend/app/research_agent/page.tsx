@@ -20,6 +20,7 @@ export default function ResearchDashboard() {
     const [uploading, setUploading] = useState(false);
     const [fileName, setFileName] = useState("Click to browse or drag file here");
     const [applyingToAgent, setApplyingToAgent] = useState(false);
+    const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Poll for data
@@ -56,7 +57,7 @@ export default function ResearchDashboard() {
         formData.append("file", fileInputRef.current.files[0]);
 
         try {
-            const res = await fetch("/api/register-seed", {
+            const res = await fetch(`/api/register-seed?research_mode=${researchMode}`, {
                 method: "POST",
                 body: formData,
             });
@@ -356,6 +357,31 @@ export default function ResearchDashboard() {
                                     className="hidden"
                                     onChange={handleFileChange}
                                 />
+                            </div>
+
+                            <div className="space-y-3 px-1">
+                                <p className="text-sm font-medium">Research Mode</p>
+                                <div className="flex gap-2 p-1 bg-muted rounded-lg">
+                                    <button
+                                        type="button"
+                                        onClick={() => setResearchMode("agent")}
+                                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${researchMode === "agent" ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                                    >
+                                        Deep Research (Agent)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setResearchMode("grounding")}
+                                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${researchMode === "grounding" ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                                    >
+                                        Web Grounding (Search)
+                                    </button>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground italic px-1">
+                                    {researchMode === "agent"
+                                        ? "徹底調査 (約2-3分): AIエージェントがWebを巡回して詳しく調査します"
+                                        : "高速調査 (約1分): Google検索結果を直接利用して信頼性の高い情報を素早く取得します"}
+                                </p>
                             </div>
 
                             <button

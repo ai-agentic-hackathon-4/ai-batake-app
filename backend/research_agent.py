@@ -146,14 +146,117 @@ def analyze_seed_packet(image_bytes: bytes) -> str:
         error(f"Error in analyze_seed_packet: {e}", exc_info=True)
         return '{"name": "不明な野菜", "visible_instructions": "API Error"}'
 
+def extract_structured_research_data(vegetable_name: str, report_text: str, query_param: str, headers: dict) -> dict:
+    """
+    調査レポートから、アプリで利用しやすいJSON形式のデータを抽出します。
+    """
+    info(f"Extracting structured data for {vegetable_name}")
+    extraction_prompt = f"""
+    以下の調査レポートに基づいて、野菜「{vegetable_name}」の育て方情報を抽出してJSON形式でまとめてください。
+    特にsummary_promptには最適な気温、湿度、土壌水分量、水やり頻度、日照条件について数値を含めてこれだけで野菜を育てることができるほど詳しく記載してください。
+
+    ---レポート---
+    {report_text}
+    -------------
+    
+    出力フォーマット(JSON):
+    {{
+        "name": "{vegetable_name}",
+        "optimal_temp_range": "...",
+        "optimal_humidity_range": "...",
+        "soil_moisture_standard": "...",
+        "watering_instructions": "...",
+        "light_requirements": "...",
+        "care_tips": "...",
+        "summary_prompt": "..."
+    }}
+    """
+    
+    # 抽出には通常の Gemini 3 Flash を使用 (AI Studio or Vertex depending on context, but here we use the default for research_agent)
+    # 既存のロジックに合わせて AI Studio (generativelanguage) を使用
+    gen_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent{query_param}"
+    gen_payload = {
+        "contents": [{"parts": [{"text": extraction_prompt}]}],
+        "generation_config": {"response_mime_type": "application/json"}
+    }
+    
+    try:
+        gen_resp = request_with_retry("POST", gen_url, headers=headers, json=gen_payload)
+        gen_resp.raise_for_status()
+        
+        gen_data = gen_resp.json()
+        extracted_text = gen_data['candidates'][0]['content']['parts'][0]['text']
+        result = json.loads(extracted_text)
+        info(f"Successfully extracted research data for {vegetable_name}")
+        return result
+    except Exception as e:
+        warning(f"Failed to parse extraction result for {vegetable_name}: {e}")
+        return {"name": vegetable_name, "raw_research": report_text, "error": "Extraction Parsing Failed"}
+
+def perform_web_grounding_research(vegetable_name: str, packet_info: str) -> dict:
+    """
+    Vertex AI の Google Search Grounding を使用して、野菜の詳細な育て方を調査します。
+    """
+    info(f"Starting Web Grounding research for: {vegetable_name}")
+    
+    # Web Grounding 用に特定のキーを取得
+    api_key = os.environ.get("SEED_GUIDE_GEMINI_KEY")
+    if not api_key:
+        error("SEED_GUIDE_GEMINI_KEY not found in environment variables")
+        return {"name": vegetable_name, "error": "API Key missing"}
+
+    query_param = f"?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    
+    # 検証済みのエンドポイントとモデル
+    model_id = "gemini-3-flash-preview"
+    url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{model_id}:generateContent{query_param}"
+
+    research_topic = f"「{vegetable_name}」の育て方について、家庭菜園や農業の専門的な情報を詳しく調べてください。特に最適な気温、湿度、土壌水分量、水やり頻度、日照条件について数値を含めて調査してください。"
+    if packet_info:
+        research_topic += f" また、種の袋には以下の情報がありました: {packet_info}"
+
+    payload = {
+        "contents": [{
+            "role": "user",
+            "parts": [{"text": research_topic}]
+        }],
+        "tools": [
+            {"google_search": {}}
+        ]
+    }
+
+    try:
+        debug(f"Sending Web Grounding request for: {vegetable_name}")
+        response = request_with_retry("POST", url, headers=headers, json=payload)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        try:
+            candidates = data.get("candidates", [])
+            if not candidates:
+                error(f"No candidates in response: {data}")
+                return {"name": vegetable_name, "error": "Empty response from AI"}
+            
+            grounding_text = candidates[0]['content']['parts'][0]['text']
+            info(f"Web Grounding research completed for {vegetable_name}")
+            
+            # AI Studio のクエリパラメータを使用して構造化データを抽出 (互換性のため)
+            _, studio_query_param = get_auth_headers()
+            return extract_structured_research_data(vegetable_name, grounding_text, studio_query_param, headers)
+            
+        except (KeyError, IndexError) as e:
+            error(f"Failed to parse Web Grounding response: {e}, Data: {data}")
+            return {"name": vegetable_name, "error": "Response parsing failed"}
+
+    except Exception as e:
+        error(f"Error in perform_web_grounding_research for {vegetable_name}: {e}", exc_info=True)
+        return {"name": vegetable_name, "error": str(e)}
+
 def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
     """
     Deep Research Agent の REST API を使用して、野菜の詳細な育て方を調査します。
-    
-    プロセスは以下の3ステップで構成されます：
-    1. 調査インタラクションの開始 (POST /interactions)
-    2. 完了までのポーリング (GET /interactions/{id})
-    3. 調査結果からの構造化データ抽出 (Gemini generateContent)
     """
     info(f"Starting deep research for: {vegetable_name}")
     headers, query_param = get_auth_headers()
@@ -164,7 +267,6 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
 
     try:
         # 1. インタラクションの開始 (POST)
-        # Deep Research Agent に調査トピックを送信し、バックグラウンドでの調査を開始します。
         base_url = "https://generativelanguage.googleapis.com/v1beta/interactions"
         start_url = f"{base_url}{query_param}"
         
@@ -182,55 +284,25 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
              return {"name": vegetable_name, "error": f"Start failed: {response.status_code} - {response.text}"}
              
         interaction_data = response.json()
-        # レスポンスが大きい場合のためデバッグ出力を制限
-        interaction_str = json.dumps(interaction_data, ensure_ascii=False)
-        debug(f"Interaction data received: {interaction_str[:500] if len(interaction_str) > 500 else interaction_str}...")
         interaction_name = interaction_data.get("name")
         if not interaction_name:
-            # フォールバック: リソース名はIDから構築される可能性がある
             interaction_id = interaction_data.get("id")
             if interaction_id:
-                # APIは通常 "interactions/<ID>" または単にIDを返す
-                # ドキュメントに基づき、名前がない場合は 'interactions/{id}' と仮定する
                 interaction_name = f"interactions/{interaction_id}"
-                debug(f"Constructed interaction_name from ID: {interaction_name}")
 
-        
         info(f"Research started: {interaction_name}")
         
-        
         # 2. ポーリング (GET)
-        # 調査が完了するまで、定期的にステータスを確認します。
         poll_url = f"https://generativelanguage.googleapis.com/v1beta/{interaction_name}{query_param}"
-        debug(f"Poll URL: {poll_url.split('?')[0]}...")
-        
-        if not interaction_name:
-             error("Interaction Name is None or Empty!")
-             return {"name": vegetable_name, "error": "Interaction Name missing"}
         
         max_retries = 180
         final_text = ""
-        status = "unknown"
         
-        start_time = time.time()
         for i in range(max_retries):
-            current_time = time.time()
-            elapsed = current_time - start_time
-            
-            # ログのスパムを減らすため、10回ごとに進捗をログ出力
-            if i % 10 == 0:
-                debug(f"Polling iteration {i+1}/{max_retries}. Elapsed: {elapsed:.2f}s")
-
             poll_resp = request_with_retry("GET", poll_url, headers=headers)
             if poll_resp.status_code != 200:
-                warning(f"Poll failed: {poll_resp.status_code} - {poll_resp.text[:200]}...")
-                
-                # 404 (Interaction not found) の場合は停止
                 if poll_resp.status_code == 404:
-                     error(f"Interaction not found (404). Aborting poll for {interaction_name}")
-                     return {"name": vegetable_name, "error": f"Research failed: Interaction not found (404)"}
-
-                # 一時的なエラー (500系など) の場合はすぐに中断しない
+                     return {"name": vegetable_name, "error": "Research failed: Interaction not found (404)"}
                 time.sleep(10)
                 continue
                 
@@ -241,63 +313,18 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
                 outputs = data.get("outputs", [])
                 if outputs:
                     final_text = outputs[-1].get("text", "")
-                    info(f"Research completed for {vegetable_name}. Output length: {len(final_text)}")
-                else:
-                    warning("Research completed but no outputs found.")
+                    info(f"Research completed for {vegetable_name}")
                 break
             elif status == "failed":
                 error_msg = data.get('error')
-                error(f"Research failed for {vegetable_name}. Error: {error_msg}")
                 return {"name": vegetable_name, "error": f"Research failed: {error_msg}"}
                 
             time.sleep(10)
         else:
-            error(f"Research timed out for {vegetable_name} after {max_retries} retries ({max_retries * 10}s). Last status: {status}")
             return {"name": vegetable_name, "error": "Research Timeout"}
 
         # 3. データ抽出 (REST)
-        # 調査レポート (自由記述テキスト) から、アプリで利用しやすいJSON形式のデータを抽出します。
-        info(f"Extracting structured data for {vegetable_name}")
-        extraction_prompt = f"""
-        以下の調査レポートに基づいて、野菜「{vegetable_name}」の育て方情報を抽出してJSON形式でまとめてください。
-        特にsummary_promptには最適な気温、湿度、土壌水分量、水やり頻度、日照条件について数値を含めてこれだけで野菜を育てることができるほど詳しく記載してください。
-
-        ---レポート---
-        {final_text}
-        -------------
-        
-        出力フォーマット(JSON):
-        {{
-            "name": "{vegetable_name}",
-            "optimal_temp_range": "...",
-            "optimal_humidity_range": "...",
-            "soil_moisture_standard": "...",
-            "watering_instructions": "...",
-            "light_requirements": "...",
-            "care_tips": "...",
-            "summary_prompt": "..."
-        }}
-        """
-        
-        gen_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent{query_param}"
-        gen_payload = {
-            "contents": [{"parts": [{"text": extraction_prompt}]}],
-            "generation_config": {"response_mime_type": "application/json"}
-        }
-        
-        # 抽出リクエストの送信
-        gen_resp = request_with_retry("POST", gen_url, headers=headers, json=gen_payload)
-        gen_resp.raise_for_status()
-        
-        gen_data = gen_resp.json()
-        try:
-            extracted_text = gen_data['candidates'][0]['content']['parts'][0]['text']
-            result = json.loads(extracted_text)
-            info(f"Successfully extracted research data for {vegetable_name}")
-            return result
-        except:
-             warning(f"Failed to parse extraction result for {vegetable_name}")
-             return {"name": vegetable_name, "raw_research": final_text, "error": "Extraction Parsing Failed"}
+        return extract_structured_research_data(vegetable_name, final_text, query_param, headers)
 
     except Exception as e:
         error(f"Error in perform_deep_research for {vegetable_name}: {e}", exc_info=True)
