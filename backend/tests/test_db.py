@@ -65,6 +65,12 @@ class TestUpdateVegetableStatus:
         mock_collection = Mock()
         mock_doc_ref = Mock()
         
+        # Mock doc_ref.get() which is called to merge existing result
+        mock_existing_doc = Mock()
+        mock_existing_doc.exists = True
+        mock_existing_doc.to_dict.return_value = {"result": {"existing_key": "value"}}
+        mock_doc_ref.get.return_value = mock_existing_doc
+        
         mock_db.collection.return_value = mock_collection
         mock_collection.document.return_value = mock_doc_ref
         
@@ -78,6 +84,9 @@ class TestUpdateVegetableStatus:
         call_args = mock_doc_ref.update.call_args[0][0]
         assert call_args["status"] == "completed"
         assert call_args["instructions"] == {"data": "test"}
+        # Verify result is merged with existing data
+        assert call_args["result"]["existing_key"] == "value"
+        assert call_args["result"]["data"] == "test"
     
     @patch('db.db')
     def test_update_vegetable_status_without_data(self, mock_db):

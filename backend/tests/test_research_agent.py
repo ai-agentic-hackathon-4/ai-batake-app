@@ -12,9 +12,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 class TestGetAuthHeaders:
     """Tests for get_auth_headers function"""
     
+    @patch.dict(os.environ, {}, clear=False)
     @patch('research_agent.google.auth.default')
     def test_get_auth_headers_success_with_adc(self, mock_auth_default):
         """Test successful auth header retrieval with ADC"""
+        # Remove GEMINI_API_KEY so ADC path is taken
+        os.environ.pop('GEMINI_API_KEY', None)
+        
         mock_credentials = Mock()
         mock_credentials.token = "test-token"
         mock_credentials.valid = True

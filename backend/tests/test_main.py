@@ -129,9 +129,10 @@ class TestVegetableEndpoints:
 class TestRegisterSeedEndpoint:
     """Tests for /api/register-seed endpoint"""
     
+    @patch('main.process_research')
     @patch('main.analyze_seed_packet')
     @patch('main.init_vegetable_status')
-    def test_register_seed_success(self, mock_init, mock_analyze, client):
+    def test_register_seed_success(self, mock_init, mock_analyze, mock_process, client):
         """Test successful seed registration"""
         mock_analyze.return_value = '{"name": "Tomato", "visible_instructions": "test"}'
         mock_init.return_value = "test-doc-id"
@@ -161,8 +162,10 @@ class TestRegisterSeedEndpoint:
 class TestSeedGuideJobEndpoints:
     """Tests for /api/seed-guide/jobs endpoints"""
     
+    @patch('main.process_seed_guide')
+    @patch('main._upload_to_gcs_sync', return_value='https://storage.googleapis.com/bucket/test.jpg')
     @patch('main.db')
-    def test_create_seed_guide_job_success(self, mock_db, client):
+    def test_create_seed_guide_job_success(self, mock_db, mock_upload, mock_process, client):
         """Test successful seed guide job creation"""
         # Mock the async Firestore client
         mock_collection = Mock()
@@ -174,7 +177,7 @@ class TestSeedGuideJobEndpoints:
         
         files = {"file": ("test.jpg", b"fake image data", "image/jpeg")}
         
-        response = client.post("/api/seed-guide/jobs", files=files)
+        response = client.post("/api/seed-guide/generate", files=files)
         
         assert response.status_code == 200
         assert "job_id" in response.json()
@@ -289,18 +292,19 @@ class TestDiaryEndpoints:
         assert result["status"] == "accepted"
         assert "date" in result
     
-    @patch('main.process_daily_diary')
+    @patch('main.process_daily_diary', new_callable=AsyncMock)
     def test_generate_manual_diary_success(self, mock_process, client):
-        """Test successful manual diary generation"""
+        """Test successful manual diary generation (SSE streaming response)"""
         response = client.post(
             "/api/diary/generate-manual",
             json={"date": "2025-01-15"}
         )
         
         assert response.status_code == 200
-        result = response.json()
-        assert result["status"] == "accepted"
-        assert result["date"] == "2025-01-15"
+        # Endpoint returns SSE stream, not JSON
+        assert 'text/event-stream' in response.headers.get('content-type', '')
+        body = response.text
+        assert 'completed' in body or 'processing' in body
     
     def test_generate_manual_diary_invalid_date(self, client):
         """Test manual diary generation with invalid date"""

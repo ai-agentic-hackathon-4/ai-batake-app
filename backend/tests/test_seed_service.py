@@ -71,8 +71,9 @@ class TestAnalyzeSeedAndGenerateGuide:
     
     @pytest.mark.asyncio
     @patch.dict(os.environ, {"SEED_GUIDE_GEMINI_KEY": "test-api-key"})
+    @patch('seed_service.time.sleep')
     @patch('seed_service.requests.post')
-    async def test_analyze_seed_api_failure(self, mock_post):
+    async def test_analyze_seed_api_failure(self, mock_post, mock_sleep):
         """Test handling of API failure"""
         from seed_service import analyze_seed_and_generate_guide
         
