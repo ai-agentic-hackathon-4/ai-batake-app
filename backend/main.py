@@ -1053,6 +1053,8 @@ async def auto_generate_diary_endpoint(key: Optional[str] = None):
     """
     Endpoint for Cloud Scheduler to trigger automatic diary generation.
     Secured by a simple API key check.
+    Runs synchronously (awaits completion) to prevent Cloud Run CPU throttling
+    from killing background tasks.
     """
     secret_key = os.environ.get("DIARY_API_KEY")
     if secret_key and key != secret_key:
@@ -1063,15 +1065,15 @@ async def auto_generate_diary_endpoint(key: Optional[str] = None):
         current_date_str = datetime.now().date().isoformat()
         info(f"Auto-generating diary for today: {current_date_str}")
         
-        asyncio.create_task(process_daily_diary(current_date_str))
+        await process_daily_diary(current_date_str)
         
         return {
-            "status": "accepted",
+            "status": "completed",
             "date": current_date_str,
-            "message": "Automatic diary generation started"
+            "message": "Automatic diary generation completed"
         }
     except Exception as e:
-        error(f"Failed to trigger auto-generation: {e}")
+        error(f"Failed to auto-generate diary: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1260,9 +1262,11 @@ async def get_seed_guide_image(job_id: str, step_index: int):
 
 
 @app.post("/api/diary/generate-daily")
-async def generate_daily_diary_endpoint(background_tasks: BackgroundTasks):
+async def generate_daily_diary_endpoint():
     """
     Trigger daily diary generation.
+    Runs synchronously (awaits completion) to prevent Cloud Run CPU throttling
+    from killing background tasks.
     """
     if process_daily_diary is None:
         raise HTTPException(status_code=503, detail="Diary service not available")
@@ -1270,14 +1274,18 @@ async def generate_daily_diary_endpoint(background_tasks: BackgroundTasks):
     try:
         from datetime import datetime, timedelta
         target_date = (datetime.now() - timedelta(hours=1)).date()
-        background_tasks.add_task(process_daily_diary, target_date.isoformat())
+        target_date_str = target_date.isoformat()
+        info(f"Generating daily diary for: {target_date_str}")
+        
+        await process_daily_diary(target_date_str)
+        
         return {
-            "status": "accepted",
-            "date": target_date.isoformat(),
-            "message": "Diary generation started"
+            "status": "completed",
+            "date": target_date_str,
+            "message": "Diary generation completed"
         }
     except Exception as e:
-        error(f"Error starting diary generation: {e}")
+        error(f"Error in diary generation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
