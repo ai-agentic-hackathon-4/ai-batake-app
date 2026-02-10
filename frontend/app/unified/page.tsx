@@ -513,7 +513,7 @@ export default function UnifiedPage() {
                                                                     ) : charSelected ? (
                                                                         <><CheckCircle2 className="h-4 w-4" /> 日記のパートナーに登録しました！</>
                                                                     ) : (
-                                                                        <><Heart className="h-4 w-4" /> この子を日記で使う 💕</>
+                                                                        <><Heart className="h-4 w-4" /> この子を日記で使う</>
                                                                     )}
                                                                 </button>
                                                             </div>
