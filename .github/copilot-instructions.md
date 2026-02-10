@@ -127,14 +127,24 @@ docker build -t ai-batake-app .
 
 ### Backend Testing (Python/pytest)
 
-**Test Framework**: pytest with comprehensive test coverage
+**Test Framework**: pytest with pytest-asyncio and pytest-cov
 
-**Test Structure**:
-- `backend/tests/test_db.py` - Database operations (Firestore)
-- `backend/tests/test_agent.py` - AI agent integration and communication
-- `backend/tests/test_main.py` - FastAPI endpoint testing
-- `backend/tests/test_seed_service.py` - Seed image analysis service
-- `backend/tests/test_utils.py` - Utility functions
+**Test Structure** (15 test files, 473 tests, 96% code coverage):
+- `backend/tests/test_main.py` - FastAPI endpoints, middleware, background tasks (131 tests)
+- `backend/tests/test_db.py` - Firestore database operations (75 tests)
+- `backend/tests/test_diary_service.py` - Diary service: data collection, AI generation, persistence (71 tests)
+- `backend/tests/test_seed_service.py` - Seed image analysis and guide image generation (38 tests)
+- `backend/tests/test_research_agent.py` - Seed packet analysis, Deep Research, Web Grounding (37 tests)
+- `backend/tests/test_logger.py` - Structured logging, JSON Formatter, decorators (34 tests)
+- `backend/tests/test_image_service.py` - Picture diary image generation (27 tests)
+- `backend/tests/test_agent.py` - AI agent: sessions, queries, SSE streaming (24 tests)
+- `backend/tests/test_character_service.py` - Character generation service (10 tests)
+- `backend/tests/test_select_feature.py` - Instruction selection (5 tests)
+- `backend/tests/test_seed_guide_persistence.py` - Seed guide CRUD (4 tests)
+- `backend/tests/test_character_api.py` - Character API endpoints (4 tests)
+- `backend/tests/test_vegetable_config.py` - Vegetable config and diary priority (4 tests)
+- `backend/tests/test_utils.py` - Utility functions (4 tests)
+- `backend/tests/test_async_flow.py` - Async generation flow (3 tests)
 
 **Running Tests**:
 ```bash
@@ -143,28 +153,36 @@ pip install -r requirements.txt
 pytest
 ```
 
+**Running with Coverage**:
+```bash
+cd /path/to/project
+venv/bin/python -m pytest backend/tests/ --cov=backend --cov-config=backend/pytest.ini --cov-report=term-missing
+```
+
 **Configuration**:
-- `backend/pytest.ini` - pytest configuration file
-- Mock external dependencies (Firestore, Google Cloud APIs)
+- `backend/pytest.ini` - pytest configuration file (asyncio_mode=strict)
+- Mock external dependencies (Firestore, Google Cloud APIs, Gemini API)
 - Test both success and error scenarios
 - Always check if `db` is None for offline testing
 
-**Test Coverage**: 42 tests covering:
-- Database operations (11 tests) - init, update, query operations
-- Agent functionality (10 tests) - authentication, session management, queries
-- API endpoints (13 tests) - all REST endpoints with success/error cases
-- Seed service (4 tests) - image analysis and guide generation
-- Utilities (4 tests) - basic Python operations
+**Code Coverage** (96% overall):
+- `logger.py` - 100%
+- `research_agent.py` - 99%
+- `character_service.py`, `db.py`, `diary_service.py`, `image_service.py`, `seed_service.py` - 97%
+- `agent.py` - 96%
+- `main.py` - 94%
 
 ### Frontend Testing (TypeScript/Jest)
 
 **Test Framework**: Jest with React Testing Library
 
-**Test Structure**:
+**Test Structure** (6 test suites, 42 tests):
 - `frontend/__tests__/lib/utils.test.ts` - Utility functions (cn helper)
 - `frontend/__tests__/components/metric-card.test.tsx` - MetricCard component
 - `frontend/__tests__/components/weather-card.test.tsx` - WeatherCard component
 - `frontend/__tests__/components/growth-stage-card.test.tsx` - GrowthStageCard component
+- `frontend/__tests__/components/plant-camera.test.tsx` - PlantCamera component
+- `frontend/__tests__/components/environment-chart.test.tsx` - EnvironmentChart component
 
 **Running Tests**:
 ```bash
@@ -184,32 +202,29 @@ npm run test:watch
 - Use `@testing-library/react` for component testing
 - Use `@testing-library/jest-dom` for DOM assertions
 
-**Test Coverage**: 30 tests covering:
-- Utility functions (7 tests) - class name merging, conditional classes
-- UI Components (23 tests) - rendering, props, styling, interactions
-
 ### Test Documentation
 
 **Comprehensive Test Matrix**: See `docs/TEST_MATRIX.md` for:
-- Complete list of all test cases with IDs
+- Complete list of all test cases organized by module
 - Test categorization (normal/error scenarios)
-- Expected behaviors
-- Implementation status
+- Coverage breakdown per file
 
 **Test Summary**: See `docs/TEST_README.md` for:
-- Quick reference guide
+- Quick reference guide with per-file test counts
+- Code coverage table
 - Test execution instructions
-- Overall test statistics (72 total tests, 100% pass rate)
+- Overall test statistics (515 total tests, 100% pass rate, 96% backend coverage)
 
 ### Testing Best Practices
 
 1. **Always run tests before committing code changes**
-2. **Mock external dependencies** (Firestore, Google Cloud APIs)
+2. **Mock external dependencies** (Firestore, Google Cloud APIs, Gemini API)
 3. **Test both success and error paths**
 4. **Use descriptive test names** that explain what is being tested
 5. **Follow existing test patterns** when adding new tests
 6. **Maintain 100% test pass rate** - do not commit failing tests
-7. **Update TEST_MATRIX.md** when adding new test cases
+7. **Maintain 95%+ code coverage** - run coverage reports to verify
+8. **Update TEST_MATRIX.md** when adding new test cases
 
 ## Important Notes
 - The application requires Google Cloud credentials to function properly
