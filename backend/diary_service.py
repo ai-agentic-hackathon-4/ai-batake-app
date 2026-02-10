@@ -46,6 +46,7 @@ async def request_with_retry_async(method: str, url: str, **kwargs) -> httpx.Res
     min_delay = 1.0
     start_time = time.time()
     
+    last_exc: Exception | None = None
     async with httpx.AsyncClient() as client:
         for i in range(max_retries):
             elapsed = time.time() - start_time
@@ -59,18 +60,28 @@ async def request_with_retry_async(method: str, url: str, **kwargs) -> httpx.Res
                 
                 if response.status_code == 429 or response.status_code >= 500:
                     sleep_time = random.uniform(min_delay, max_delay)
-                    warning(f"{response.status_code} error. Retrying in {sleep_time:.1f}s...")
+                    warning(f"API {response.status_code}. Retrying in {sleep_time:.2f}s... (Attempt {i+1}/{max_retries})")
                     await asyncio.sleep(sleep_time)
                     continue
                 return response
             except httpx.RequestError as e:
+                last_exc = e
                 sleep_time = random.uniform(min_delay, max_delay)
-                warning(f"Request failed: {e}. Retrying in {sleep_time:.1f}s...")
+                warning(f"Request failed: {e}. Retrying in {sleep_time:.2f}s... (Attempt {i+1}/{max_retries})")
                 await asyncio.sleep(sleep_time)
-        
-        # Final attempt
-        info("Final API Request attempt...")
-        return await client.request(method, url, **kwargs)
+        else:
+            # for-loop exhausted without break – do a final attempt
+            info("[LLM] Final API Request attempt...")
+            return await client.request(method, url, **kwargs)
+
+    # Reached here only via 'break' (time budget exceeded)
+    if last_exc:
+        raise last_exc
+    raise httpx.HTTPStatusError(
+        f"Retry budget exhausted after {max_elapsed_seconds}s",
+        request=httpx.Request(method, url),
+        response=response,  # noqa: F821 – last response from loop
+    )
 
 
 async def get_agent_logs_for_date_async(target_date: date) -> List[Dict]:
