@@ -151,6 +151,27 @@ async def get_plant_image_for_date_async(target_date: date) -> Optional[str]:
     return None
 
 
+async def get_selected_character_async() -> Optional[Dict]:
+    """Get the selected character from Firestore (growing_diaries/Character) (async)."""
+    if db is None:
+        logging.warning("Database not available for character lookup")
+        return None
+    try:
+        doc = await asyncio.to_thread(
+            lambda: db.collection("growing_diaries").document("Character").get()
+        )
+        if doc.exists:
+            data = doc.to_dict()
+            info(f"Selected character found: {data.get('name')}")
+            return data
+        else:
+            info("No selected character found in growing_diaries/Character")
+            return None
+    except Exception as e:
+        logging.error(f"Error fetching selected character: {e}")
+        return None
+
+
 def calculate_statistics(sensor_data: List[Dict]) -> Dict:
     """Calculate statistics from sensor data."""
     if not sensor_data:
@@ -213,12 +234,30 @@ def extract_key_events(agent_logs: List[Dict], max_events: int = 10) -> List[Dic
     return events[:max_events]
 
 
-def build_diary_prompt(date_str: str, statistics: Dict, events: List[Dict], vegetable_info: Optional[Dict]) -> str:
+def build_diary_prompt(date_str: str, statistics: Dict, events: List[Dict], vegetable_info: Optional[Dict], character_info: Optional[Dict] = None) -> str:
     """Build the prompt for AI diary generation."""
     veg_name = vegetable_info.get("name", "野菜") if vegetable_info else "野菜"
     event_summary = "\n".join([f"- {e.get('time', 'N/A')}: {e.get('device', '')} {e['action']}" for e in events[:10]])
     
-    return f"""あなたは植物栽培の専門家です。以下のデータをもとに、育成日記を作成してください。
+    # Build character instruction
+    char_name = None
+    char_personality = None
+    if character_info:
+        char_name = character_info.get("name")
+        char_personality = character_info.get("personality")
+    
+    if char_name and char_personality:
+        role_instruction = f"""あなたは「{char_name}」という名前の{veg_name}のキャラクターです。
+性格は「{char_personality}」です。
+このキャラクターになりきって、一人称で育成日記を書いてください。
+キャラクターの性格や口調を反映した、親しみやすい文体で書いてください。"""
+    elif char_name:
+        role_instruction = f"""あなたは「{char_name}」という名前の{veg_name}のキャラクターです。
+このキャラクターになりきって、一人称で親しみやすい育成日記を書いてください。"""
+    else:
+        role_instruction = "あなたは植物栽培の専門家です。以下のデータをもとに、育成日記を作成してください。"
+
+    return f"""{role_instruction}
 
 【日付】
 {date_str}
@@ -289,7 +328,8 @@ async def generate_diary_with_ai_async(
     date_str: str,
     statistics: Dict,
     events: List[Dict],
-    vegetable_info: Optional[Dict]
+    vegetable_info: Optional[Dict],
+    character_info: Optional[Dict] = None
 ) -> Dict[str, str]:
     """Generate diary content using Gemini AI (async)."""
     api_key = os.environ.get("SEED_GUIDE_GEMINI_KEY") or os.environ.get("GEMINI_API_KEY")
@@ -302,7 +342,7 @@ async def generate_diary_with_ai_async(
         }
     
     headers = {"Content-Type": "application/json"}
-    prompt = build_diary_prompt(date_str, statistics, events, vegetable_info)
+    prompt = build_diary_prompt(date_str, statistics, events, vegetable_info, character_info)
     url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-3-flash-preview:generateContent?key={api_key}"
     
     payload = {
@@ -347,6 +387,9 @@ async def collect_daily_data_async(target_date: date, progress_callback=None) ->
     await update("植物情報を取得中...")
     vegetable = await get_current_vegetable_async()
     
+    await update("キャラクター情報を取得中...")
+    character = await get_selected_character_async()
+    
     plant_image = await get_plant_image_for_date_async(target_date)
     
     return {
@@ -354,6 +397,7 @@ async def collect_daily_data_async(target_date: date, progress_callback=None) ->
         "agent_logs": agent_logs,
         "sensor_data": sensor_data,
         "vegetable": vegetable,
+        "character": character,
         "plant_image": plant_image
     }
 
@@ -421,7 +465,7 @@ async def process_daily_diary(target_date_str: str, progress_callback=None):
         
         await update_progress("成長記録を執筆中...")
         ai_content = await generate_diary_with_ai_async(
-            target_date_str, statistics, events, daily_data["vegetable"]
+            target_date_str, statistics, events, daily_data["vegetable"], daily_data.get("character")
         )
         
         try:

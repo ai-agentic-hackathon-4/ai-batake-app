@@ -321,29 +321,192 @@ class TestCollectDailyData:
     """Tests for collect_daily_data function"""
     
     @pytest.mark.asyncio
-    @patch('diary_service.get_agent_logs_for_date')
-    @patch('diary_service.get_sensor_data_for_date')
-    @patch('diary_service.get_current_vegetable')
-    @patch('diary_service.get_plant_image_for_date')
+    @patch('diary_service.get_selected_character_async')
+    @patch('diary_service.get_agent_logs_for_date_async')
+    @patch('diary_service.get_sensor_data_for_date_async')
+    @patch('diary_service.get_current_vegetable_async')
+    @patch('diary_service.get_plant_image_for_date_async')
     async def test_collect_daily_data(
         self, 
         mock_image, 
         mock_veg, 
         mock_sensor, 
-        mock_agent
+        mock_agent,
+        mock_character
     ):
         """Test collecting daily data"""
-        from diary_service import collect_daily_data
+        from diary_service import collect_daily_data_async
         from datetime import date
         
         mock_agent.return_value = [{"action": "test"}]
         mock_sensor.return_value = [{"temperature": 25}]
         mock_veg.return_value = {"name": "Tomato"}
         mock_image.return_value = None
+        mock_character.return_value = None
         
-        result = await collect_daily_data(date(2025, 1, 1))
+        result = await collect_daily_data_async(date(2025, 1, 1))
         
         assert result["date"] == "2025-01-01"
         assert len(result["agent_logs"]) == 1
         assert len(result["sensor_data"]) == 1
         assert result["vegetable"]["name"] == "Tomato"
+        assert result["character"] is None
+    
+    @pytest.mark.asyncio
+    @patch('diary_service.get_selected_character_async')
+    @patch('diary_service.get_agent_logs_for_date_async')
+    @patch('diary_service.get_sensor_data_for_date_async')
+    @patch('diary_service.get_current_vegetable_async')
+    @patch('diary_service.get_plant_image_for_date_async')
+    async def test_collect_daily_data_with_character(
+        self, 
+        mock_image, 
+        mock_veg, 
+        mock_sensor, 
+        mock_agent,
+        mock_character
+    ):
+        """Test collecting daily data includes selected character"""
+        from diary_service import collect_daily_data_async
+        from datetime import date
+        
+        mock_agent.return_value = []
+        mock_sensor.return_value = []
+        mock_veg.return_value = {"name": "トマト"}
+        mock_image.return_value = None
+        mock_character.return_value = {
+            "name": "トマちゃん",
+            "personality": "元気で明るい性格",
+            "image_uri": "gs://bucket/image.png"
+        }
+        
+        result = await collect_daily_data_async(date(2025, 1, 1))
+        
+        assert result["character"] is not None
+        assert result["character"]["name"] == "トマちゃん"
+        assert result["character"]["personality"] == "元気で明るい性格"
+
+
+class TestBuildDiaryPromptWithCharacter:
+    """Tests for build_diary_prompt with character integration"""
+    
+    def test_prompt_with_character_name_and_personality(self):
+        """Test prompt includes character personality when available"""
+        from diary_service import build_diary_prompt
+        
+        statistics = {
+            "temperature": {"min": 20, "max": 30, "avg": 25},
+            "humidity": {"min": 50, "max": 70, "avg": 60},
+            "soil_moisture": {"min": 30, "max": 40, "avg": 35}
+        }
+        character_info = {
+            "name": "トマちゃん",
+            "personality": "元気で明るい性格"
+        }
+        
+        prompt = build_diary_prompt("2025-01-01", statistics, [], {"name": "トマト"}, character_info)
+        
+        assert "トマちゃん" in prompt
+        assert "元気で明るい性格" in prompt
+        assert "なりきって" in prompt
+    
+    def test_prompt_with_character_name_only(self):
+        """Test prompt with character name but no personality"""
+        from diary_service import build_diary_prompt
+        
+        statistics = {
+            "temperature": {"min": 20, "max": 30, "avg": 25},
+            "humidity": {"min": 50, "max": 70, "avg": 60},
+            "soil_moisture": {"min": 30, "max": 40, "avg": 35}
+        }
+        character_info = {"name": "トマちゃん"}
+        
+        prompt = build_diary_prompt("2025-01-01", statistics, [], {"name": "トマト"}, character_info)
+        
+        assert "トマちゃん" in prompt
+        assert "なりきって" in prompt
+    
+    def test_prompt_without_character(self):
+        """Test prompt falls back to expert role when no character"""
+        from diary_service import build_diary_prompt
+        
+        statistics = {
+            "temperature": {"min": 20, "max": 30, "avg": 25},
+            "humidity": {"min": 50, "max": 70, "avg": 60},
+            "soil_moisture": {"min": 30, "max": 40, "avg": 35}
+        }
+        
+        prompt = build_diary_prompt("2025-01-01", statistics, [], {"name": "トマト"}, None)
+        
+        assert "植物栽培の専門家" in prompt
+        assert "トマちゃん" not in prompt
+    
+    def test_prompt_with_empty_character(self):
+        """Test prompt falls back when character has no name"""
+        from diary_service import build_diary_prompt
+        
+        statistics = {
+            "temperature": {"min": 20, "max": 30, "avg": 25},
+            "humidity": {"min": 50, "max": 70, "avg": 60},
+            "soil_moisture": {"min": 30, "max": 40, "avg": 35}
+        }
+        character_info = {"image_uri": "gs://bucket/image.png"}
+        
+        prompt = build_diary_prompt("2025-01-01", statistics, [], {"name": "トマト"}, character_info)
+        
+        assert "植物栽培の専門家" in prompt
+
+
+class TestGetSelectedCharacter:
+    """Tests for get_selected_character_async function"""
+    
+    @pytest.mark.asyncio
+    @patch('diary_service.db')
+    async def test_get_character_success(self, mock_db):
+        """Test successful character retrieval"""
+        from diary_service import get_selected_character_async
+        
+        mock_doc = Mock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = {
+            "name": "トマちゃん",
+            "personality": "元気で明るい性格",
+            "image_uri": "gs://bucket/image.png"
+        }
+        
+        mock_collection = Mock()
+        mock_collection.document.return_value.get.return_value = mock_doc
+        mock_db.collection.return_value = mock_collection
+        
+        result = await get_selected_character_async()
+        
+        assert result is not None
+        assert result["name"] == "トマちゃん"
+        assert result["personality"] == "元気で明るい性格"
+    
+    @pytest.mark.asyncio
+    @patch('diary_service.db')
+    async def test_get_character_not_found(self, mock_db):
+        """Test when no character is selected"""
+        from diary_service import get_selected_character_async
+        
+        mock_doc = Mock()
+        mock_doc.exists = False
+        
+        mock_collection = Mock()
+        mock_collection.document.return_value.get.return_value = mock_doc
+        mock_db.collection.return_value = mock_collection
+        
+        result = await get_selected_character_async()
+        
+        assert result is None
+    
+    @pytest.mark.asyncio
+    @patch('diary_service.db', None)
+    async def test_get_character_no_db(self):
+        """Test character retrieval when db is None"""
+        from diary_service import get_selected_character_async
+        
+        result = await get_selected_character_async()
+        
+        assert result is None
