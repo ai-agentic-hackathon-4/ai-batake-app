@@ -272,22 +272,22 @@ export default function ResearchDashboard() {
                                         }`}
                                     onClick={() => !isProcessing && setSelectedVeg(veg)}
                                 >
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-lg ${isProcessing ? "bg-amber-100 text-amber-600" :
-                                                isFailed ? "bg-red-100 text-red-600" :
-                                                    "bg-primary/10 text-primary"
+                                    <div className="flex justify-between items-start mb-4 gap-2">
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                            <div className={`p-2 rounded-lg shrink-0 ${isProcessing ? "bg-amber-100 text-amber-600" :
+                                                    isFailed ? "bg-red-100 text-red-600" :
+                                                        "bg-primary/10 text-primary"
                                                 }`}>
                                                 {isProcessing ? <Clock className="h-5 w-5" /> :
                                                     isFailed ? <AlertCircle className="h-5 w-5" /> :
                                                         <Sprout className="h-5 w-5" />}
                                             </div>
-                                            <div className="overflow-hidden">
+                                            <div className="min-w-0">
                                                 <h3 className="font-semibold text-lg leading-none truncate">{veg.name}</h3>
                                                 <p className="text-xs text-muted-foreground mt-1 truncate">ID: {veg.id.substring(0, 8)}</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 shrink-0">
                                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${isProcessing ? "bg-amber-50 text-amber-600 border-amber-200" :
                                                 isFailed ? "bg-red-50 text-red-600 border-red-200" :
                                                     "bg-blue-50 text-blue-600 border-blue-200"
