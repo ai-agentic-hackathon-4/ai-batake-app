@@ -88,7 +88,7 @@ def analyze_and_generate_character(image_path):
     
     # 1. Identify Vegetable & Character Personality (Gemini 3 Pro)
     print("\n1. Calling Gemini 3 Pro (Analysis)...")
-    model_id = "gemini-3-pro-preview"
+    model_id = "gemini-3-flash-preview"
     image_b64 = base64.b64encode(image_bytes).decode('utf-8')
     
     prompt_text = """

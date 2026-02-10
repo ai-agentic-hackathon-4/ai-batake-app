@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+import os
 from google.cloud import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 from datetime import datetime
 
 import google.auth.exceptions
@@ -12,6 +14,28 @@ except ImportError:
 
 # Initialize logger
 logger = get_logger()
+
+# ---------------------------------------------------------------------------
+# Environment-based collection name resolution
+# ---------------------------------------------------------------------------
+_APP_ENV = os.environ.get("APP_ENV", "dev")
+
+# Log collections are shared across all environments
+_SHARED_COLLECTIONS = frozenset({"sensor_logs", "agent_execution_logs"})
+
+
+def col(name: str) -> str:
+    """Return the environment-specific Firestore collection name.
+
+    * dev  (default) – returns *name* as-is (no prefix).
+    * prod           – returns ``prod_<name>``.
+    * Any other value – returns ``{APP_ENV}_{name}``.
+    * Log collections (sensor_logs, agent_execution_logs) are always shared
+      and never prefixed.
+    """
+    if _APP_ENV == "dev" or name in _SHARED_COLLECTIONS:
+        return name
+    return f"{_APP_ENV}_{name}"
 
 # Initialize Firestore
 # Note: Requires GOOGLE_CLOUD_PROJECT environment variable or ADC.
@@ -32,13 +56,13 @@ def init_vegetable_status(vegetable_name: str) -> str:
     if db is None: return "mock-id-processing"
     
     try:
-        doc_ref = db.collection("vegetables").document()
+        doc_ref = db.collection(col("vegetables")).document()
         doc_ref.set({
             "name": vegetable_name,
             "created_at": datetime.now(),
             "status": "processing"
         })
-        debug(f"Initialized vegetable status for {vegetable_name} with ID: {doc_ref.id}")
+        info(f"Initialized vegetable status for {vegetable_name} with ID: {doc_ref.id}")
         return doc_ref.id
     except Exception as e:
         error(f"Error initializing status for {vegetable_name}: {e}", exc_info=True)
@@ -49,13 +73,24 @@ def update_vegetable_status(doc_id: str, status: str, data: dict = None):
     if db is None: return
 
     try:
-        doc_ref = db.collection("vegetables").document(doc_id)
+        doc_ref = db.collection(col("vegetables")).document(doc_id)
         update_data = {
             "status": status,
             "updated_at": datetime.now()
         }
         if data:
             update_data["instructions"] = data
+            # Also merge into result field for frontend access
+            # Get existing result first to preserve basic_analysis
+            existing_doc = doc_ref.get()
+            existing_result = {}
+            if existing_doc.exists:
+                existing_data = existing_doc.to_dict()
+                existing_result = existing_data.get("result", {}) if existing_data else {}
+            
+            # Merge deep research into existing result
+            merged_result = {**existing_result, **data}
+            update_data["result"] = merged_result
             
         doc_ref.update(update_data)
         info(f"Updated doc {doc_id} to status {status}")
@@ -68,7 +103,7 @@ def get_all_vegetables():
 
     try:
         debug("Fetching all vegetables from Firestore")
-        docs = db.collection("vegetables").order_by("created_at", direction=firestore.Query.DESCENDING).stream()
+        docs = db.collection(col("vegetables")).order_by("created_at", direction=firestore.Query.DESCENDING).stream()
         results = []
         for doc in docs:
             d = doc.to_dict()
@@ -97,7 +132,7 @@ def save_growing_instructions(vegetable_name: str, data: dict) -> str:
         warning("Firestore is not available. Skipping save.")
         return "mock-id-firestore-unavailable"
 
-    collection_name = "vegetables"
+    collection_name = col("vegetables")
     
     try:
         # Create a document prompt. 
@@ -130,7 +165,7 @@ def get_latest_vegetable():
         return None
 
     try:
-        collection_name = "vegetables"
+        collection_name = col("vegetables")
         debug("Fetching latest vegetable from Firestore")
         # Order by created_at descending and limit to 1
         docs = db.collection(collection_name).order_by("created_at", direction=google.cloud.firestore.Query.DESCENDING).limit(1).stream()
@@ -168,7 +203,7 @@ def update_edge_agent_config(research_data: dict):
              support_prompt = f"【栽培データ: {name}】\n最適気温: {temp}\n水分基準: {water}"
 
         # Overwrite the instruction field directly with the support prompt
-        doc_ref = db.collection("configurations").document("edge_agent")
+        doc_ref = db.collection(col("configurations")).document("edge_agent")
         doc_ref.set({
             "instruction": support_prompt,
             "vegetable_name": research_data.get("name", "Unknown Plant"),
@@ -187,8 +222,8 @@ def select_vegetable_instruction(doc_id: str) -> bool:
     if db is None: return False
 
     try:
-        debug(f"Selecting vegetable instruction for doc: {doc_id}")
-        doc_ref = db.collection("vegetables").document(doc_id)
+        info(f"Selecting vegetable instruction for doc: {doc_id}")
+        doc_ref = db.collection(col("vegetables")).document(doc_id)
         doc = doc_ref.get()
         
         if not doc.exists:
@@ -223,7 +258,7 @@ def get_recent_sensor_logs(limit: int = 5):
         return []
 
     try:
-        collection_name = "sensor_logs"
+        collection_name = col("sensor_logs")
         debug(f"Fetching recent {limit} sensor logs")
         # Order by timestamp descending
         # Note: direction should be accessible via firestore.Query.DESCENDING or similar depending on import
@@ -254,7 +289,7 @@ def get_sensor_history(hours: int = 24):
 
     try:
         import time
-        collection_name = "sensor_logs"
+        collection_name = col("sensor_logs")
         
         # Calculate cutoff timestamp
         now = time.time()
@@ -265,7 +300,7 @@ def get_sensor_history(hours: int = 24):
         # Query: specific range and order
         # Note: In Firestore, if you have a range filter on a field, you must order by that field first.
         docs = db.collection(collection_name)\
-            .where("unix_timestamp", ">=", cutoff_time)\
+            .where(filter=FieldFilter("unix_timestamp", ">=", cutoff_time))\
             .order_by("unix_timestamp", direction=firestore.Query.ASCENDING)\
             .stream()
         
@@ -292,7 +327,7 @@ def get_agent_execution_logs(limit: int = 20):
         return []
 
     try:
-        collection_name = "agent_execution_logs"
+        collection_name = col("agent_execution_logs")
         debug(f"Fetching recent {limit} agent execution logs")
         # Order by unix_timestamp descending (assuming standard logging format)
         # If unix_timestamp doesn't exist, we might need to rely on 'timestamp' string or similar.
@@ -331,7 +366,7 @@ def save_seed_guide(data: dict, doc_id: str = None) -> str:
         warning("Firestore is not available. Skipping save.")
         return "mock-id-firestore-unavailable"
 
-    collection_name = "seed_guide_jobs"
+    collection_name = col("seed_guide_jobs")
     
     try:
         save_data = data.copy()
@@ -358,7 +393,7 @@ def update_seed_guide_status(doc_id: str, status: str, message: str = None, resu
     if db is None: return
 
     try:
-        doc_ref = db.collection("seed_guide_jobs").document(doc_id)
+        doc_ref = db.collection(col("seed_guide_jobs")).document(doc_id)
         update_data = {
             "status": status,
             "updated_at": datetime.now()
@@ -378,7 +413,7 @@ def get_all_seed_guides():
     if db is None: return []
 
     try:
-        docs = db.collection("seed_guide_jobs").order_by("created_at", direction=firestore.Query.DESCENDING).stream()
+        docs = db.collection(col("seed_guide_jobs")).order_by("created_at", direction=firestore.Query.DESCENDING).stream()
         results = []
         for doc in docs:
             d = doc.to_dict()
@@ -398,7 +433,7 @@ def get_seed_guide(doc_id: str):
     if db is None: return None
     
     try:
-        doc_ref = db.collection("seed_guide_jobs").document(doc_id)
+        doc_ref = db.collection(col("seed_guide_jobs")).document(doc_id)
         doc = doc_ref.get()
         if doc.exists:
             d = doc.to_dict()
@@ -427,6 +462,78 @@ if __name__ == "__main__":
     else:
         print("Firestore client is not initialized.")
 
+def get_all_character_jobs():
+    """Retrieves all completed character jobs sorted by creation date."""
+    if db is None: return []
+
+    try:
+        debug("Fetching character jobs from Firestore")
+        # Fetch only by status (single-field query, no composite index needed)
+        docs = db.collection(col("character_jobs"))\
+            .where(filter=FieldFilter("status", "==", "COMPLETED"))\
+            .stream()
+            
+        results = []
+        for doc in docs:
+            d = doc.to_dict()
+            d['id'] = doc.id
+            # Handle timestamps
+            if 'created_at' in d and hasattr(d['created_at'], 'isoformat'):
+                d['created_at'] = d['created_at'].isoformat()
+            if 'updated_at' in d and hasattr(d['updated_at'], 'isoformat'):
+                d['updated_at'] = d['updated_at'].isoformat()
+            results.append(d)
+        # Sort client-side by created_at descending
+        results.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        debug(f"Retrieved {len(results)} character jobs")
+        return results
+    except Exception as e:
+        error(f"Error listing character jobs: {e}", exc_info=True)
+        return []
+
+def select_character_for_diary(job_id: str) -> bool:
+    """
+    Selects a character from character_jobs and sets it as the active diary character.
+    """
+    if db is None: return False
+
+    try:
+        info(f"Selecting character job {job_id} for diary")
+        doc_ref = db.collection(col("character_jobs")).document(job_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            error(f"Character job {job_id} not found.")
+            return False
+            
+        job_data = doc.to_dict()
+        if job_data.get("status") != "COMPLETED":
+            error(f"Character job {job_id} is not completed.")
+            return False
+            
+        result = job_data.get("result")
+        if not result:
+            error(f"Character job {job_id} has no result.")
+            return False
+            
+        # Update growing_diaries/Character
+        char_doc_ref = db.collection(col("growing_diaries")).document("Character")
+        char_doc_ref.set({
+            "name": result.get("character_name"),
+            "vegetable_name": result.get("name"),
+            "image_uri": result.get("image_url"), # Note: image_url in result is the GCS URL
+            "personality": result.get("personality"),
+            "updated_at": firestore.SERVER_TIMESTAMP,
+            "selected_from_job_id": job_id
+        }, merge=True)
+        
+        info(f"Successfully selected character {result.get('character_name')} for diary (from job {job_id})")
+        return True
+        
+    except Exception as e:
+        error(f"Error selecting character for diary: {e}", exc_info=True)
+        return False
+
 def get_edge_agent_config() -> dict:
     """
     Retrieves the current edge agent configuration from Firestore.
@@ -436,7 +543,7 @@ def get_edge_agent_config() -> dict:
         return {}
 
     try:
-        doc_ref = db.collection("configurations").document("edge_agent")
+        doc_ref = db.collection(col("configurations")).document("edge_agent")
         doc = doc_ref.get()
         if doc.exists:
             return doc.to_dict()

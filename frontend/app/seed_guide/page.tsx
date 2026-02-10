@@ -1,9 +1,11 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { Upload, ArrowLeft, ArrowRight, Sprout, AlertCircle, Loader2, BookOpen, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Upload, ArrowLeft, ArrowRight, Sprout, AlertCircle, Loader2, BookOpen, Clock, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from 'next/link';
 
 interface Step {
@@ -24,6 +26,22 @@ interface SavedGuide {
     steps: Step[];
 }
 
+const getProxiedImageUrl = (url?: string) => {
+    if (!url) return "";
+    if (url.startsWith("https://storage.googleapis.com/ai-agentic-hackathon-4-bk/seed-guides/output/")) {
+        // Extract job_id and index from URL: .../output/{job_id}_{timestamp}_{index}.jpg
+        const parts = url.split("/");
+        const fileName = parts[parts.length - 1];
+        const fileParts = fileName.split("_");
+        if (fileParts.length >= 3) {
+            const jobId = fileParts[0];
+            const indexStr = fileParts[fileParts.length - 1].split(".")[0];
+            return `/api/seed-guide/image/${jobId}/${indexStr}`;
+        }
+    }
+    return url;
+};
+
 export default function SeedGuidePage() {
     // View State: 'create' | 'list' | 'detail'
     // Default to 'list' for the unified dashboard view
@@ -31,6 +49,8 @@ export default function SeedGuidePage() {
 
     // Create Mode State
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [imageModel, setImageModel] = useState<string>("pro");
+    const [guideImageMode, setGuideImageMode] = useState<string>("single");
     const [error, setError] = useState<string | null>(null);
 
     // List/Detail Mode State
@@ -94,7 +114,7 @@ export default function SeedGuidePage() {
 
         try {
             // Updated endpoint name
-            const response = await fetch('/api/seed-guide/generate', {
+            const response = await fetch(`/api/seed-guide/generate?image_model=${imageModel}&guide_image_mode=${guideImageMode}`, {
                 method: 'POST',
                 body: formData,
             });
@@ -133,6 +153,22 @@ export default function SeedGuidePage() {
             console.error("Failed to fetch guide details:", e);
         } finally {
             setIsLoadingDetails(false);
+        }
+    };
+
+    const handleDeleteGuide = async (id: string) => {
+        if (!confirm("この栽培ガイドを削除しますか？")) return;
+        try {
+            const res = await fetch(`/api/seed-guide/saved/${id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error("Delete failed");
+            if (selectedGuide?.id === id) {
+                setSelectedGuide(null);
+                setViewMode('list');
+            }
+            fetchSavedGuides();
+        } catch (e) {
+            console.error(e);
+            setError("削除に失敗しました");
         }
     };
 
@@ -228,7 +264,19 @@ export default function SeedGuidePage() {
                                     <Card key={guide.id} className="hover:shadow-md transition-shadow cursor-pointer border-border" onClick={() => handleSelectGuide(guide)}>
                                         <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
                                             <CardTitle className="text-lg truncate pr-2">{guide.title || "無題のガイド"}</CardTitle>
-                                            <div className="shrink-0">{getStatusBadge(guide.status)}</div>
+                                            <div className="shrink-0 flex items-center gap-2">
+                                                {getStatusBadge(guide.status)}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteGuide(guide.id);
+                                                    }}
+                                                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                    aria-label="削除"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
                                         </CardHeader>
                                         <CardContent>
                                             <p className="text-sm text-muted-foreground mb-4 line-clamp-2 h-10">
@@ -270,6 +318,31 @@ export default function SeedGuidePage() {
                                             className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                             onChange={handleFileChange}
                                         />
+                                    </div>
+                                    <div className="grid w-full items-center gap-1.5 text-left pb-4">
+                                        <label className="text-xs font-medium text-muted-foreground ml-1">🎨 図解モード</label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setGuideImageMode("single")}
+                                                className={`flex-1 text-sm px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "single"
+                                                        ? "bg-primary text-primary-foreground border-primary shadow-md"
+                                                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                                    }`}
+                                            >
+                                                🖼️ 1枚絵（Pro）
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setGuideImageMode("per_step")}
+                                                className={`flex-1 text-sm px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "per_step"
+                                                        ? "bg-primary text-primary-foreground border-primary shadow-md"
+                                                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                                    }`}
+                                            >
+                                                📸 ステップ別
+                                            </button>
+                                        </div>
                                     </div>
                                     <button
                                         onClick={handleUpload}
@@ -346,41 +419,48 @@ export default function SeedGuidePage() {
 
                                 {/* Completed Steps View */}
                                 {selectedGuide.status === 'COMPLETED' && selectedGuide.steps && selectedGuide.steps.length > 0 && (
-                                    <div className="space-y-6">
+                                    <div className="space-y-3">
                                         <div className="flex justify-between items-center text-sm text-muted-foreground">
                                             <span className="text-sm font-medium text-primary">ステップ {currentStepIndex + 1} / {selectedGuide.steps.length}</span>
                                             <div className="flex gap-1">
                                                 {selectedGuide.steps.map((_, idx) => (
-                                                    <div
+                                                    <button
                                                         key={idx}
-                                                        className={`h-1.5 w-8 rounded-full transition-colors ${idx <= currentStepIndex ? 'bg-primary' : 'bg-muted'}`}
+                                                        onClick={() => setCurrentStepIndex(idx)}
+                                                        className={`h-1.5 w-8 rounded-full transition-colors cursor-pointer hover:opacity-80 ${idx <= currentStepIndex ? 'bg-primary' : 'bg-muted'}`}
                                                     />
                                                 ))}
                                             </div>
                                         </div>
 
                                         <Card className="overflow-hidden border-border shadow-sm">
-                                            <div className="aspect-video bg-muted relative flex items-center justify-center border-b border-border">
+                                            <div className="h-[40vh] bg-muted relative flex items-center justify-center border-b border-border">
                                                 {(() => {
                                                     const step = selectedGuide.steps[currentStepIndex];
-                                                    const imageUrl = step.image_url;
-                                                    const imageBase64 = step.image_base64;
+                                                    // Detect single image mode: only step 0 has image
+                                                    const stepsWithImages = selectedGuide.steps.filter((s: any) => s.image_url || s.image_base64);
+                                                    const isSingleImageMode = stepsWithImages.length <= 1 && (selectedGuide.steps[0]?.image_url || selectedGuide.steps[0]?.image_base64);
+
+                                                    // In single mode, always show step 0's image; in per_step mode, show current step's image
+                                                    const displayStep = isSingleImageMode ? selectedGuide.steps[0] : step;
+                                                    const imageUrl = displayStep.image_url;
+                                                    const imageBase64 = displayStep.image_base64;
 
                                                     if (imageBase64) {
                                                         return (
                                                             <img
                                                                 src={`data:image/jpeg;base64,${imageBase64}`}
-                                                                alt={step.title}
-                                                                className="w-full h-full object-cover animate-in fade-in duration-500"
+                                                                alt={isSingleImageMode ? "栽培ガイド" : step.title}
+                                                                className="w-full h-full object-contain bg-white animate-in fade-in duration-500"
                                                             />
                                                         );
                                                     } else if (imageUrl) {
-                                                        // Should rely on parent loading state, but safe fallback
                                                         return (
-                                                            <div className="flex flex-col items-center justify-center h-full w-full bg-muted/50 text-muted-foreground animate-pulse">
-                                                                <Loader2 className="h-10 w-10 mb-3 animate-spin text-primary/50" />
-                                                                <span className="text-sm font-medium">画像を読み込み中...</span>
-                                                            </div>
+                                                            <img
+                                                                src={getProxiedImageUrl(imageUrl)}
+                                                                alt={isSingleImageMode ? "栽培ガイド" : step.title}
+                                                                className="w-full h-full object-contain bg-white animate-in fade-in duration-500"
+                                                            />
                                                         );
                                                     } else {
                                                         return (
@@ -392,36 +472,41 @@ export default function SeedGuidePage() {
                                                     }
                                                 })()}
                                             </div>
-                                            <CardContent className="pt-6 space-y-4">
-                                                <h3 className="text-2xl font-bold tracking-tight">{selectedGuide.steps[currentStepIndex].title}</h3>
+                                            <CardContent className="py-4 space-y-2">
+                                                <h3 className="text-lg font-bold tracking-tight">{selectedGuide.steps[currentStepIndex].title}</h3>
                                                 <div className="h-px w-full bg-border" />
-                                                <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">手順の詳細</h4>
-                                                <p className="text-lg leading-relaxed text-muted-foreground">
+                                                <p className="text-sm leading-relaxed text-muted-foreground line-clamp-4">
                                                     {selectedGuide.steps[currentStepIndex].description}
                                                 </p>
                                             </CardContent>
                                         </Card>
 
-                                        <div className="flex justify-between pt-4">
+                                        <div className="flex justify-between">
                                             <button
                                                 onClick={handlePrev}
                                                 disabled={currentStepIndex === 0}
-                                                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 gap-2"
+                                                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1.5 gap-2"
                                             >
                                                 <ArrowLeft className="h-4 w-4" /> 戻る
                                             </button>
 
-                                            <div className="flex gap-3">
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleDeleteGuide(selectedGuide.id)}
+                                                    className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-red-200 text-red-600 bg-red-50 shadow-sm hover:bg-red-100 h-9 px-3 py-1.5"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" /> 削除
+                                                </button>
                                                 <button
                                                     onClick={() => setViewMode('list')}
-                                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 gap-2"
+                                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1.5 gap-2"
                                                 >
                                                     一覧に戻る
                                                 </button>
                                                 <button
                                                     onClick={handleNext}
                                                     disabled={currentStepIndex === (selectedGuide.steps.length) - 1}
-                                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-10 px-4 py-2 gap-2"
+                                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-3 py-1.5 gap-2"
                                                 >
                                                     次へ <ArrowRight className="h-4 w-4" />
                                                 </button>

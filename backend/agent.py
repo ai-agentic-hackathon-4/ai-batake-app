@@ -21,7 +21,7 @@ try:
     info("Cloud Logging setup successfully.")
 except Exception as e:
     # Fallback to standard logging if authentication fails (e.g. local dev without credentials)
-    debug(f"Cloud Logging not available, using local logger: {e}")
+    info(f"Cloud Logging not available, using local logger: {e}")
 
 def get_auth_headers():
     """Retrieves the Authorization header with a valid Google ID token."""
@@ -61,7 +61,7 @@ def create_session() -> str:
         "userId": "test-user"
     } 
     
-    info(f"Creating session for agent: {agent_id}")
+    debug(f"Creating session for agent: {agent_id}")
     response = requests.post(url, json=payload, headers=headers, timeout=30)
     try:
         response.raise_for_status()
@@ -74,11 +74,11 @@ def create_session() -> str:
     
     # Check if it's a Long Running Operation
     if "/operations/" in operation_name:
-        info(f"Session creation returned LRO: {operation_name}. Waiting for completion...")
+        debug(f"Session creation returned LRO: {operation_name}. Waiting for completion...")
         return wait_for_lro(operation_name)
     
     # Immediate success (unlikely for this API but possible)
-    info(f"Session created immediately: {operation_name}")
+    debug(f"Session created immediately: {operation_name}")
     return operation_name
 
 def wait_for_lro(operation_name: str) -> str:
@@ -107,7 +107,7 @@ def wait_for_lro(operation_name: str) -> str:
             # The 'response' field contains the Session resource
             if "response" in op_json and "name" in op_json["response"]:
                 session_name = op_json["response"]["name"]
-                info(f"LRO completed. Session created: {session_name}")
+                debug(f"LRO completed. Session created: {session_name}")
                 return session_name
             else:
                 error(f"LRO completed but missing 'response.name': {op_json}")
@@ -203,7 +203,7 @@ def query_session(session_name: str, query_text: str) -> str:
          # raise ValueError("Agent returned empty response")
     
     info(f"Received response from agent: {len(combined_text)} chars")
-    debug(f"Agent response preview: {combined_text[:200]}..." if len(combined_text) > 200 else f"Agent response: {combined_text}")
+    info(f"Agent response preview: {combined_text[:200]}..." if len(combined_text) > 200 else f"Agent response: {combined_text}")
     return combined_text
 
 def get_weather_from_agent(region: str) -> str:
@@ -211,11 +211,11 @@ def get_weather_from_agent(region: str) -> str:
     Sends a request to the Vertex AI Agent Engine.
     Creates a NEW session for each request (stateless usage of stateful API).
     """
-    info(f"Getting weather for region: {region}")
+    debug(f"Getting weather for region: {region}")
     try:
         session_name = create_session()
         result = query_session(session_name, f"{region}の天気を教えてください。")
-        info(f"Weather query completed for {region}")
+        debug(f"Weather query completed for {region}")
         return result
     except Exception as e:
         error(f"Agent connection error for {region}: {e}", exc_info=True)

@@ -21,8 +21,7 @@ logger = get_logger()
 
 # Configuration
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "ai-agentic-hackathon-4")
-LOCATION =  "us-central1"
-API_ENDPOINT = f"https://{LOCATION}-aiplatform.googleapis.com/v1"
+API_ENDPOINT = "aiplatform.googleapis.com"
 
 def get_access_token():
     credentials, _ = google.auth.default()
@@ -30,71 +29,121 @@ def get_access_token():
     return credentials.token
 
 # Helper for Exponential Backoff (Sync)
-def call_api_with_backoff(url, payload, headers, max_retries=10):
-    base_delay = 2
-    
+def call_api_with_backoff(
+    url,
+    payload,
+    headers,
+    max_retries=100,
+    max_elapsed_seconds=1800,
+    base_delay=2.0,
+    max_delay=15.0,
+    request_timeout=60,
+):
+    start_time = time.time()
+    # Extract model name from URL for logging
+    _model_name = "unknown"
+    if "/models/" in url:
+        _model_name = url.split("/models/")[1].split(":")[0]
+
     for attempt in range(max_retries):
+        elapsed = time.time() - start_time
+        if elapsed >= max_elapsed_seconds:
+            error(f"[LLM] ⏰ Retry budget exceeded ({max_elapsed_seconds}s) for model={_model_name}")
+            raise RuntimeError("Retry budget exceeded")
+
+        if attempt > 0:
+            info(f"[LLM] 🔄 Retry attempt {attempt+1}/{max_retries} for model={_model_name} (elapsed={elapsed:.0f}s)")
+
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=120)
-            
+            response = requests.post(url, headers=headers, json=payload, timeout=request_timeout)
+
             if response.status_code == 200:
+                elapsed_now = time.time() - start_time
+                info(f"[LLM] ✅ API call succeeded: model={_model_name} elapsed={elapsed_now:.1f}s")
                 return response
-            elif response.status_code == 429:
-                # 429 Resource Exhausted
-                delay = (base_delay * (2 ** attempt)) + random.uniform(0, 1)
-                warning(f"API 429 (Resource Exhausted). Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
+            if response.status_code in (429,) or response.status_code >= 500:
+                # Honor Retry-After when present
+                retry_after = response.headers.get("Retry-After")
+                if retry_after is not None:
+                    try:
+                        delay = min(float(retry_after), max_delay)
+                    except ValueError:
+                        delay = min(base_delay * (2 ** attempt), max_delay)
+                else:
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+
+                # Add small jitter
+                delay += random.uniform(0, 0.5)
+                warning(
+                    f"API {response.status_code}. Retrying in {delay:.2f}s... "
+                    f"(Attempt {attempt+1}/{max_retries})"
+                )
                 time.sleep(delay)
                 continue
-            elif response.status_code >= 500:
-                # Server Error - also retry
-                delay = (base_delay * (2 ** attempt)) + random.uniform(0, 1)
-                warning(f"API {response.status_code}. Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
-                time.sleep(delay)
-                continue
-            else:
-                # Other errors (400, 403, etc) - do not retry
-                return response
+
+            # Other errors (400, 403, etc) - do not retry
+            return response
         except requests.exceptions.RequestException as e:
             # Network error - retry
-            delay = (base_delay * (2 ** attempt)) + random.uniform(0, 1)
-            warning(f"Network Error: {e}. Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
+            delay = min(base_delay * (2 ** attempt), max_delay) + random.uniform(0, 0.5)
+            warning(
+                f"Network Error: {e}. Retrying in {delay:.2f}s... "
+                f"(Attempt {attempt+1}/{max_retries})"
+            )
             time.sleep(delay)
-    
+
     error(f"Max retries ({max_retries}) exceeded.")
     raise RuntimeError(f"Max retries ({max_retries}) exceeded.")
 
 # Define a consistent style for all images
 UNIFIED_STYLE = "soft digital illustration, warm sunlight, gentle pastel colors, white background, home gardening context, consistent character design, high quality"
 
+# Final hardcoded placeholder image (Base64 of a simple 1x1 green pixel or a small SVG-like data)
+# In a real app, this should be a nice SVG or a small gardening icon. 
+# For now, we use a slightly more meaningful placeholder if possible, or just a generic high-quality one.
+# Let's use a simple green-themed placeholder.
+DEFAULT_PLACEHOLDER_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==" # 1x1 green pixel as safe failover
+
 def process_step(args):
-    """Generates image for a single step (Parallel Execution Helper)"""
+    """Generates image for a single step using Pro model only (Parallel Execution Helper)"""
     # args tuple unpacking needed because map passes one argument
     step, img_url, headers = args
     
     # Small start jitter to avoid hitting rate limit exactly simultaneously
-    time.sleep(random.uniform(0, 1.0))
+    time.sleep(random.uniform(0.5, 1.5))
     
-    debug(f"Generating Image for step: {step['step_title']}")
+    info(f"[LLM] Generating image for step: {step['step_title']}")
     
     # Append style keywords to ensure consistency
     img_prompt = f"Generate an image of {step['image_prompt']}, {UNIFIED_STYLE}"
     img_payload = {
         "contents": [{ "role": "user", "parts": [{"text": img_prompt}] }],
-        "generationConfig": {} # responseMimeType removed
+        "generationConfig": {}
     }
     
+    img_response = None
+    
     try:
-        img_response = call_api_with_backoff(img_url, img_payload, headers, max_retries=10)
-        
-        if img_response.status_code != 200:
-            warning(f"Image generation failed for '{step['step_title']}': {img_response.status_code}")
-            return {
-                "title": step['step_title'],
-                "description": step['description'],
-                "image_base64": None,
-                "error": f"API Error: {img_response.status_code}"
-            }
-        else:
+        try:
+            img_response = call_api_with_backoff(
+                img_url,
+                img_payload,
+                headers,
+                max_retries=100,
+                max_elapsed_seconds=1800,
+                base_delay=1.5,
+                max_delay=15.0,
+                request_timeout=180,
+            )
+            if img_response.status_code != 200:
+                warning(f"Image generation failed for '{step['step_title']}': {img_response.status_code}")
+                img_response = None
+        except Exception as e:
+            warning(f"Pro model exception for '{step['step_title']}': {e}")
+            img_response = None
+
+        # --- Parse the successful response ---
+        if img_response is not None and img_response.status_code == 200:
             img_resp_json = img_response.json()
             try:
                 parts = img_resp_json['candidates'][0]['content']['parts']
@@ -105,35 +154,32 @@ def process_step(args):
                         break
                 
                 if b64_data:
-                    debug(f"Image generated successfully for step: {step['step_title']}")
+                    info(f"[LLM] ✅ Image generated successfully for step: {step['step_title']}")
                     return {
                         "title": step['step_title'],
                         "description": step['description'],
                         "image_base64": b64_data
                     }
                 else:
-                    warning(f"No inline image data for step: {step['step_title']}")
-                    return {
-                        "title": step['step_title'],
-                        "description": step['description'],
-                        "image_base64": None,
-                        "error": "No image data returned"
-                    }
+                    warning(f"No inline image data for step: {step['step_title']}. Using placeholder.")
             except Exception as e:
                 error(f"Failed to parse image response for '{step['step_title']}': {e}")
-                return {
-                    "title": step['step_title'],
-                    "description": step['description'],
-                    "image_base64": None,
-                    "error": f"Parse Error: {str(e)}"
-                }
+
+        # --- All attempts failed or parsing failed: use placeholder ---
+        warning(f"All AI generation attempts exhausted for '{step['step_title']}'. Using placeholder.")
+        return {
+            "title": step['step_title'],
+            "description": step['description'],
+            "image_base64": DEFAULT_PLACEHOLDER_B64,
+            "error": "All generation attempts failed, used placeholder"
+        }
 
     except Exception as e:
         error(f"Image request failed for '{step['step_title']}': {e}")
         return {
             "title": step['step_title'],
             "description": step['description'],
-            "image_base64": None,
+            "image_base64": DEFAULT_PLACEHOLDER_B64,
             "error": f"Request Failed: {str(e)}"
         }
 
@@ -145,36 +191,135 @@ def _generate_images_parallel(steps, img_url, headers):
     # We need to pass img_url and headers to each thread
     map_args = [(step, img_url, headers) for step in steps]
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         # map preserves the order of results corresponding to 'steps'
         final_steps = list(executor.map(process_step, map_args))
         
     return final_steps
 
-async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=None):
+
+def _generate_single_guide_image(guide_title, steps, api_key, headers):
+    """Generates a single infographic-style image summarizing all steps using NanoBanana Pro."""
+    info(f"Generating single guide image for: {guide_title} ({len(steps)} steps)")
+    
+    # Build a comprehensive prompt from all steps
+    steps_description = "\n".join(
+        f"Step {i+1}: {s.get('step_title', s.get('title', ''))} - {s.get('description', '')[:100]}"
+        for i, s in enumerate(steps)
+    )
+    
+    prompt = (
+        f"Create a beautiful, detailed infographic-style illustration for a home gardening guide: '{guide_title}'.\n"
+        f"The image should show the complete growing process in a single visual, with numbered steps arranged in a clear flow.\n"
+        f"Steps:\n{steps_description}\n\n"
+        f"Style: Soft watercolor illustration, warm pastel colors, numbered steps with small icons, "
+        f"clean white background, Japanese home gardening context, cute and friendly style, "
+        f"high quality infographic layout, step numbers clearly visible, "
+        f"arrows or flow lines connecting each step."
+    )
+    
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {}
+    }
+    
+    # --- gemini-3-pro-image-preview only ---
+    model = "gemini-3-pro-image-preview"
+    url = (
+        f"https://{API_ENDPOINT}/v1/publishers/google/"
+        f"models/{model}:generateContent?key={api_key}"
+    )
+    
+    try:
+        info(f"Generating single guide image with {model} for: {guide_title}")
+        response = call_api_with_backoff(
+            url, payload, headers,
+            max_retries=100,
+            max_elapsed_seconds=1800,
+            base_delay=2.0,
+            max_delay=15.0,
+            request_timeout=180,
+        )
+        
+        if response.status_code == 200:
+            b64_data = _extract_image_from_response(response)
+            if b64_data:
+                info(f"Single guide image generated successfully for: {guide_title}")
+                return b64_data
+            warning(f"No inline image data in response for: {guide_title}")
+        else:
+            warning(f"Pro model failed for single guide image: {response.status_code}")
+    except Exception as e:
+        warning(f"Pro model exception for single guide image: {e}")
+    
+    # --- Tertiary: Flash with simplified prompt ---
+    try:
+        simple_prompt = (
+            f"A simple, cute digital illustration showing the gardening process for {guide_title}. "
+            f"Clean white background, soft pastel colors, numbered steps."
+        )
+        simple_payload = {
+            "contents": [{"role": "user", "parts": [{"text": simple_prompt}]}],
+            "generationConfig": {}
+        }
+        warning(f"Trying tertiary (Flash + simple prompt) for single guide image")
+        response = call_api_with_backoff(
+            fallback_url, simple_payload, headers,
+            max_retries=2,
+            max_elapsed_seconds=180,
+            base_delay=1.5,
+            max_delay=6.0,
+            request_timeout=180,
+        )
+        
+        if response.status_code == 200:
+            b64_data = _extract_image_from_response(response)
+            if b64_data:
+                info(f"Single guide image generated successfully (tertiary) for: {guide_title}")
+                return b64_data
+    except Exception as e:
+        error(f"All single guide image generation attempts failed: {e}")
+    
+    error(f"Single guide image generation exhausted all attempts for: {guide_title}")
+    return None
+
+
+def _extract_image_from_response(response):
+    """Extract base64 image data from a Gemini API response."""
+    try:
+        resp_json = response.json()
+        parts = resp_json['candidates'][0]['content']['parts']
+        for part in parts:
+            if 'inlineData' in part:
+                return part['inlineData']['data']
+    except (KeyError, IndexError, Exception) as e:
+        warning(f"Failed to extract image from response: {e}")
+    return None
+
+async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=None, guide_image_mode: str = "single"):
     """
     Analyzes a seed image and generates a step-by-step planting guide with images using Vertex AI REST API.
+    Always uses gemini-3-pro-image-preview for image generation.
     Args:
         image_bytes: The image content.
         progress_callback: Optional async function(message: str) to report progress.
+        guide_image_mode: "single" for one infographic image (NanoBanana Pro), "per_step" for per-step images
     """
-    info(f"Starting seed analysis and guide generation ({len(image_bytes)} bytes)")
+    info(f"Starting seed analysis and guide generation ({len(image_bytes)} bytes, model=pro)")
     if progress_callback: await progress_callback("🌱 AI is analyzing the seed image (Gemini 3 Pro)...")
-
-    # API Key Authentication
+    
+    # ... (rest of authentication and analysis logic stays same)
     api_key = os.environ.get("SEED_GUIDE_GEMINI_KEY")
     if not api_key:
         error("SEED_GUIDE_GEMINI_KEY environment variable not set")
         raise RuntimeError("SEED_GUIDE_GEMINI_KEY environment variable not set")
         
-    # Headers: API Key mode does not use Bearer Token usually, but requires Content-Type
     headers = {
         "Content-Type": "application/json"
     }
 
-    # 1. Analyze with Gemini 3 Pro (gemini-3-pro-preview)
-    # Using User's Reference Config (Thinking, Tools) and Endpoint Structure
-    model_id = "gemini-3-pro-preview"
+    # 1. Analyze with Gemini 3 Pro (gemini-3-flash-preview)
+    model_id = "gemini-3-flash-preview"
     steps = []
     
     image_b64 = base64.b64encode(image_bytes).decode('utf-8')
@@ -204,12 +349,11 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
     
     注意:
     - 日本語で出力してください。
-    - image_promptは画像生成AI(Nanobanana Pro)に入力するため、英語で具体的に記述してください。
+    - image_promptは画像生成AIに入力するため、英語で具体的に記述してください。
     - 家庭菜園初心者にもわかりやすく説明してください。
     - JSONオブジェクトのみを出力してください。Markdownコードブロックは不要です。
     """
 
-    # User Reference Configuration
     payload = {
         "contents": [
             {
@@ -231,13 +375,12 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         ]
     }
 
-    # Endpoint: https://aiplatform.googleapis.com/v1/publishers/google/models/{model_id}:generateContent?key={API_KEY}
-    url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{model_id}:generateContent?key={api_key}"
-    
-    debug(f"Requesting Gemini 3 Pro Analysis: {url.split('?')[0]}?key=***")
+    url = (
+        f"https://{API_ENDPOINT}/v1/publishers/google/"
+        f"models/{model_id}:generateContent?key={api_key}"
+    )
     
     try:
-        # User dedicated executor to avoid default loop executor issues
         loop = asyncio.get_running_loop()
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             response = await loop.run_in_executor(pool, lambda: call_api_with_backoff(url, payload, headers))
@@ -253,20 +396,15 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         steps = []
         
         try:
-            # Parse response.
             text_content = resp_json['candidates'][0]['content']['parts'][0]['text']
-            
-            # Clean up JSON markdown
             text = text_content.strip()
             if text.startswith("```json"): text = text[7:]
             if text.endswith("```"): text = text[:-3]
             
             data = json.loads(text.strip())
             
-            # Handle both list (old format fallback) and object (new format)
             if isinstance(data, list):
                 steps = data
-                # Infer title from first step or default
                 if steps and "title" in steps[0]:
                      guide_title = steps[0]["title"].split("：")[0] + "の育て方"
                 else:
@@ -286,20 +424,61 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         error(f"Seed analysis failed: {e}", exc_info=True)
         raise e
 
-    if progress_callback: await progress_callback(f"🎨 Generating illustrations for {len(steps)} steps (Nanobanana Pro)...")
+    if guide_image_mode == "single":
+        # --- Single Image Mode: Generate one infographic using NanoBanana Pro ---
+        if progress_callback: await progress_callback("🎨 NanoBanana Pro で栽培ガイド画像を生成中...")
+        
+        info(f"Using SINGLE image mode (NanoBanana Pro) for guide: {guide_title}")
+        
+        single_image_b64 = await asyncio.to_thread(
+            _generate_single_guide_image,
+            guide_title,
+            steps,
+            api_key,
+            headers
+        )
+        
+        # Build final steps with text only, attach single image to first step
+        final_steps = []
+        for i, step in enumerate(steps):
+            step_data = {
+                "title": step.get('step_title', step.get('title', f'Step {i+1}')),
+                "description": step.get('description', ''),
+            }
+            if i == 0 and single_image_b64:
+                step_data["image_base64"] = single_image_b64
+            final_steps.append(step_data)
+        
+        has_image = single_image_b64 is not None
+        info(f"Single image guide complete: {len(final_steps)} steps, image={'yes' if has_image else 'no'}")
+        
+        if progress_callback: await progress_callback("✨ Guide generation complete!")
+        return guide_title, guide_description, final_steps
+    
+    else:
+        # --- Per-Step Image Mode (Original): Generate image for each step ---
+        if progress_callback: await progress_callback(f"🎨 Generating illustrations for {len(steps)} steps...")
 
-    # 2. Generate Images with Nanobanana Pro (gemini-3-pro-image-preview)
-    img_model_id = "gemini-3-pro-image-preview" 
-    
-    # Url: https://aiplatform.googleapis.com/v1/publishers/google/models/{img_model_id}:generateContent?key={API_KEY}
-    img_url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{img_model_id}:generateContent?key={api_key}"
-    
-    # Offload parallel image generation to thread
-    final_steps = await asyncio.to_thread(_generate_images_parallel, steps, img_url, headers)
-    
-    successful_images = sum(1 for step in final_steps if step.get('image_base64'))
-    info(f"Guide generation complete: {len(final_steps)} steps, {successful_images} images generated")
-    
-    if progress_callback: await progress_callback("✨ Guide generation complete!")
-            
-    return guide_title, guide_description, final_steps
+        # 2. Generate Images with Pro model only
+        img_model_id = "gemini-3-pro-image-preview"
+        info(f"Using {img_model_id} for image generation")
+        
+        img_url = (
+            f"https://{API_ENDPOINT}/v1/publishers/google/"
+            f"models/{img_model_id}:generateContent?key={api_key}"
+        )
+        
+        # Offload parallel image generation to thread
+        final_steps = await asyncio.to_thread(
+            _generate_images_parallel,
+            steps,
+            img_url,
+            headers
+        )
+        
+        successful_images = sum(1 for step in final_steps if step.get('image_base64'))
+        info(f"Guide generation complete: {len(final_steps)} steps, {successful_images} images generated")
+        
+        if progress_callback: await progress_callback("✨ Guide generation complete!")
+                
+        return guide_title, guide_description, final_steps

@@ -42,6 +42,7 @@
 ```json
 {
   "name": "キャラクター名",
+  "vegetable_name": "植物名（例：トマト）",
   "personality": "性格の説明...",
   "image_uri": "/api/character/image?path=..."
 }

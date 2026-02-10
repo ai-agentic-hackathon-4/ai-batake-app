@@ -26,6 +26,10 @@ export default function CharacterPage() {
     const [jobId, setJobId] = useState<string | null>(null);
     const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
     const [character, setCharacter] = useState<CharacterResult | null>(null);
+    const [savedCharacters, setSavedCharacters] = useState<any[]>([]);
+    const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+    const [activeCharJobId, setActiveCharJobId] = useState<string | null>(null);
+    const [isSelecting, setIsSelecting] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     // Animation states
@@ -37,11 +41,64 @@ export default function CharacterPage() {
     const retryCountRef = useRef(0);
 
     useEffect(() => {
+        fetchSavedCharacters();
         return () => {
             if (previewUrl) URL.revokeObjectURL(previewUrl);
             stopPolling();
         };
     }, []);
+
+    const fetchSavedCharacters = async () => {
+        setIsLoadingSaved(true);
+        try {
+            const res = await fetch('/api/character/list');
+            if (res.ok) {
+                const data = await res.json();
+                setSavedCharacters(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch characters", err);
+        } finally {
+            setIsLoadingSaved(false);
+        }
+    };
+
+    const fetchActiveCharacter = async () => {
+        try {
+            const res = await fetch('/api/character');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.selected_from_job_id) {
+                    setActiveCharJobId(data.selected_from_job_id);
+                }
+            }
+        } catch (err) {
+            console.error("Failed to fetch active character", err);
+        }
+    };
+
+    useEffect(() => {
+        fetchActiveCharacter();
+    }, []);
+
+    const handleSelectCharacter = async (jobId: string) => {
+        setIsSelecting(jobId);
+        try {
+            const res = await fetch(`/api/character/${jobId}/select`, {
+                method: 'POST',
+            });
+            if (res.ok) {
+                setActiveCharJobId(jobId);
+            } else {
+                const data = await res.json();
+                setError(data.detail || "選択に失敗しました");
+            }
+        } catch (err) {
+            setError("通信エラーが発生しました");
+        } finally {
+            setIsSelecting(null);
+        }
+    };
 
     // Watch status to trigger animations
     useEffect(() => {
@@ -68,7 +125,7 @@ export default function CharacterPage() {
             if (!isPollingRef.current) return;
 
             try {
-                const response = await fetch(`/api/seed-guide/jobs/${id}`);
+                const response = await fetch(`/api/character/jobs/${id}`);
 
                 // Handle non-200 responses
                 if (!response.ok) {
@@ -90,6 +147,7 @@ export default function CharacterPage() {
                 if (status.status === 'COMPLETED') {
                     // Success!
                     setCharacter(status.result as CharacterResult);
+                    fetchSavedCharacters(); // Refresh the list
                     stopPolling();
                 } else if (status.status === 'FAILED') {
                     // Fatal failure
@@ -182,21 +240,19 @@ export default function CharacterPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-green-50 to-background flex flex-col font-sans">
+        <div className="min-h-screen bg-background flex flex-col font-sans">
             {/* Header */}
-            <header className="border-b border-border/50 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Link href="/" className="mr-2 p-2 hover:bg-green-100 rounded-full transition-colors">
-                            <ArrowLeft className="h-5 w-5 text-green-700" />
-                        </Link>
-                        <div className="p-2 rounded-xl bg-gradient-to-br from-green-400 to-emerald-600 shadow-md">
-                            <Sparkles className="h-6 w-6 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-800 tracking-tight">AI Character Maker</h1>
-                            <p className="text-xs text-green-600 font-medium">種から生まれる不思議なお友達</p>
-                        </div>
+            <header className="border-b border-border bg-card">
+                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-3">
+                    <Link href="/" className="mr-2 p-1 hover:bg-accent rounded-full transition-colors">
+                        <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+                    </Link>
+                    <div className="p-2 rounded-lg bg-primary/10">
+                        <Sparkles className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-semibold text-card-foreground">AI Character Maker</h1>
+                        <p className="text-sm text-muted-foreground">種から生まれる不思議なお友達</p>
                     </div>
                 </div>
             </header>
@@ -345,6 +401,93 @@ export default function CharacterPage() {
                         </Card>
                     </div>
                 )}
+
+                {/* Character Collection Section */}
+                <div className="w-full mt-20 mb-12 animate-in fade-in slide-in-from-bottom-10 duration-1000">
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="p-2 rounded-lg bg-emerald-100 text-emerald-600">
+                            <Sprout className="h-5 w-5" />
+                        </div>
+                        <h2 className="text-2xl font-black text-gray-800 tracking-tight">図鑑：出会ったお友達</h2>
+                    </div>
+
+                    {isLoadingSaved ? (
+                        <div className="flex justify-center p-12">
+                            <Loader2 className="h-8 w-8 text-green-500 animate-spin" />
+                        </div>
+                    ) : savedCharacters.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                            {savedCharacters.map((job) => {
+                                const char = job.result;
+                                if (!char) return null;
+                                const isSelected = activeCharJobId === job.id;
+
+                                return (
+                                    <Card
+                                        key={job.id}
+                                        className={cn(
+                                            "group hover:shadow-xl transition-all duration-300 border-2 bg-white/60 backdrop-blur overflow-hidden flex flex-col h-full transform hover:-translate-y-1",
+                                            isSelected ? "border-green-500 ring-2 ring-green-200" : "border-transparent"
+                                        )}
+                                    >
+                                        <div className="relative aspect-square overflow-hidden bg-white">
+                                            <img
+                                                src={char.image_url || char.image_uri || `data:image/jpeg;base64,${char.image_base64}`}
+                                                alt={char.character_name}
+                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                            />
+                                            <div className="absolute top-2 right-2 bg-white/90 backdrop-blur rounded-full px-3 py-1 text-[10px] font-bold text-green-700 shadow-sm border border-green-100">
+                                                {char.name}
+                                            </div>
+                                            {isSelected && (
+                                                <div className="absolute inset-0 bg-green-500/10 flex items-center justify-center pointer-events-none">
+                                                    <div className="bg-green-500 text-white px-4 py-1 rounded-full text-xs font-bold shadow-lg transform -rotate-12 animate-in zoom-in duration-300">
+                                                        使用中
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <CardContent className="p-5 flex flex-col flex-1">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h3 className="text-lg font-black text-gray-800 truncate">
+                                                    {char.character_name}
+                                                </h3>
+                                            </div>
+                                            <p className="text-sm text-gray-600 font-medium leading-relaxed italic line-clamp-2 mb-4">
+                                                "{char.personality}"
+                                            </p>
+
+                                            <div className="mt-auto pt-4 border-t border-gray-100">
+                                                <button
+                                                    onClick={() => handleSelectCharacter(job.id)}
+                                                    disabled={isSelected || !!isSelecting}
+                                                    className={cn(
+                                                        "w-full py-2 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-2",
+                                                        isSelected
+                                                            ? "bg-green-100 text-green-700 cursor-default"
+                                                            : "bg-gray-100 text-gray-700 hover:bg-green-500 hover:text-white"
+                                                    )}
+                                                >
+                                                    {isSelecting === job.id ? (
+                                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                                    ) : isSelected ? (
+                                                        <>日記で使用中</>
+                                                    ) : (
+                                                        <>この子を日記で使う</>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="text-center p-12 bg-white/40 rounded-3xl border-2 border-dashed border-green-100">
+                            <p className="text-gray-400">まだ出会ったお友達はいません。新しいキャラクターを生み出してみよう！</p>
+                        </div>
+                    )}
+                </div>
 
             </main>
 
