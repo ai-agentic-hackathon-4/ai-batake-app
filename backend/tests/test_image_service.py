@@ -38,6 +38,7 @@ class TestGeneratePictureDiary:
         
         assert result is None
     
+    @patch('db.db', None)
     @patch('image_service.get_storage_client')
     @patch('image_service.requests.post')
     @patch.dict('os.environ', {'SEED_GUIDE_GEMINI_KEY': 'test-key'})
@@ -58,38 +59,46 @@ class TestGeneratePictureDiary:
         
         assert result is None
     
+    @patch('db.db', None)
+    @patch('image_service.call_api_with_backoff')
     @patch('image_service.get_storage_client')
-    @patch('image_service.requests.post')
     @patch.dict('os.environ', {'SEED_GUIDE_GEMINI_KEY': 'test-key'})
-    def test_generate_picture_diary_api_error(self, mock_post, mock_get_client):
-        """Test diary generation with API error"""
+    def test_generate_picture_diary_api_error(self, mock_get_client, mock_api_call):
+        """Test diary generation with API error - all attempts fail, placeholder saved"""
         mock_bucket = Mock()
         mock_blob = Mock()
         mock_blob.exists.return_value = True
         mock_blob.download_as_bytes.return_value = b"fake image"
-        mock_bucket.blob.return_value = mock_blob
+        
+        mock_output_blob = Mock()
+        
+        def mock_blob_fn(path):
+            if "diaries/" in path:
+                return mock_output_blob
+            return mock_blob
+        
+        mock_bucket.blob.side_effect = mock_blob_fn
         
         mock_client = Mock()
         mock_client.bucket.return_value = mock_bucket
         mock_get_client.return_value = mock_client
         
-        mock_response = Mock()
-        mock_response.status_code = 500
-        mock_response.text = "Server Error"
-        mock_post.return_value = mock_response
+        mock_api_call.side_effect = RuntimeError("Max retries exceeded")
         
         from image_service import generate_picture_diary
         
         result = generate_picture_diary("2025-01-01", "Test summary")
         
-        assert result is None
+        assert result is not None
+        assert "diaries/2025-01-01.png" in result
+        mock_output_blob.upload_from_string.assert_called_once()
     
+    @patch('db.db', None)
+    @patch('image_service.call_api_with_backoff')
     @patch('image_service.get_storage_client')
-    @patch('image_service.requests.post')
     @patch.dict('os.environ', {'SEED_GUIDE_GEMINI_KEY': 'test-key'})
-    def test_generate_picture_diary_success(self, mock_post, mock_get_client):
+    def test_generate_picture_diary_success(self, mock_get_client, mock_api_call):
         """Test successful diary generation"""
-        # Mock storage client
         mock_bucket = Mock()
         mock_character_blob = Mock()
         mock_character_blob.exists.return_value = True
@@ -98,16 +107,15 @@ class TestGeneratePictureDiary:
         mock_output_blob = Mock()
         
         def mock_blob(path):
-            if "character_image" in path:
-                return mock_character_blob
-            return mock_output_blob
+            if "diaries/" in path:
+                return mock_output_blob
+            return mock_character_blob
         
         mock_bucket.blob.side_effect = mock_blob
         mock_client = Mock()
         mock_client.bucket.return_value = mock_bucket
         mock_get_client.return_value = mock_client
         
-        # Mock API response
         generated_image_b64 = base64.b64encode(b"generated image").decode()
         mock_response = Mock()
         mock_response.status_code = 200
@@ -118,7 +126,7 @@ class TestGeneratePictureDiary:
                 }
             }]
         }
-        mock_post.return_value = mock_response
+        mock_api_call.return_value = mock_response
         
         from image_service import generate_picture_diary
         
@@ -128,22 +136,30 @@ class TestGeneratePictureDiary:
         assert "gs://" in result
         mock_output_blob.upload_from_string.assert_called_once()
     
+    @patch('db.db', None)
+    @patch('image_service.call_api_with_backoff')
     @patch('image_service.get_storage_client')
-    @patch('image_service.requests.post')
     @patch.dict('os.environ', {'SEED_GUIDE_GEMINI_KEY': 'test-key'})
-    def test_generate_picture_diary_no_image_in_response(self, mock_post, mock_get_client):
-        """Test diary generation when API returns no image"""
+    def test_generate_picture_diary_no_image_in_response(self, mock_get_client, mock_api_call):
+        """Test diary generation when API returns no image - placeholder saved"""
         mock_bucket = Mock()
         mock_blob = Mock()
         mock_blob.exists.return_value = True
         mock_blob.download_as_bytes.return_value = b"fake image"
-        mock_bucket.blob.return_value = mock_blob
+        
+        mock_output_blob = Mock()
+        
+        def mock_blob_fn(path):
+            if "diaries/" in path:
+                return mock_output_blob
+            return mock_blob
+        
+        mock_bucket.blob.side_effect = mock_blob_fn
         
         mock_client = Mock()
         mock_client.bucket.return_value = mock_bucket
         mock_get_client.return_value = mock_client
         
-        # API response without inlineData
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -153,45 +169,39 @@ class TestGeneratePictureDiary:
                 }
             }]
         }
-        mock_post.return_value = mock_response
+        mock_api_call.return_value = mock_response
         
         from image_service import generate_picture_diary
         
         result = generate_picture_diary("2025-01-01", "Test summary")
         
-        assert result is None
+        assert result is not None
+        assert "diaries/2025-01-01.png" in result
+        mock_output_blob.upload_from_string.assert_called_once()
 
+    @patch('db.db', None)
+    @patch('image_service.call_api_with_backoff')
     @patch('image_service.get_storage_client')
-    @patch('image_service.requests.post')
     @patch.dict('os.environ', {'SEED_GUIDE_GEMINI_KEY': 'test-key'})
-    def test_generate_picture_diary_fallback_success(self, mock_post, mock_get_client):
-        """Test diary generation with fallback success"""
+    def test_generate_picture_diary_fallback_success(self, mock_get_client, mock_api_call):
+        """Test diary generation with primary failing, fallback succeeding"""
         mock_bucket = Mock()
-        mock_blob = Mock()
-        mock_blob.exists.return_value = True
-        mock_blob.download_as_bytes.return_value = b"fake image"
-        mock_bucket.blob.return_value = mock_blob
+        mock_character_blob = Mock()
+        mock_character_blob.exists.return_value = True
+        mock_character_blob.download_as_bytes.return_value = b"fake image"
         
         mock_output_blob = Mock()
-        # Ensure mock_blob handles different paths if needed, or just return mocks
-        # The code calls bucket.blob(CHARACTER_IMAGE_PATH) then bucket.blob(output_filename)
-        # We can simplify by making sure valid blobs are returned
         
         def mock_blob_side_effect(path):
-            if "character_image" in path:
-                return mock_blob
-            return mock_output_blob
+            if "diaries/" in path:
+                return mock_output_blob
+            return mock_character_blob
             
         mock_bucket.blob.side_effect = mock_blob_side_effect
         
         mock_client = Mock()
         mock_client.bucket.return_value = mock_bucket
         mock_get_client.return_value = mock_client
-        
-        # First call fails (500), Second call succeeds (200)
-        mock_response_fail = Mock()
-        mock_response_fail.status_code = 500
-        mock_response_fail.text = "Internal Server Error"
         
         generated_image_b64 = base64.b64encode(b"generated image").decode()
         mock_response_success = Mock()
@@ -204,68 +214,156 @@ class TestGeneratePictureDiary:
             }]
         }
         
-        mock_post.side_effect = [mock_response_fail, mock_response_success]
+        mock_api_call.side_effect = [
+            RuntimeError("Primary failed"),
+            mock_response_success
+        ]
         
         from image_service import generate_picture_diary
         
         result = generate_picture_diary("2025-01-01", "Test summary")
         
         assert result is not None
-        # Should have called post at least twice (primary + fallback)
-        # actually call_api_with_backoff retries locally, but since we mock post, 
-        # the first call_api_with_backoff will try post (fail 500), then maybe retry depending on logic
-        # wait, call_api_with_backoff retries on 500.
-        # So it will retry the PRIMARY model first.
-        # To test fallback, we need the Primary model to FAIL ALL RETRIES.
-        # OR we can simulate a 4xx error that is NOT retried by backoff, but is handled by fallback logic?
-        # Actually my implementation says: if response.status_code != 200: warning... attempt fallback.
-        # BUT call_api_with_backoff raises RuntimeError if max retries exceeded.
-        # And it returns response if status is 4xx (except 429).
-        # If I want to trigger fallback, I should return a non-200 response from call_api_with_backoff.
-        # If I return 500, backoff will retry until budget exceeded, then raise RuntimeError.
-        # My code catches Exception: error(f"Image generation request execution failed: {e}") return None.
-        # Wait, if call_api_with_backoff raises, I catch it and return None! I DON'T trigger fallback!
-        # I need to fix `image_service.py` to handle the Exception or ensure call_api_with_backoff returns the failed response instead of raising?
-        # OR I should let call_api_with_backoff return the last response even if failed?
-        # seed_service.py raises RuntimeError.
-        # So my current implementation in image_service.py:
-        # try: response = call_api_with_backoff(...) except Exception: return None.
-        # result: Fallback is NEVER reached if primary raises exception (e.g. 500 timeout).
-        # Fallback IS reached if primary returns 400 (bad request, not retried).
-        
-        # We need to fix `image_service.py` first. 
-        # I will update the test to expect what I WANT (fallback on 500), which means I need to fix the code.
-        # But first let's just write the test that *would* pass if I fix the code, or construct the test to use 400 for now?
-        # No, fallback usually implies "Primary is down/overloaded (503/429)" or "Model doesn't support this (400)".
-        # To robustly handle 500s leading to fallback, I should catch the RuntimeError from backoff.
-        
-        pass
+        assert "gs://" in result
+        mock_output_blob.upload_from_string.assert_called_once()
 
+    @patch('db.db', None)
+    @patch('image_service.call_api_with_backoff')
     @patch('image_service.get_storage_client')
-    @patch('image_service.requests.post')
     @patch.dict('os.environ', {'SEED_GUIDE_GEMINI_KEY': 'test-key'})
-    def test_generate_picture_diary_fallback_all_fail(self, mock_post, mock_get_client):
-        """Test diary generation when both primary and fallback fail"""
+    def test_generate_picture_diary_fallback_all_fail(self, mock_get_client, mock_api_call):
+        """Test diary generation when all attempts fail - placeholder saved"""
         mock_bucket = Mock()
         mock_blob = Mock()
         mock_blob.exists.return_value = True
         mock_blob.download_as_bytes.return_value = b"fake image"
-        mock_bucket.blob.return_value = mock_blob
+        
+        mock_output_blob = Mock()
+        
+        def mock_blob_fn(path):
+            if "diaries/" in path:
+                return mock_output_blob
+            return mock_blob
+        
+        mock_bucket.blob.side_effect = mock_blob_fn
         
         mock_client = Mock()
         mock_client.bucket.return_value = mock_bucket
         mock_get_client.return_value = mock_client
         
-        # Primary returns 400 (Bad Request) -> triggers fallback
-        # Fallback also returns 400
-        mock_response_fail = Mock()
-        mock_response_fail.status_code = 400
-        mock_response_fail.text = "Bad Request"
-        
-        mock_post.return_value = mock_response_fail
+        mock_api_call.side_effect = RuntimeError("All retries failed")
         
         from image_service import generate_picture_diary
         
         result = generate_picture_diary("2025-01-01", "Test summary")
         
-        assert result is None
+        assert result is not None
+        assert "diaries/2025-01-01.png" in result
+        mock_output_blob.upload_from_string.assert_called_once()
+
+
+class TestGeneratePictureDiaryWithCharacter:
+    """Tests for generate_picture_diary with selected character from Firestore"""
+    
+    @patch('image_service.call_api_with_backoff')
+    @patch('image_service.get_storage_client')
+    @patch.dict('os.environ', {'SEED_GUIDE_GEMINI_KEY': 'test-key'})
+    def test_uses_selected_character_image(self, mock_get_client, mock_api_call):
+        """Test that selected character image from Firestore is used"""
+        mock_char_doc = Mock()
+        mock_char_doc.exists = True
+        mock_char_doc.to_dict.return_value = {
+            "name": "test-char",
+            "image_uri": "https://storage.googleapis.com/ai-agentic-hackathon-4-bk/characters/test-char.png",
+            "personality": "friendly"
+        }
+        
+        mock_firestore_db = Mock()
+        mock_firestore_db.collection.return_value.document.return_value.get.return_value = mock_char_doc
+        
+        mock_bucket = Mock()
+        mock_character_blob = Mock()
+        mock_character_blob.exists.return_value = True
+        mock_character_blob.download_as_bytes.return_value = b"character image bytes"
+        
+        mock_output_blob = Mock()
+        
+        blob_paths_called = []
+        def mock_blob_fn(path):
+            blob_paths_called.append(path)
+            if "diaries/" in path:
+                return mock_output_blob
+            return mock_character_blob
+        
+        mock_bucket.blob.side_effect = mock_blob_fn
+        mock_client = Mock()
+        mock_client.bucket.return_value = mock_bucket
+        mock_get_client.return_value = mock_client
+        
+        generated_image_b64 = base64.b64encode(b"generated image").decode()
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "candidates": [{
+                "content": {
+                    "parts": [{"inlineData": {"data": generated_image_b64}}]
+                }
+            }]
+        }
+        mock_api_call.return_value = mock_response
+        
+        with patch('db.db', mock_firestore_db):
+            from image_service import generate_picture_diary
+            result = generate_picture_diary("2025-01-01", "Test summary")
+        
+        assert result is not None
+        assert "characters/test-char.png" in blob_paths_called
+    
+    @patch('image_service.call_api_with_backoff')
+    @patch('image_service.get_storage_client')
+    @patch.dict('os.environ', {'SEED_GUIDE_GEMINI_KEY': 'test-key'})
+    def test_falls_back_to_default_when_no_character(self, mock_get_client, mock_api_call):
+        """Test fallback to default character when no character selected"""
+        mock_char_doc = Mock()
+        mock_char_doc.exists = False
+        
+        mock_firestore_db = Mock()
+        mock_firestore_db.collection.return_value.document.return_value.get.return_value = mock_char_doc
+        
+        mock_bucket = Mock()
+        mock_blob = Mock()
+        mock_blob.exists.return_value = True
+        mock_blob.download_as_bytes.return_value = b"default image bytes"
+        
+        mock_output_blob = Mock()
+        
+        blob_paths_called = []
+        def mock_blob_fn(path):
+            blob_paths_called.append(path)
+            if "diaries/" in path:
+                return mock_output_blob
+            return mock_blob
+        
+        mock_bucket.blob.side_effect = mock_blob_fn
+        mock_client = Mock()
+        mock_client.bucket.return_value = mock_bucket
+        mock_get_client.return_value = mock_client
+        
+        generated_image_b64 = base64.b64encode(b"generated image").decode()
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "candidates": [{
+                "content": {
+                    "parts": [{"inlineData": {"data": generated_image_b64}}]
+                }
+            }]
+        }
+        mock_api_call.return_value = mock_response
+        
+        with patch('db.db', mock_firestore_db):
+            from image_service import generate_picture_diary
+            result = generate_picture_diary("2025-01-01", "Test summary")
+        
+        assert result is not None
+        assert "character_image/image.png" in blob_paths_called

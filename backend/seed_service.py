@@ -37,6 +37,7 @@ def call_api_with_backoff(
     max_elapsed_seconds=30,
     base_delay=1.0,
     max_delay=6.0,
+    request_timeout=60,
 ):
     start_time = time.time()
 
@@ -47,7 +48,7 @@ def call_api_with_backoff(
             raise RuntimeError("Retry budget exceeded")
 
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=60)
+            response = requests.post(url, headers=headers, json=payload, timeout=request_timeout)
 
             if response.status_code == 200:
                 return response
@@ -121,9 +122,10 @@ def process_step(args):
                 img_payload,
                 headers,
                 max_retries=6,
-                max_elapsed_seconds=90,
+                max_elapsed_seconds=300,
                 base_delay=1.5,
                 max_delay=8.0,
+                request_timeout=180,
             )
             if img_response.status_code != 200:
                 warning(f"Image generation failed for '{step['step_title']}' (primary): {img_response.status_code}")
@@ -141,9 +143,10 @@ def process_step(args):
                     img_payload,
                     headers,
                     max_retries=4,
-                    max_elapsed_seconds=60,
+                    max_elapsed_seconds=240,
                     base_delay=1.5,
                     max_delay=8.0,
+                    request_timeout=180,
                 )
                 if img_response.status_code != 200:
                     warning(f"Fallback also failed for '{step['step_title']}': {img_response.status_code}")
@@ -166,9 +169,10 @@ def process_step(args):
                     simple_payload,
                     headers,
                     max_retries=3,
-                    max_elapsed_seconds=45,
+                    max_elapsed_seconds=180,
                     base_delay=1.0,
                     max_delay=5.0,
+                    request_timeout=180,
                 )
                 if img_response.status_code != 200:
                     warning(f"Tertiary also failed for '{step['step_title']}': {img_response.status_code}")
@@ -253,40 +257,111 @@ def _generate_single_guide_image(guide_title, steps, api_key, headers):
         f"arrows or flow lines connecting each step."
     )
     
-    model_id = "gemini-3-pro-image-preview"
-    url = (
-        f"https://{API_ENDPOINT}/v1/publishers/google/"
-        f"models/{model_id}:generateContent?key={api_key}"
-    )
-    
     payload = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {}
     }
     
+    # --- Primary: gemini-3-pro-image-preview ---
+    primary_model = "gemini-3-pro-image-preview"
+    primary_url = (
+        f"https://{API_ENDPOINT}/v1/publishers/google/"
+        f"models/{primary_model}:generateContent?key={api_key}"
+    )
+    
     try:
+        info(f"Trying primary model ({primary_model}) for single guide image")
         response = call_api_with_backoff(
-            url, payload, headers,
-            max_retries=6,
-            max_elapsed_seconds=120,
+            primary_url, payload, headers,
+            max_retries=4,
+            max_elapsed_seconds=300,
             base_delay=2.0,
             max_delay=10.0,
+            request_timeout=180,
         )
         
         if response.status_code == 200:
-            resp_json = response.json()
-            parts = resp_json['candidates'][0]['content']['parts']
-            for part in parts:
-                if 'inlineData' in part:
-                    b64_data = part['inlineData']['data']
-                    info(f"Single guide image generated successfully for: {guide_title}")
-                    return b64_data
-            warning(f"No inline image data in single guide response for: {guide_title}")
+            b64_data = _extract_image_from_response(response)
+            if b64_data:
+                info(f"Single guide image generated successfully (primary) for: {guide_title}")
+                return b64_data
+            warning(f"No inline image data in primary response for: {guide_title}")
         else:
-            warning(f"Single guide image generation failed: {response.status_code}")
+            warning(f"Primary model failed for single guide image: {response.status_code}")
     except Exception as e:
-        error(f"Single guide image generation error: {e}")
+        warning(f"Primary model exception for single guide image: {e}")
     
+    # --- Fallback: gemini-2.5-flash-image ---
+    fallback_model = "gemini-2.5-flash-image"
+    fallback_url = (
+        f"https://{API_ENDPOINT}/v1/publishers/google/"
+        f"models/{fallback_model}:generateContent?key={api_key}"
+    )
+    
+    try:
+        warning(f"Retrying with fallback model ({fallback_model}) for single guide image")
+        response = call_api_with_backoff(
+            fallback_url, payload, headers,
+            max_retries=3,
+            max_elapsed_seconds=240,
+            base_delay=2.0,
+            max_delay=8.0,
+            request_timeout=180,
+        )
+        
+        if response.status_code == 200:
+            b64_data = _extract_image_from_response(response)
+            if b64_data:
+                info(f"Single guide image generated successfully (fallback) for: {guide_title}")
+                return b64_data
+            warning(f"No inline image data in fallback response for: {guide_title}")
+        else:
+            warning(f"Fallback model also failed for single guide image: {response.status_code}")
+    except Exception as e:
+        warning(f"Fallback model exception for single guide image: {e}")
+    
+    # --- Tertiary: Flash with simplified prompt ---
+    try:
+        simple_prompt = (
+            f"A simple, cute digital illustration showing the gardening process for {guide_title}. "
+            f"Clean white background, soft pastel colors, numbered steps."
+        )
+        simple_payload = {
+            "contents": [{"role": "user", "parts": [{"text": simple_prompt}]}],
+            "generationConfig": {}
+        }
+        warning(f"Trying tertiary (Flash + simple prompt) for single guide image")
+        response = call_api_with_backoff(
+            fallback_url, simple_payload, headers,
+            max_retries=2,
+            max_elapsed_seconds=180,
+            base_delay=1.5,
+            max_delay=6.0,
+            request_timeout=180,
+        )
+        
+        if response.status_code == 200:
+            b64_data = _extract_image_from_response(response)
+            if b64_data:
+                info(f"Single guide image generated successfully (tertiary) for: {guide_title}")
+                return b64_data
+    except Exception as e:
+        error(f"All single guide image generation attempts failed: {e}")
+    
+    error(f"Single guide image generation exhausted all attempts for: {guide_title}")
+    return None
+
+
+def _extract_image_from_response(response):
+    """Extract base64 image data from a Gemini API response."""
+    try:
+        resp_json = response.json()
+        parts = resp_json['candidates'][0]['content']['parts']
+        for part in parts:
+            if 'inlineData' in part:
+                return part['inlineData']['data']
+    except (KeyError, IndexError, Exception) as e:
+        warning(f"Failed to extract image from response: {e}")
     return None
 
 async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=None, image_model: str = "pro", guide_image_mode: str = "single"):

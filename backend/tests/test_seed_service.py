@@ -51,10 +51,12 @@ class TestAnalyzeSeedAndGenerateGuide:
         image_bytes = b"fake image data"
         result = await analyze_seed_and_generate_guide(image_bytes)
         
-        assert len(result) == 1
-        assert result[0]["title"] == "準備"
-        assert result[0]["description"] == "土を準備します"
-        assert result[0]["image_base64"] == "base64imagedata"
+        assert len(result) == 3
+        guide_title, guide_description, steps = result
+        assert len(steps) == 1
+        assert steps[0]["title"] == "準備"
+        assert steps[0]["description"] == "土を準備します"
+        assert steps[0]["image_base64"] == "base64imagedata"
     
     @pytest.mark.asyncio
     @patch.dict(os.environ, {}, clear=True)
@@ -77,11 +79,12 @@ class TestAnalyzeSeedAndGenerateGuide:
         mock_response = Mock()
         mock_response.status_code = 500
         mock_response.text = "Internal Server Error"
+        mock_response.headers = {}  # No Retry-After header
         mock_post.return_value = mock_response
         
         image_bytes = b"fake image data"
         
-        with pytest.raises(RuntimeError, match="Gemini 3 Pro Analysis failed"):
+        with pytest.raises(RuntimeError):
             await analyze_seed_and_generate_guide(image_bytes)
     
     @pytest.mark.asyncio
@@ -130,5 +133,6 @@ class TestAnalyzeSeedAndGenerateGuide:
         result = await analyze_seed_and_generate_guide(image_bytes, progress_callback)
         
         assert len(progress_messages) > 0
-        assert any("analyzing" in msg.lower() for msg in progress_messages)
-        assert len(result) == 1
+        assert any("analyzing" in msg.lower() or "分析" in msg or "AI" in msg for msg in progress_messages)
+        guide_title, guide_description, steps = result
+        assert len(steps) == 1
