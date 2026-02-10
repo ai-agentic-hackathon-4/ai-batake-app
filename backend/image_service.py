@@ -21,6 +21,9 @@ CHARACTER_IMAGE_PATH = "character_image/image.png"
 DIARY_IMAGES_PATH = "diaries/"
 PROJECT_ID = "ai-agentic-hackathon-4"
 
+# Final hardcoded placeholder image (Base64 of a simple 1x1 green pixel as safe failover)
+DEFAULT_PLACEHOLDER_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+
 def get_storage_client():
     return storage.Client()
 
@@ -171,35 +174,54 @@ def generate_picture_diary(date_str: str, summary: str):
                     max_delay=8.0
                 )
             except Exception as e:
-                error(f"Fallback model execution failed: {e}")
-                return None
-                
-        if response is None or response.status_code != 200:
-            status = response.status_code if response else "Unknown"
-            text = response.text if response else "No response"
-            error(f"Image generation failed after fallback: {status} - {text}")
-            return None
+                warning(f"Fallback model execution failed: {e}")
+                # Try tertiary fallback
 
-        resp_json = response.json()
-        
-        # Parse inlineData (Image Output)
-        try:
-            parts = resp_json['candidates'][0]['content']['parts']
-            generated_b64 = None
-            for part in parts:
-                if 'inlineData' in part:
-                    generated_b64 = part['inlineData']['data']
-                    break
-            
-            if not generated_b64:
-                error("No image data returned from NanoBanana-pro.")
-                return None
+        # Tertiary Fallback: Flash with Simplified Prompt
+        if not response or response.status_code != 200:
+            try:
+                info(f"Both attempts failed. Trying Tertiary (Flash + Simple Prompt) for diary...")
+                simple_prompt = f"A simple garden diary illustration, {summary}, soft colors"
+                simple_payload = {
+                    "contents": [{ "role": "user", "parts": [{"text": simple_prompt}] }],
+                    "generationConfig": {}
+                }
+                response = call_api_with_backoff(
+                    fallback_url,
+                    simple_payload,
+                    headers,
+                    max_retries=3,
+                    max_elapsed_seconds=45,
+                    base_delay=1.0,
+                    max_delay=5.0
+                )
+            except Exception as e:
+                warning(f"Tertiary fallback failed for diary: {e}")
+
+        # Final check before parsing/placeholder
+        if not response or response.status_code != 200:
+            status = response.status_code if response else "Unknown"
+            warning(f"All AI generation attempts failed for diary (status: {status}). Using placeholder.")
+            generated_bytes = base64.b64decode(DEFAULT_PLACEHOLDER_B64)
+        else:
+            resp_json = response.json()
+            # Parse inlineData (Image Output)
+            try:
+                parts = resp_json['candidates'][0]['content']['parts']
+                generated_b64 = None
+                for part in parts:
+                    if 'inlineData' in part:
+                        generated_b64 = part['inlineData']['data']
+                        break
                 
-            generated_bytes = base64.b64decode(generated_b64)
-            
-        except (KeyError, IndexError) as e:
-            error(f"Failed to parse NanoBanana-pro response: {e}")
-            return None
+                if not generated_b64:
+                    warning("No image data returned from AI. Using placeholder.")
+                    generated_bytes = base64.b64decode(DEFAULT_PLACEHOLDER_B64)
+                else:
+                    generated_bytes = base64.b64decode(generated_b64)
+            except (KeyError, IndexError) as e:
+                warning(f"Failed to parse AI response: {e}. Using placeholder.")
+                generated_bytes = base64.b64decode(DEFAULT_PLACEHOLDER_B64)
 
         # 4. Save to GCS
         output_filename = f"{DIARY_IMAGES_PATH}{date_str}.png"

@@ -88,6 +88,12 @@ def call_api_with_backoff(
 # Define a consistent style for all images
 UNIFIED_STYLE = "soft digital illustration, warm sunlight, gentle pastel colors, white background, home gardening context, consistent character design, high quality"
 
+# Final hardcoded placeholder image (Base64 of a simple 1x1 green pixel or a small SVG-like data)
+# In a real app, this should be a nice SVG or a small gardening icon. 
+# For now, we use a slightly more meaningful placeholder if possible, or just a generic high-quality one.
+# Let's use a simple green-themed placeholder.
+DEFAULT_PLACEHOLDER_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==" # 1x1 green pixel as safe failover
+
 def process_step(args):
     """Generates image for a single step (Parallel Execution Helper)"""
     # args tuple unpacking needed because map passes one argument
@@ -140,19 +146,40 @@ def process_step(args):
                     warning(
                         f"Fallback image generation failed for '{step['step_title']}': {e}"
                     )
-                    return {
-                        "title": step['step_title'],
-                        "description": step['description'],
-                        "image_base64": None,
-                        "error": f"API Error: {img_response.status_code}"
-                    }
+                    # Don't return yet, try tertiary fallback
 
-            if img_response.status_code != 200:
+            # Tertiary Fallback: Flash with Simplified Prompt
+            if not img_response or img_response.status_code != 200:
+                try:
+                    warning(
+                        f"Primary and Fallback failed. Trying Tertiary (Flash + Simple Prompt) for '{step['step_title']}'"
+                    )
+                    # Simplified prompt to avoid safety filters or parsing issues
+                    simple_prompt = f"A simple digital illustration of gardening, {step['step_title']}, clean white background"
+                    simple_payload = {
+                        "contents": [{ "role": "user", "parts": [{"text": simple_prompt}] }],
+                        "generationConfig": {}
+                    }
+                    img_response = call_api_with_backoff(
+                        fallback_img_url,
+                        simple_payload,
+                        headers,
+                        max_retries=3,
+                        max_elapsed_seconds=45,
+                        base_delay=1.0,
+                        max_delay=5.0,
+                    )
+                except Exception as e:
+                    warning(f"Tertiary fallback failed for '{step['step_title']}': {e}")
+
+            # Final check before parsing
+            if not img_response or img_response.status_code != 200:
+                warning(f"All AI generation attempts failed for '{step['step_title']}'. Using placeholder.")
                 return {
                     "title": step['step_title'],
                     "description": step['description'],
-                    "image_base64": None,
-                    "error": f"API Error: {img_response.status_code}"
+                    "image_base64": DEFAULT_PLACEHOLDER_B64,
+                    "error": "All generation attempts failed, used placeholder"
                 }
         else:
             img_resp_json = img_response.json()
@@ -172,19 +199,19 @@ def process_step(args):
                         "image_base64": b64_data
                     }
                 else:
-                    warning(f"No inline image data for step: {step['step_title']}")
+                    warning(f"No inline image data for step: {step['step_title']}. Using placeholder.")
                     return {
                         "title": step['step_title'],
                         "description": step['description'],
-                        "image_base64": None,
-                        "error": "No image data returned"
+                        "image_base64": DEFAULT_PLACEHOLDER_B64,
+                        "error": "No image data returned from AI"
                     }
             except Exception as e:
                 error(f"Failed to parse image response for '{step['step_title']}': {e}")
                 return {
                     "title": step['step_title'],
                     "description": step['description'],
-                    "image_base64": None,
+                    "image_base64": DEFAULT_PLACEHOLDER_B64,
                     "error": f"Parse Error: {str(e)}"
                 }
 
@@ -193,7 +220,7 @@ def process_step(args):
         return {
             "title": step['step_title'],
             "description": step['description'],
-            "image_base64": None,
+            "image_base64": DEFAULT_PLACEHOLDER_B64,
             "error": f"Request Failed: {str(e)}"
         }
 
