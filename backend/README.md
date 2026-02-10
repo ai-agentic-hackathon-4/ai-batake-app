@@ -239,6 +239,61 @@ sequenceDiagram
     M-->>C: {status, result}
 ```
 
+### 統合シード機能フロー (POST /api/unified/start)
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant M as main.py
+    participant R as research_agent.py (Phase 1/2)
+    participant S as seed_service.py (Phase 3)
+    participant CF as Character Func (Phase 1)
+    participant F as Firestore
+
+    C->>M: POST /api/unified/start (画像)
+    M->>F: Unified Job 作成 (PROCESSING)
+    M->>F: Sub-Jobs 作成 (Research/Guide/Char)
+    M-->>C: {job_id, sub_job_ids...}
+
+    Note over M: BackgroundTask (Unified Runner)
+
+    par Phase 1: Character & Basic Analysis
+        M->>CF: キャラクター生成
+        CF->>F: Character Job 完了
+        M->>R: 基本解析 (Vegetable Name)
+        R->>F: Vegetable Doc 作成 (Status: researching)
+    end
+    
+    Note over M: Phase 1 完了待ち (await gather)
+
+    opt Phase 2: Deep Research
+        M->>R: perform_deep_research()
+        R->>F: Vegetable Doc 更新 (Status: completed)
+    end
+
+    opt Phase 3: Cultivation Guide
+        M->>S: process_seed_guide()
+        S->>F: Guide Job 完了
+    end
+
+    C->>M: GET /api/unified/jobs/{job_id}
+    M->>F: Unified Job & Sub-Jobs 状態取得
+    M-->>C: {job_status, research_status, guide_status, char_status}
+```
+
+#### 使用する Firestore コレクション
+
+この機能は複数のコレクションを横断してデータを管理します。
+
+| コレクション名 | ドキュメントID | 用途 |
+|--------------|---------------|------|
+| `unified_jobs` | UUID | 統合ジョブの全体ステータスとサブジョブIDの管理 |
+| `seed_guide_jobs` | UUID (prefix: `guide-`) | 栽培ガイド生成 (`guide-`) のジョブステータス・結果 |
+| `character_jobs` | UUID (prefix: `char-`) | キャラクター生成 (`char-`) のジョブステータス・結果 |
+| `vegetables` | UUID | 野菜の基本情報、Deep Research 結果、ステータス |
+| `growing_diaries` | `Character` (固定) | 生成された最新のキャラクター情報（エッジエージェント表示用） |
+
+
 ## 🧪 テスト
 
 ### テストの実行

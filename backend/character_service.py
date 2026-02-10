@@ -19,7 +19,7 @@ async def analyze_seed_and_generate_character(image_bytes: bytes):
     Analyzes a seed image, identifies the vegetable, and generates a character image.
     Uses Gemini 3 Pro (Text) and Gemini 3 Pro Image (nanoBanana).
     """
-    info(f"Starting character generation ({len(image_bytes)} bytes)")
+    info(f"[LLM] 🎭 Starting character generation ({len(image_bytes)} bytes)")
 
     # API Key Authentication
     api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("SEED_GUIDE_GEMINI_KEY")
@@ -36,29 +36,40 @@ async def analyze_seed_and_generate_character(image_bytes: bytes):
         import time
         import random
         base_delay = 2
-        max_retries = 5
+        max_delay = 15.0
+        max_retries = 100
+        max_elapsed_seconds = 1800  # 30 minutes
+        start_time = time.time()
         
         for attempt in range(max_retries):
+            elapsed = time.time() - start_time
+            if elapsed >= max_elapsed_seconds:
+                raise RuntimeError(f"API call failed: retry budget exceeded ({max_elapsed_seconds}s)")
             try:
                 response = requests.post(url, headers=headers, json=payload, timeout=60)
                 if response.status_code == 200:
                     return response
                 elif response.status_code == 429 or response.status_code >= 500:
-                    time.sleep((base_delay * (2 ** attempt)) + random.uniform(0, 1))
+                    delay = min(base_delay * (2 ** attempt), max_delay) + random.uniform(0, 1)
+                    warning(f"API {response.status_code}. Retrying in {delay:.1f}s... (attempt {attempt+1}/{max_retries}, elapsed={elapsed:.0f}s)")
+                    time.sleep(delay)
                     continue
                 else:
                     return response
-            except requests.exceptions.RequestException:
-                time.sleep((base_delay * (2 ** attempt)) + random.uniform(0, 1))
+            except requests.exceptions.RequestException as e:
+                delay = min(base_delay * (2 ** attempt), max_delay) + random.uniform(0, 1)
+                warning(f"Request error: {e}. Retrying in {delay:.1f}s... (attempt {attempt+1}/{max_retries}, elapsed={elapsed:.0f}s)")
+                time.sleep(delay)
         raise RuntimeError(f"API call failed after {max_retries} retries")
 
     # 1. Identify Vegetable & Character Personality (Gemini 3 Pro)
-    model_id = "gemini-3-pro-preview"
+    model_id = "gemini-3-flash-preview"
     image_b64 = base64.b64encode(image_bytes).decode('utf-8')
     
     prompt_text = """
     このタネの画像を分析し、何の植物か特定してください。
     そして、その植物をモチーフにした「ゆるキャラ」の設定を考えてください。
+    
     
     以下のJSON形式で出力してください:
     {
@@ -92,7 +103,7 @@ async def analyze_seed_and_generate_character(image_bytes: bytes):
             
         text_content = resp.json()['candidates'][0]['content']['parts'][0]['text']
         data = json.loads(text_content.strip())
-        info(f"Character identified: {data.get('character_name')}")
+        info(f"[LLM] ✅ Character identified: {data.get('character_name')}")
         
     except Exception as e:
         error(f"Character analysis failed: {e}")
@@ -102,7 +113,14 @@ async def analyze_seed_and_generate_character(image_bytes: bytes):
     img_model_id = "gemini-3-pro-image-preview" 
     img_url = f"https://generativelanguage.googleapis.com/v1beta/models/{img_model_id}:generateContent?key={api_key}"
     
-    img_prompt = f"Generate an image of ONE single {data['image_prompt']}, solo character, centered, cute mascot character, simple design, white background, high quality, no other characters, single subject"
+    img_prompt = (
+        f"Generate an image of exactly ONE single {data['image_prompt']}. "
+        "STRICT RULES: "
+        "1. The background MUST be pure white (#FFFFFF), no patterns, no gradients, no scenery. "
+        "2. There MUST be exactly ONE character only, no duplicates, no other characters, no companions. "
+        "Solo character, centered composition, cute mascot character, simple clean design, "
+        "high quality, digital art style, single subject, isolated on white background."
+    )
     img_payload = {
         "contents": [{ "role": "user", "parts": [{"text": img_prompt}] }],
         "generationConfig": {} 

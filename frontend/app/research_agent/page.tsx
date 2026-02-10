@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical, Droplets, Thermometer, Sun, Sprout, Check, Send, AlertCircle, ArrowRight, ArrowLeft, Search, ExternalLink } from "lucide-react";
+import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical, Droplets, Thermometer, Sun, Sprout, Check, Send, AlertCircle, ArrowRight, ArrowLeft, Search, ExternalLink, Trash2, ChevronRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import Link from "next/link";
+import { GroundingDisplay } from "@/components/grounding-display";
 
 interface Vegetable {
     id: string;
@@ -20,6 +21,8 @@ export default function ResearchDashboard() {
     const [uploading, setUploading] = useState(false);
     const [fileName, setFileName] = useState("Click to browse or drag file here");
     const [applyingToAgent, setApplyingToAgent] = useState(false);
+    const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
+    const [showRawReport, setShowRawReport] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Poll for data
@@ -56,7 +59,7 @@ export default function ResearchDashboard() {
         formData.append("file", fileInputRef.current.files[0]);
 
         try {
-            const res = await fetch("/api/register-seed", {
+            const res = await fetch(`/api/register-seed?research_mode=${researchMode}`, {
                 method: "POST",
                 body: formData,
             });
@@ -95,6 +98,19 @@ export default function ResearchDashboard() {
         }
     };
 
+    const handleDeleteVegetable = async (id: string) => {
+        if (!confirm("このリサーチデータを削除しますか？")) return;
+        try {
+            const res = await fetch(`/api/vegetables/${id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error("Delete failed");
+            if (selectedVeg?.id === id) setSelectedVeg(null);
+            fetchVegetables();
+        } catch (e) {
+            console.error(e);
+            alert("削除に失敗しました");
+        }
+    };
+
     const openModal = () => {
         setIsModalOpen(true);
         setFileName("Click to browse or drag file here");
@@ -129,7 +145,7 @@ export default function ResearchDashboard() {
         };
 
         Object.entries(instructions).forEach(([key, value]) => {
-            if (key === "original_analysis" || key === "name" || key === "volumetric_water_content" || key === "description") return;
+            if (key === "original_analysis" || key === "name" || key === "volumetric_water_content" || key === "description" || key === "raw_report" || key === "grounding_metadata") return;
 
             const lowerKey = key.toLowerCase();
             if (lowerKey.includes("water") || lowerKey.includes("soil") || lowerKey.includes("moisture") || lowerKey.includes("ph")) {
@@ -256,27 +272,39 @@ export default function ResearchDashboard() {
                                         }`}
                                     onClick={() => !isProcessing && setSelectedVeg(veg)}
                                 >
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-lg ${isProcessing ? "bg-amber-100 text-amber-600" :
-                                                isFailed ? "bg-red-100 text-red-600" :
-                                                    "bg-primary/10 text-primary"
+                                    <div className="flex justify-between items-start mb-4 gap-2">
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                            <div className={`p-2 rounded-lg shrink-0 ${isProcessing ? "bg-amber-100 text-amber-600" :
+                                                    isFailed ? "bg-red-100 text-red-600" :
+                                                        "bg-primary/10 text-primary"
                                                 }`}>
                                                 {isProcessing ? <Clock className="h-5 w-5" /> :
                                                     isFailed ? <AlertCircle className="h-5 w-5" /> :
                                                         <Sprout className="h-5 w-5" />}
                                             </div>
-                                            <div className="overflow-hidden">
+                                            <div className="min-w-0">
                                                 <h3 className="font-semibold text-lg leading-none truncate">{veg.name}</h3>
                                                 <p className="text-xs text-muted-foreground mt-1 truncate">ID: {veg.id.substring(0, 8)}</p>
                                             </div>
                                         </div>
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${isProcessing ? "bg-amber-50 text-amber-600 border-amber-200" :
-                                            isFailed ? "bg-red-50 text-red-600 border-red-200" :
-                                                "bg-blue-50 text-blue-600 border-blue-200"
-                                            }`}>
-                                            {isProcessing ? "ANALYZING" : isFailed ? "FAILED" : "READY"}
-                                        </span>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${isProcessing ? "bg-amber-50 text-amber-600 border-amber-200" :
+                                                isFailed ? "bg-red-50 text-red-600 border-red-200" :
+                                                    "bg-blue-50 text-blue-600 border-blue-200"
+                                                }`}>
+                                                {isProcessing ? "ANALYZING" : isFailed ? "FAILED" : "READY"}
+                                            </span>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteVegetable(veg.id);
+                                                }}
+                                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                aria-label="削除"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Progress Bar for Processing - Moved Inside Content */}
@@ -331,6 +359,31 @@ export default function ResearchDashboard() {
                                     className="hidden"
                                     onChange={handleFileChange}
                                 />
+                            </div>
+
+                            <div className="space-y-3 px-1">
+                                <p className="text-sm font-medium">Research Mode</p>
+                                <div className="flex gap-2 p-1 bg-muted rounded-lg">
+                                    <button
+                                        type="button"
+                                        onClick={() => setResearchMode("agent")}
+                                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${researchMode === "agent" ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                                    >
+                                        Deep Research (Agent)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setResearchMode("grounding")}
+                                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${researchMode === "grounding" ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                                    >
+                                        Web Grounding (Search)
+                                    </button>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground italic px-1">
+                                    {researchMode === "agent"
+                                        ? "徹底調査 (約2-3分): AIエージェントがWebを巡回して詳しく調査します"
+                                        : "高速調査 (約1分): Google検索結果を直接利用して信頼性の高い情報を素早く取得します"}
+                                </p>
                             </div>
 
                             <button
@@ -449,6 +502,33 @@ export default function ResearchDashboard() {
                                                 );
                                             });
                                         })()}
+                                        {/* Grounding Attribution */}
+                                        {selectedVeg.instructions.grounding_metadata && (
+                                            <GroundingDisplay metadata={selectedVeg.instructions.grounding_metadata} />
+                                        )}
+
+                                        {/* Raw Report Display */}
+                                        {selectedVeg.instructions.raw_report && (
+                                            <div className="mt-8 border-t border-border pt-6">
+                                                <button
+                                                    onClick={() => setShowRawReport(!showRawReport)}
+                                                    className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors w-full group uppercase tracking-wider"
+                                                >
+                                                    <div className={`p-1 rounded bg-muted group-hover:bg-muted/80 transition-colors ${showRawReport ? 'rotate-90' : ''}`}>
+                                                        <ChevronRight className="h-3 w-3 transition-transform" />
+                                                    </div>
+                                                    AIの調査レポート原文を表示
+                                                </button>
+
+                                                {showRawReport && (
+                                                    <div className="mt-4 p-5 bg-slate-900 rounded-xl overflow-x-auto border border-slate-800 shadow-inner animate-in fade-in slide-in-from-top-2 duration-300">
+                                                        <pre className="text-[10px] text-slate-300 font-mono leading-relaxed whitespace-pre-wrap">
+                                                            {selectedVeg.instructions.raw_report}
+                                                        </pre>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </>
                             ) : (
