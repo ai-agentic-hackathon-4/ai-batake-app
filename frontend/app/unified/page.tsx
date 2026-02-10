@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity } from 'lucide-react';
+import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search } from 'lucide-react';
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
+import { GroundingDisplay } from "@/components/grounding-display";
 
 // Types
 interface UnifiedJobStatus {
@@ -25,6 +26,9 @@ export default function UnifiedPage() {
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState<string>('');
     const [currentStep, setCurrentStep] = useState(0); // For carousel navigation
+    const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
+    const [showRawReport, setShowRawReport] = useState(false);
+
     // Poll for status
     useEffect(() => {
         if (!jobId) return
@@ -72,7 +76,7 @@ export default function UnifiedPage() {
         formData.append("file", file)
 
         try {
-            const res = await fetch("/api/unified/start", {
+            const res = await fetch(`/api/unified/start?research_mode=${researchMode}`, {
                 method: "POST",
                 body: formData,
             })
@@ -137,6 +141,21 @@ export default function UnifiedPage() {
                                     accept="image/*"
                                     onChange={handleFileChange}
                                 />
+                            </div>
+
+                            <div className="space-y-3 pb-2">
+                                <p className="text-sm font-medium text-slate-700">リサーチモードの選択</p>
+                                <Tabs value={researchMode} onValueChange={(val) => setResearchMode(val as any)} className="w-full">
+                                    <TabsList className="grid w-full grid-cols-2">
+                                        <TabsTrigger value="agent" className="text-xs">Deep Research</TabsTrigger>
+                                        <TabsTrigger value="grounding" className="text-xs">Web Grounding</TabsTrigger>
+                                    </TabsList>
+                                </Tabs>
+                                <p className="text-[10px] text-slate-400 text-center italic">
+                                    {researchMode === "agent"
+                                        ? "Deep Research: AIが時間をかけて徹底的に調査します (約2-3分)"
+                                        : "Web Grounding: 最新のGoogle検索結果を元に素早く回答します (約1分)"}
+                                </p>
                             </div>
 
                             {error && (
@@ -582,6 +601,34 @@ export default function UnifiedPage() {
                                                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                                                         <h3 className="font-semibold text-slate-800 mb-2">📋 詳細情報</h3>
                                                         <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{status.research.result.summary_prompt}</p>
+                                                    </div>
+                                                )}
+
+                                                {/* Grounding Attribution */}
+                                                {status.research.result.grounding_metadata && (
+                                                    <GroundingDisplay metadata={status.research.result.grounding_metadata} />
+                                                )}
+
+                                                {/* Raw Report Display */}
+                                                {status.research.result.raw_report && (
+                                                    <div className="mt-8 border-t border-slate-200 pt-6">
+                                                        <button
+                                                            onClick={() => setShowRawReport(!showRawReport)}
+                                                            className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors w-full group"
+                                                        >
+                                                            <div className={`p-1 rounded bg-slate-100 group-hover:bg-slate-200 transition-colors ${showRawReport ? 'rotate-90' : ''}`}>
+                                                                <ChevronRight className="h-3.5 w-3.5 transition-transform" />
+                                                            </div>
+                                                            AIの調査レポート原文を表示
+                                                        </button>
+
+                                                        {showRawReport && (
+                                                            <div className="mt-4 p-5 bg-slate-900 rounded-xl overflow-x-auto border border-slate-800 shadow-inner animate-in fade-in slide-in-from-top-2 duration-300">
+                                                                <pre className="text-xs text-slate-300 font-mono leading-relaxed whitespace-pre-wrap">
+                                                                    {status.research.result.raw_report}
+                                                                </pre>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>

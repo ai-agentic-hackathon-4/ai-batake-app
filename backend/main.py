@@ -47,7 +47,7 @@ try:
         get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs,
         get_all_seed_guides, save_seed_guide, get_seed_guide
     )
-    from .research_agent import analyze_seed_packet, perform_deep_research
+    from .research_agent import analyze_seed_packet, perform_deep_research, perform_web_grounding_research
     from .agent import get_weather_from_agent
 except ImportError:
     # When running directly as a script
@@ -57,7 +57,7 @@ except ImportError:
         get_sensor_history, get_recent_sensor_logs, get_agent_execution_logs,
         get_all_seed_guides, save_seed_guide, get_seed_guide
     )
-    from research_agent import analyze_seed_packet, perform_deep_research
+    from research_agent import analyze_seed_packet, perform_deep_research, perform_web_grounding_research
     from agent import get_weather_from_agent
 
 # Imports from feature/#5 (Async/New)
@@ -257,20 +257,25 @@ async def get_agent_logs_endpoint():
 
 # --- feature/#3 Endpoints (Research Agent UI Support) ---
 
-def process_research(doc_id: str, vegetable_name: str, analysis_data: dict):
+def process_research(doc_id: str, vegetable_name: str, analysis_data: dict, mode: str = "agent"):
     """
-    Background task to perform heavy deep research and update DB.
+    Background task to perform heavy research and update DB.
+    mode: "agent" (Deep Research Agent) or "grounding" (Google Search Grounding)
     """
     # Set a session ID for background task tracing
     task_session_id = f"bg-{doc_id[:8]}"
     set_session_id(task_session_id)
     set_request_id(generate_request_id())
     
-    info(f"[Background] Starting research for {vegetable_name} (ID: {doc_id})")
+    info(f"[Background] Starting research for {vegetable_name} (ID: {doc_id}, mode: {mode})")
     try:
-        # Perform Deep Research
-        debug(f"Calling perform_deep_research for {vegetable_name}")
-        research_result = perform_deep_research(vegetable_name, str(analysis_data))
+        # Perform Research based on mode
+        if mode == "grounding":
+            debug(f"Calling perform_web_grounding_research for {vegetable_name}")
+            research_result = perform_web_grounding_research(vegetable_name, str(analysis_data))
+        else:
+            debug(f"Calling perform_deep_research for {vegetable_name}")
+            research_result = perform_deep_research(vegetable_name, str(analysis_data))
         
         # Merge analysis data (like original instructions) if needed
         if isinstance(research_result, dict):
@@ -290,7 +295,7 @@ def process_research(doc_id: str, vegetable_name: str, analysis_data: dict):
         update_vegetable_status(doc_id, "failed", {"error": str(e)})
 
 @app.post("/api/register-seed")
-async def register_seed(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def register_seed(background_tasks: BackgroundTasks, file: UploadFile = File(...), research_mode: str = "agent"):
     """
     Receives image, starts async research, returns ID immediately.
     Used by Research Agent Dashboard.
@@ -322,7 +327,7 @@ async def register_seed(background_tasks: BackgroundTasks, file: UploadFile = Fi
         debug(f"Created document with ID: {doc_id}")
         
         # 3. Queue Background Task
-        background_tasks.add_task(process_research, doc_id, vegetable_name, analysis_data)
+        background_tasks.add_task(process_research, doc_id, vegetable_name, analysis_data, mode=research_mode)
         info(f"Background research task queued for {vegetable_name} (doc_id: {doc_id})")
         
         return {
@@ -1215,7 +1220,7 @@ async def get_character_image_endpoint(path: str):
 # --- Unified Seed Feature Endpoints ---
 
 @app.post("/api/unified/start")
-async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile = File(...), research_mode: str = "agent"):
     """
     Unified endpoint to start Research, Guide, and Character generation from a single image.
     """
@@ -1400,9 +1405,9 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
                 f"[Unified] phase2_3 start job={job_id} veg={veg_name}"
             )
 
-            info(f"[Unified][LLM] deep_research start job={job_id} research={research_doc_id}")
+            info(f"[Unified][LLM] deep_research start job={job_id} research={research_doc_id} mode={research_mode}")
             research_start_ts = time.time()
-            research_task = asyncio.to_thread(process_research, research_doc_id, veg_name, analysis_data)
+            research_task = asyncio.to_thread(process_research, research_doc_id, veg_name, analysis_data, mode=research_mode)
             guide_task = process_seed_guide(guide_job_id, blob_name)
             research_result, guide_result = await asyncio.gather(
                 research_task,
@@ -1494,9 +1499,21 @@ async def get_unified_job_status(job_id: str):
         if g_data:
             # Handle guide image proxying like in other endpoints if needed, but for now just raw
             # Guide endpoint logic:
-            if g_data.get("result") and isinstance(g_data["result"], list):
-                 pass
             results["guide"] = make_serializable(g_data)
+            
+            # Transform Step Image URLs to Proxy URLs
+            if results["guide"].get("result") and isinstance(results["guide"]["result"], list):
+                bucket_name = "ai-agentic-hackathon-4-bk"
+                prefix = f"https://storage.googleapis.com/{bucket_name}/"
+                
+                for step in results["guide"]["result"]:
+                    if isinstance(step, dict) and step.get("image_url"):
+                        gcs_uri = step["image_url"]
+                        if gcs_uri.startswith(prefix):
+                            blob_path = gcs_uri[len(prefix):]
+                            import urllib.parse
+                            encoded_path = urllib.parse.quote(blob_path)
+                            step["image_url"] = f"/api/character/image?path={encoded_path}"
         if c_data:
             # Transform image_uri to proxy URL if it's a GCS URL
             # The character document saves 'image_uri' but the result might have 'image_url' or 'image_uri'
