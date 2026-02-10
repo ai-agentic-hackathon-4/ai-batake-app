@@ -1453,6 +1453,8 @@ async def get_unified_job_status(job_id: str):
             # Normalize status to uppercase for frontend
             if "status" in r_data:
                 r_data["status"] = r_data["status"].upper()
+            # Include the research doc ID so frontend can apply it to edge agent
+            r_data["id"] = research_id
             results["research"] = make_serializable(r_data)
         if g_data:
             # Handle guide image proxying like in other endpoints if needed, but for now just raw
