@@ -746,6 +746,23 @@ async def list_characters():
     
     return jobs
 
+@app.post("/api/character/{job_id}/select")
+async def select_character_endpoint(job_id: str):
+    """Selects the specified character job results as the active character for the diary."""
+    info(f"Selecting character {job_id} for diary")
+    try:
+        from backend.db import select_character_for_diary as select_func
+    except ImportError:
+        from db import select_character_for_diary as select_func
+
+    success = select_func(job_id)
+    if not success:
+        warning(f"Failed to select character {job_id}")
+        raise HTTPException(status_code=404, detail="Failed to select character (not found or not completed).")
+    
+    info(f"Successfully selected character {job_id}")
+    return {"status": "success", "message": f"Diary character updated to {job_id}"}
+
 @app.get("/api/character")
 async def get_character():
     """

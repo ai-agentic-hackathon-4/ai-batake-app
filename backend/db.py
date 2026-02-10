@@ -466,6 +466,48 @@ def get_all_character_jobs():
         error(f"Error listing character jobs: {e}", exc_info=True)
         return []
 
+def select_character_for_diary(job_id: str) -> bool:
+    """
+    Selects a character from character_jobs and sets it as the active diary character.
+    """
+    if db is None: return False
+
+    try:
+        debug(f"Selecting character job {job_id} for diary")
+        doc_ref = db.collection("character_jobs").document(job_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            error(f"Character job {job_id} not found.")
+            return False
+            
+        job_data = doc.to_dict()
+        if job_data.get("status") != "COMPLETED":
+            error(f"Character job {job_id} is not completed.")
+            return False
+            
+        result = job_data.get("result")
+        if not result:
+            error(f"Character job {job_id} has no result.")
+            return False
+            
+        # Update growing_diaries/Character
+        char_doc_ref = db.collection("growing_diaries").document("Character")
+        char_doc_ref.set({
+            "name": result.get("character_name"),
+            "image_uri": result.get("image_url"), # Note: image_url in result is the GCS URL
+            "personality": result.get("personality"),
+            "updated_at": firestore.SERVER_TIMESTAMP,
+            "selected_from_job_id": job_id
+        }, merge=True)
+        
+        info(f"Successfully selected character {result.get('character_name')} for diary (from job {job_id})")
+        return True
+        
+    except Exception as e:
+        error(f"Error selecting character for diary: {e}", exc_info=True)
+        return False
+
 def get_edge_agent_config() -> dict:
     """
     Retrieves the current edge agent configuration from Firestore.

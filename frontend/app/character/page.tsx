@@ -28,6 +28,8 @@ export default function CharacterPage() {
     const [character, setCharacter] = useState<CharacterResult | null>(null);
     const [savedCharacters, setSavedCharacters] = useState<any[]>([]);
     const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+    const [activeCharJobId, setActiveCharJobId] = useState<string | null>(null);
+    const [isSelecting, setIsSelecting] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     // Animation states
@@ -58,6 +60,43 @@ export default function CharacterPage() {
             console.error("Failed to fetch characters", err);
         } finally {
             setIsLoadingSaved(false);
+        }
+    };
+
+    const fetchActiveCharacter = async () => {
+        try {
+            const res = await fetch('/api/character');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.selected_from_job_id) {
+                    setActiveCharJobId(data.selected_from_job_id);
+                }
+            }
+        } catch (err) {
+            console.error("Failed to fetch active character", err);
+        }
+    };
+
+    useEffect(() => {
+        fetchActiveCharacter();
+    }, []);
+
+    const handleSelectCharacter = async (jobId: string) => {
+        setIsSelecting(jobId);
+        try {
+            const res = await fetch(`/api/character/${jobId}/select`, {
+                method: 'POST',
+            });
+            if (res.ok) {
+                setActiveCharJobId(jobId);
+            } else {
+                const data = await res.json();
+                setError(data.detail || "選択に失敗しました");
+            }
+        } catch (err) {
+            setError("通信エラーが発生しました");
+        } finally {
+            setIsSelecting(null);
         }
     };
 
@@ -383,8 +422,16 @@ export default function CharacterPage() {
                             {savedCharacters.map((job) => {
                                 const char = job.result;
                                 if (!char) return null;
+                                const isSelected = activeCharJobId === job.id;
+
                                 return (
-                                    <Card key={job.id} className="group hover:shadow-xl transition-all duration-300 border-none bg-white/60 backdrop-blur overflow-hidden flex flex-col h-full transform hover:-translate-y-1">
+                                    <Card
+                                        key={job.id}
+                                        className={cn(
+                                            "group hover:shadow-xl transition-all duration-300 border-2 bg-white/60 backdrop-blur overflow-hidden flex flex-col h-full transform hover:-translate-y-1",
+                                            isSelected ? "border-green-500 ring-2 ring-green-200" : "border-transparent"
+                                        )}
+                                    >
                                         <div className="relative aspect-square overflow-hidden bg-white">
                                             <img
                                                 src={char.image_url || char.image_uri || `data:image/jpeg;base64,${char.image_base64}`}
@@ -394,14 +441,44 @@ export default function CharacterPage() {
                                             <div className="absolute top-2 right-2 bg-white/90 backdrop-blur rounded-full px-3 py-1 text-[10px] font-bold text-green-700 shadow-sm border border-green-100">
                                                 {char.name}
                                             </div>
+                                            {isSelected && (
+                                                <div className="absolute inset-0 bg-green-500/10 flex items-center justify-center pointer-events-none">
+                                                    <div className="bg-green-500 text-white px-4 py-1 rounded-full text-xs font-bold shadow-lg transform -rotate-12 animate-in zoom-in duration-300">
+                                                        使用中
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                         <CardContent className="p-5 flex flex-col flex-1">
-                                            <h3 className="text-lg font-black text-gray-800 mb-2 truncate">
-                                                {char.character_name}
-                                            </h3>
-                                            <p className="text-sm text-gray-600 font-medium leading-relaxed italic line-clamp-2">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h3 className="text-lg font-black text-gray-800 truncate">
+                                                    {char.character_name}
+                                                </h3>
+                                            </div>
+                                            <p className="text-sm text-gray-600 font-medium leading-relaxed italic line-clamp-2 mb-4">
                                                 "{char.personality}"
                                             </p>
+
+                                            <div className="mt-auto pt-4 border-t border-gray-100">
+                                                <button
+                                                    onClick={() => handleSelectCharacter(job.id)}
+                                                    disabled={isSelected || !!isSelecting}
+                                                    className={cn(
+                                                        "w-full py-2 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-2",
+                                                        isSelected
+                                                            ? "bg-green-100 text-green-700 cursor-default"
+                                                            : "bg-gray-100 text-gray-700 hover:bg-green-500 hover:text-white"
+                                                    )}
+                                                >
+                                                    {isSelecting === job.id ? (
+                                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                                    ) : isSelected ? (
+                                                        <>日記で使用中</>
+                                                    ) : (
+                                                        <>この子を日記で使う</>
+                                                    )}
+                                                </button>
+                                            </div>
                                         </CardContent>
                                     </Card>
                                 );
