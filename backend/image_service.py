@@ -99,30 +99,36 @@ def generate_picture_diary(date_str: str, summary: str):
 
         # 2. Download Reference image from GCS
         # Resolve character image path from Firestore (selected character)
+        # Use the shared db client from db.py which has the correct project/database config
         character_image_path = DEFAULT_CHARACTER_IMAGE_PATH
         try:
-            from google.cloud.firestore import Client as SyncFirestoreClient
-            sync_db = SyncFirestoreClient()
-            char_doc = sync_db.collection("growing_diaries").document("Character").get()
-            if char_doc.exists:
-                char_data = char_doc.to_dict()
-                image_uri = char_data.get("image_uri", "")
-                if image_uri:
-                    # Convert GCS URL or gs:// URI to blob path
-                    gcs_https_prefix = f"https://storage.googleapis.com/{BUCKET_NAME}/"
-                    gs_prefix = f"gs://{BUCKET_NAME}/"
-                    if image_uri.startswith(gcs_https_prefix):
-                        character_image_path = image_uri[len(gcs_https_prefix):]
-                        info(f"Using selected character image: {character_image_path}")
-                    elif image_uri.startswith(gs_prefix):
-                        character_image_path = image_uri[len(gs_prefix):]
-                        info(f"Using selected character image (gs): {character_image_path}")
-                    else:
-                        info(f"image_uri format unknown, using default: {image_uri}")
-                else:
-                    info("No image_uri in Character doc, using default character image.")
+            from .db import db as firestore_db
+        except ImportError:
+            from db import db as firestore_db
+        try:
+            if firestore_db is None:
+                info("Firestore not available, using default character image.")
             else:
-                info("No Character doc in Firestore, using default character image.")
+                char_doc = firestore_db.collection("growing_diaries").document("Character").get()
+                if char_doc.exists:
+                    char_data = char_doc.to_dict()
+                    image_uri = char_data.get("image_uri", "")
+                    if image_uri:
+                        # Convert GCS URL or gs:// URI to blob path
+                        gcs_https_prefix = f"https://storage.googleapis.com/{BUCKET_NAME}/"
+                        gs_prefix = f"gs://{BUCKET_NAME}/"
+                        if image_uri.startswith(gcs_https_prefix):
+                            character_image_path = image_uri[len(gcs_https_prefix):]
+                            info(f"Using selected character image: {character_image_path}")
+                        elif image_uri.startswith(gs_prefix):
+                            character_image_path = image_uri[len(gs_prefix):]
+                            info(f"Using selected character image (gs): {character_image_path}")
+                        else:
+                            info(f"image_uri format unknown, using default: {image_uri}")
+                    else:
+                        info("No image_uri in Character doc, using default character image.")
+                else:
+                    info("No Character doc in Firestore, using default character image.")
         except Exception as e:
             warning(f"Failed to fetch selected character from Firestore, using default: {e}")
 
