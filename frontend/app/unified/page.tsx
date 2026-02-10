@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity } from 'lucide-react';
+import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search } from 'lucide-react';
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
+import { GroundingDisplay } from "@/components/grounding-display";
 
 // Types
 interface UnifiedJobStatus {
@@ -600,6 +601,11 @@ export default function UnifiedPage() {
                                                         <h3 className="font-semibold text-slate-800 mb-2">📋 詳細情報</h3>
                                                         <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{status.research.result.summary_prompt}</p>
                                                     </div>
+                                                )}
+
+                                                {/* Grounding Attribution */}
+                                                {status.research.result.grounding_metadata && (
+                                                    <GroundingDisplay metadata={status.research.result.grounding_metadata} />
                                                 )}
                                             </div>
                                         ) : (

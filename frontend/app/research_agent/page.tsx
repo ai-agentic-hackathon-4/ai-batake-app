@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical, Droplets, Thermometer, Sun, Sprout, Check, Send, AlertCircle, ArrowRight, ArrowLeft, Search, ExternalLink, Trash2 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import Link from "next/link";
+import { GroundingDisplay } from "@/components/grounding-display";
 
 interface Vegetable {
     id: string;
@@ -500,6 +501,10 @@ export default function ResearchDashboard() {
                                                 );
                                             });
                                         })()}
+                                        {/* Grounding Attribution */}
+                                        {selectedVeg.instructions.grounding_metadata && (
+                                            <GroundingDisplay metadata={selectedVeg.instructions.grounding_metadata} />
+                                        )}
                                     </div>
                                 </>
                             ) : (

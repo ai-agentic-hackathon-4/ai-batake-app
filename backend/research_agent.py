@@ -146,11 +146,13 @@ def analyze_seed_packet(image_bytes: bytes) -> str:
         error(f"Error in analyze_seed_packet: {e}", exc_info=True)
         return '{"name": "不明な野菜", "visible_instructions": "API Error"}'
 
-def extract_structured_research_data(vegetable_name: str, report_text: str, query_param: str, headers: dict) -> dict:
+def extract_structured_research_data(vegetable_name: str, report_text: str, query_param: str, headers: dict, grounding_metadata: dict = None) -> dict:
     """
     調査レポートから、アプリで利用しやすいJSON形式のデータを抽出します。
     """
     info(f"Extracting structured data for {vegetable_name}")
+    # Raw report logging
+    debug(f"Raw report for extraction ({vegetable_name}):\n{report_text}")
     extraction_prompt = f"""
     以下の調査レポートに基づいて、野菜「{vegetable_name}」の育て方情報を抽出してJSON形式でまとめてください。
     特にsummary_promptには最適な気温、湿度、土壌水分量、水やり頻度、日照条件について数値を含めてこれだけで野菜を育てることができるほど詳しく記載してください。
@@ -187,6 +189,12 @@ def extract_structured_research_data(vegetable_name: str, report_text: str, quer
         gen_data = gen_resp.json()
         extracted_text = gen_data['candidates'][0]['content']['parts'][0]['text']
         result = json.loads(extracted_text)
+        
+        # Preserve original report and metadata
+        result["raw_report"] = report_text
+        if grounding_metadata:
+            result["grounding_metadata"] = grounding_metadata
+            
         info(f"Successfully extracted research data for {vegetable_name}")
         return result
     except Exception as e:
@@ -240,11 +248,16 @@ def perform_web_grounding_research(vegetable_name: str, packet_info: str) -> dic
                 return {"name": vegetable_name, "error": "Empty response from AI"}
             
             grounding_text = candidates[0]['content']['parts'][0]['text']
+            grounding_metadata = candidates[0].get("groundingMetadata")
+            
+            # Log raw response for traceability
+            debug(f"Full Web Grounding Response for {vegetable_name}: {json.dumps(data, ensure_ascii=False)}")
+            
             info(f"Web Grounding research completed for {vegetable_name}")
             
             # AI Studio のクエリパラメータを使用して構造化データを抽出 (互換性のため)
             _, studio_query_param = get_auth_headers()
-            return extract_structured_research_data(vegetable_name, grounding_text, studio_query_param, headers)
+            return extract_structured_research_data(vegetable_name, grounding_text, studio_query_param, headers, grounding_metadata=grounding_metadata)
             
         except (KeyError, IndexError) as e:
             error(f"Failed to parse Web Grounding response: {e}, Data: {data}")
