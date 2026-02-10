@@ -444,10 +444,9 @@ def get_all_character_jobs():
 
     try:
         debug("Fetching character jobs from Firestore")
-        # character_jobs collection is used in main.py
+        # Fetch only by status (single-field query, no composite index needed)
         docs = db.collection("character_jobs")\
             .where("status", "==", "COMPLETED")\
-            .order_by("created_at", direction=firestore.Query.DESCENDING)\
             .stream()
             
         results = []
@@ -460,6 +459,8 @@ def get_all_character_jobs():
             if 'updated_at' in d and hasattr(d['updated_at'], 'isoformat'):
                 d['updated_at'] = d['updated_at'].isoformat()
             results.append(d)
+        # Sort client-side by created_at descending
+        results.sort(key=lambda x: x.get('created_at', ''), reverse=True)
         debug(f"Retrieved {len(results)} character jobs")
         return results
     except Exception as e:
