@@ -21,7 +21,6 @@ logger = get_logger()
 
 # Configuration
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "ai-agentic-hackathon-4")
-LOCATION =  "us-central1"
 API_ENDPOINT = "aiplatform.googleapis.com"
 
 def get_access_token():
@@ -92,10 +91,10 @@ UNIFIED_STYLE = "soft digital illustration, warm sunlight, gentle pastel colors,
 def process_step(args):
     """Generates image for a single step (Parallel Execution Helper)"""
     # args tuple unpacking needed because map passes one argument
-    step, img_url, headers = args
+    step, primary_img_url, fallback_img_url, headers = args
     
     # Small start jitter to avoid hitting rate limit exactly simultaneously
-    time.sleep(random.uniform(0, 1.0))
+    time.sleep(random.uniform(0.5, 1.5))
     
     debug(f"Generating Image for step: {step['step_title']}")
     
@@ -107,16 +106,54 @@ def process_step(args):
     }
     
     try:
-        img_response = call_api_with_backoff(img_url, img_payload, headers, max_retries=10)
+        img_response = call_api_with_backoff(
+            primary_img_url,
+            img_payload,
+            headers,
+            max_retries=6,
+            max_elapsed_seconds=90,
+            base_delay=1.5,
+            max_delay=8.0,
+        )
         
         if img_response.status_code != 200:
-            warning(f"Image generation failed for '{step['step_title']}': {img_response.status_code}")
-            return {
-                "title": step['step_title'],
-                "description": step['description'],
-                "image_base64": None,
-                "error": f"API Error: {img_response.status_code}"
-            }
+            warning(
+                f"Image generation failed for '{step['step_title']}' (primary): "
+                f"{img_response.status_code}"
+            )
+            if fallback_img_url:
+                try:
+                    warning(
+                        f"Retrying image generation with fallback model for "
+                        f"'{step['step_title']}'"
+                    )
+                    img_response = call_api_with_backoff(
+                        fallback_img_url,
+                        img_payload,
+                        headers,
+                        max_retries=4,
+                        max_elapsed_seconds=60,
+                        base_delay=1.5,
+                        max_delay=8.0,
+                    )
+                except Exception as e:
+                    warning(
+                        f"Fallback image generation failed for '{step['step_title']}': {e}"
+                    )
+                    return {
+                        "title": step['step_title'],
+                        "description": step['description'],
+                        "image_base64": None,
+                        "error": f"API Error: {img_response.status_code}"
+                    }
+
+            if img_response.status_code != 200:
+                return {
+                    "title": step['step_title'],
+                    "description": step['description'],
+                    "image_base64": None,
+                    "error": f"API Error: {img_response.status_code}"
+                }
         else:
             img_resp_json = img_response.json()
             try:
@@ -160,15 +197,15 @@ def process_step(args):
             "error": f"Request Failed: {str(e)}"
         }
 
-def _generate_images_parallel(steps, img_url, headers):
+def _generate_images_parallel(steps, primary_img_url, fallback_img_url, headers):
     """Sync function to handle parallel execution waiting."""
     info(f"Starting parallel image generation for {len(steps)} steps...")
     
     # Prepare args for map
     # We need to pass img_url and headers to each thread
-    map_args = [(step, img_url, headers) for step in steps]
+    map_args = [(step, primary_img_url, fallback_img_url, headers) for step in steps]
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         # map preserves the order of results corresponding to 'steps'
         final_steps = list(executor.map(process_step, map_args))
         
@@ -314,17 +351,28 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
 
     if progress_callback: await progress_callback(f"🎨 Generating illustrations for {len(steps)} steps (Nanobanana Pro)...")
 
-    # 2. Generate Images with Nanobanana Pro (gemini-3-pro-image-preview)
-    img_model_id = "gemini-3-pro-image-preview" 
+    # 2. Generate Images with primary model + fallback
+    primary_img_model_id = "gemini-3-pro-image-preview"
+    fallback_img_model_id = "gemini-2.5-flash-image"
     
     # Url: https://aiplatform.googleapis.com/v1/publishers/google/models/{img_model_id}:generateContent?key={API_KEY}
-    img_url = (
+    primary_img_url = (
         f"https://{API_ENDPOINT}/v1/publishers/google/"
-        f"models/{img_model_id}:generateContent?key={api_key}"
+        f"models/{primary_img_model_id}:generateContent?key={api_key}"
+    )
+    fallback_img_url = (
+        f"https://{API_ENDPOINT}/v1/publishers/google/"
+        f"models/{fallback_img_model_id}:generateContent?key={api_key}"
     )
     
     # Offload parallel image generation to thread
-    final_steps = await asyncio.to_thread(_generate_images_parallel, steps, img_url, headers)
+    final_steps = await asyncio.to_thread(
+        _generate_images_parallel,
+        steps,
+        primary_img_url,
+        fallback_img_url,
+        headers
+    )
     
     successful_images = sum(1 for step in final_steps if step.get('image_base64'))
     info(f"Guide generation complete: {len(final_steps)} steps, {successful_images} images generated")

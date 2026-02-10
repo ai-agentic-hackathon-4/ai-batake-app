@@ -366,6 +366,17 @@ async def list_vegetables():
     info(f"Retrieved {len(result)} vegetables")
     return result
 
+@app.delete("/api/vegetables/{doc_id}")
+async def delete_vegetable(doc_id: str):
+    """Deletes a vegetable research document."""
+    try:
+        await db.collection("vegetables").document(doc_id).delete()
+        info(f"Deleted vegetable doc: {doc_id}")
+        return {"status": "success", "id": doc_id}
+    except Exception as e:
+        error(f"Failed to delete vegetable {doc_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/plant-camera/latest")
 async def get_latest_plant_image():
     try:
@@ -907,6 +918,17 @@ async def get_saved_guide(doc_id: str):
     except Exception as e:
         error(f"Failed to get guide: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get guide: {str(e)}")
+
+@app.delete("/api/seed-guide/saved/{doc_id}")
+async def delete_saved_guide(doc_id: str):
+    """Deletes a saved seed guide document."""
+    try:
+        await db.collection(COLLECTION_NAME).document(doc_id).delete()
+        info(f"Deleted seed guide doc: {doc_id}")
+        return {"status": "success", "id": doc_id}
+    except Exception as e:
+        error(f"Failed to delete guide {doc_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- Diary Endpoints ---
 

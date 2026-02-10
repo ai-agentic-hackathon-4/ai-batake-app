@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical, Droplets, Thermometer, Sun, Sprout, Check, Send, AlertCircle, ArrowRight, ArrowLeft, Search, ExternalLink } from "lucide-react";
+import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical, Droplets, Thermometer, Sun, Sprout, Check, Send, AlertCircle, ArrowRight, ArrowLeft, Search, ExternalLink, Trash2 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import Link from "next/link";
 
@@ -92,6 +92,19 @@ export default function ResearchDashboard() {
             alert("An error occurred.");
         } finally {
             setApplyingToAgent(false);
+        }
+    };
+
+    const handleDeleteVegetable = async (id: string) => {
+        if (!confirm("このリサーチデータを削除しますか？")) return;
+        try {
+            const res = await fetch(`/api/vegetables/${id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error("Delete failed");
+            if (selectedVeg?.id === id) setSelectedVeg(null);
+            fetchVegetables();
+        } catch (e) {
+            console.error(e);
+            alert("削除に失敗しました");
         }
     };
 
@@ -271,12 +284,24 @@ export default function ResearchDashboard() {
                                                 <p className="text-xs text-muted-foreground mt-1 truncate">ID: {veg.id.substring(0, 8)}</p>
                                             </div>
                                         </div>
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${isProcessing ? "bg-amber-50 text-amber-600 border-amber-200" :
-                                            isFailed ? "bg-red-50 text-red-600 border-red-200" :
-                                                "bg-blue-50 text-blue-600 border-blue-200"
-                                            }`}>
-                                            {isProcessing ? "ANALYZING" : isFailed ? "FAILED" : "READY"}
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${isProcessing ? "bg-amber-50 text-amber-600 border-amber-200" :
+                                                isFailed ? "bg-red-50 text-red-600 border-red-200" :
+                                                    "bg-blue-50 text-blue-600 border-blue-200"
+                                                }`}>
+                                                {isProcessing ? "ANALYZING" : isFailed ? "FAILED" : "READY"}
+                                            </span>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteVegetable(veg.id);
+                                                }}
+                                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                aria-label="削除"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Progress Bar for Processing - Moved Inside Content */}

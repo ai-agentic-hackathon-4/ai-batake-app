@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { Upload, ArrowLeft, ArrowRight, Sprout, AlertCircle, Loader2, BookOpen, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Upload, ArrowLeft, ArrowRight, Sprout, AlertCircle, Loader2, BookOpen, Clock, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from 'next/link';
@@ -136,6 +136,22 @@ export default function SeedGuidePage() {
         }
     };
 
+    const handleDeleteGuide = async (id: string) => {
+        if (!confirm("この栽培ガイドを削除しますか？")) return;
+        try {
+            const res = await fetch(`/api/seed-guide/saved/${id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error("Delete failed");
+            if (selectedGuide?.id === id) {
+                setSelectedGuide(null);
+                setViewMode('list');
+            }
+            fetchSavedGuides();
+        } catch (e) {
+            console.error(e);
+            setError("削除に失敗しました");
+        }
+    };
+
     const handleNext = () => {
         if (!selectedGuide) return;
         if (currentStepIndex < (selectedGuide.steps?.length || 0) - 1) {
@@ -228,7 +244,19 @@ export default function SeedGuidePage() {
                                     <Card key={guide.id} className="hover:shadow-md transition-shadow cursor-pointer border-border" onClick={() => handleSelectGuide(guide)}>
                                         <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
                                             <CardTitle className="text-lg truncate pr-2">{guide.title || "無題のガイド"}</CardTitle>
-                                            <div className="shrink-0">{getStatusBadge(guide.status)}</div>
+                                            <div className="shrink-0 flex items-center gap-2">
+                                                {getStatusBadge(guide.status)}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteGuide(guide.id);
+                                                    }}
+                                                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                    aria-label="削除"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
                                         </CardHeader>
                                         <CardContent>
                                             <p className="text-sm text-muted-foreground mb-4 line-clamp-2 h-10">
@@ -412,6 +440,12 @@ export default function SeedGuidePage() {
                                             </button>
 
                                             <div className="flex gap-3">
+                                                <button
+                                                    onClick={() => handleDeleteGuide(selectedGuide.id)}
+                                                    className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-red-200 text-red-600 bg-red-50 shadow-sm hover:bg-red-100 h-10 px-4 py-2"
+                                                >
+                                                    <Trash2 className="h-4 w-4" /> 削除
+                                                </button>
                                                 <button
                                                     onClick={() => setViewMode('list')}
                                                     className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 gap-2"
