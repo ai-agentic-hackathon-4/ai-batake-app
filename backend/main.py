@@ -1393,6 +1393,7 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
                         # We use the research_doc_id in "vegetables" collection
                         # Structure it inside 'result' so frontend checks pass
                         await db.collection("vegetables").document(research_doc_id).set({
+                            "name": vegetable_name,
                             "result": {
                                 "name": vegetable_name,
                                 "difficulty_level": analysis_data.get("difficulty_level"),
