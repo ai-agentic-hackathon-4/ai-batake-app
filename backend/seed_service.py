@@ -108,80 +108,77 @@ def process_step(args):
     img_prompt = f"Generate an image of {step['image_prompt']}, {UNIFIED_STYLE}"
     img_payload = {
         "contents": [{ "role": "user", "parts": [{"text": img_prompt}] }],
-        "generationConfig": {} # responseMimeType removed
+        "generationConfig": {}
     }
     
+    img_response = None
+    
     try:
-        img_response = call_api_with_backoff(
-            primary_img_url,
-            img_payload,
-            headers,
-            max_retries=6,
-            max_elapsed_seconds=90,
-            base_delay=1.5,
-            max_delay=8.0,
-        )
-        
-        if img_response.status_code != 200:
-            warning(
-                f"Image generation failed for '{step['step_title']}' (primary): "
-                f"{img_response.status_code}"
+        # --- Primary Model ---
+        try:
+            img_response = call_api_with_backoff(
+                primary_img_url,
+                img_payload,
+                headers,
+                max_retries=6,
+                max_elapsed_seconds=90,
+                base_delay=1.5,
+                max_delay=8.0,
             )
-            if fallback_img_url:
-                try:
-                    warning(
-                        f"Retrying image generation with fallback model for "
-                        f"'{step['step_title']}'"
-                    )
-                    img_response = call_api_with_backoff(
-                        fallback_img_url,
-                        img_payload,
-                        headers,
-                        max_retries=4,
-                        max_elapsed_seconds=60,
-                        base_delay=1.5,
-                        max_delay=8.0,
-                    )
-                except Exception as e:
-                    warning(
-                        f"Fallback image generation failed for '{step['step_title']}': {e}"
-                    )
-                    # Don't return yet, try tertiary fallback
+            if img_response.status_code != 200:
+                warning(f"Image generation failed for '{step['step_title']}' (primary): {img_response.status_code}")
+                img_response = None
+        except Exception as e:
+            warning(f"Primary model exception for '{step['step_title']}': {e}")
+            img_response = None
 
-            # Tertiary Fallback: Flash with Simplified Prompt
-            if not img_response or img_response.status_code != 200:
-                try:
-                    warning(
-                        f"Primary and Fallback failed. Trying Tertiary (Flash + Simple Prompt) for '{step['step_title']}'"
-                    )
-                    # Simplified prompt to avoid safety filters or parsing issues
-                    simple_prompt = f"A simple digital illustration of gardening, {step['step_title']}, clean white background"
-                    simple_payload = {
-                        "contents": [{ "role": "user", "parts": [{"text": simple_prompt}] }],
-                        "generationConfig": {}
-                    }
-                    img_response = call_api_with_backoff(
-                        fallback_img_url,
-                        simple_payload,
-                        headers,
-                        max_retries=3,
-                        max_elapsed_seconds=45,
-                        base_delay=1.0,
-                        max_delay=5.0,
-                    )
-                except Exception as e:
-                    warning(f"Tertiary fallback failed for '{step['step_title']}': {e}")
+        # --- Fallback Model ---
+        if img_response is None and fallback_img_url:
+            try:
+                warning(f"Retrying with fallback model for '{step['step_title']}'")
+                img_response = call_api_with_backoff(
+                    fallback_img_url,
+                    img_payload,
+                    headers,
+                    max_retries=4,
+                    max_elapsed_seconds=60,
+                    base_delay=1.5,
+                    max_delay=8.0,
+                )
+                if img_response.status_code != 200:
+                    warning(f"Fallback also failed for '{step['step_title']}': {img_response.status_code}")
+                    img_response = None
+            except Exception as e:
+                warning(f"Fallback image generation failed for '{step['step_title']}': {e}")
+                img_response = None
 
-            # Final check before parsing
-            if not img_response or img_response.status_code != 200:
-                warning(f"All AI generation attempts failed for '{step['step_title']}'. Using placeholder.")
-                return {
-                    "title": step['step_title'],
-                    "description": step['description'],
-                    "image_base64": DEFAULT_PLACEHOLDER_B64,
-                    "error": "All generation attempts failed, used placeholder"
+        # --- Tertiary Fallback: Flash with Simplified Prompt ---
+        if img_response is None and fallback_img_url:
+            try:
+                warning(f"Trying Tertiary (Flash + Simple Prompt) for '{step['step_title']}'")
+                simple_prompt = f"A simple digital illustration of gardening, {step['step_title']}, clean white background"
+                simple_payload = {
+                    "contents": [{ "role": "user", "parts": [{"text": simple_prompt}] }],
+                    "generationConfig": {}
                 }
-        else:
+                img_response = call_api_with_backoff(
+                    fallback_img_url,
+                    simple_payload,
+                    headers,
+                    max_retries=3,
+                    max_elapsed_seconds=45,
+                    base_delay=1.0,
+                    max_delay=5.0,
+                )
+                if img_response.status_code != 200:
+                    warning(f"Tertiary also failed for '{step['step_title']}': {img_response.status_code}")
+                    img_response = None
+            except Exception as e:
+                warning(f"Tertiary fallback failed for '{step['step_title']}': {e}")
+                img_response = None
+
+        # --- Parse the successful response (whichever model succeeded) ---
+        if img_response is not None and img_response.status_code == 200:
             img_resp_json = img_response.json()
             try:
                 parts = img_resp_json['candidates'][0]['content']['parts']
@@ -200,20 +197,17 @@ def process_step(args):
                     }
                 else:
                     warning(f"No inline image data for step: {step['step_title']}. Using placeholder.")
-                    return {
-                        "title": step['step_title'],
-                        "description": step['description'],
-                        "image_base64": DEFAULT_PLACEHOLDER_B64,
-                        "error": "No image data returned from AI"
-                    }
             except Exception as e:
                 error(f"Failed to parse image response for '{step['step_title']}': {e}")
-                return {
-                    "title": step['step_title'],
-                    "description": step['description'],
-                    "image_base64": DEFAULT_PLACEHOLDER_B64,
-                    "error": f"Parse Error: {str(e)}"
-                }
+
+        # --- All attempts failed or parsing failed: use placeholder ---
+        warning(f"All AI generation attempts exhausted for '{step['step_title']}'. Using placeholder.")
+        return {
+            "title": step['step_title'],
+            "description": step['description'],
+            "image_base64": DEFAULT_PLACEHOLDER_B64,
+            "error": "All generation attempts failed, used placeholder"
+        }
 
     except Exception as e:
         error(f"Image request failed for '{step['step_title']}': {e}")
@@ -370,8 +364,8 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
     # 2. Generate Images based on selected model
     if image_model == "flash":
         primary_img_model_id = "gemini-2.5-flash-image"
-        fallback_img_model_id = None # No fallback if flash fails (or could swap to pro, but usually flash is more available)
-        model_name_for_log = "Gemini 2.5 Flash Image"
+        fallback_img_model_id = "gemini-3-pro-image-preview"  # Fallback to Pro if Flash fails
+        model_name_for_log = "Gemini 2.5 Flash Image (with Pro fallback)"
     else:
         # Default to pro
         primary_img_model_id = "gemini-3-pro-image-preview"
