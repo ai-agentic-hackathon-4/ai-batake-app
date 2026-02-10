@@ -757,6 +757,58 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
             "message": str(e)
         })
 
+@app.get("/api/character/jobs/{job_id}")
+async def get_character_job_status(job_id: str):
+    """Polls the status of a character generation job from Firestore."""
+    try:
+        debug(f"Fetching character job status: {job_id}")
+        doc_ref = db.collection("character_jobs").document(job_id)
+        doc = await doc_ref.get()
+        
+        if not doc.exists:
+            warning(f"Character job not found: {job_id}")
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        job_data = doc.to_dict()
+        
+        def make_serializable(obj):
+            if isinstance(obj, dict):
+                return {k: make_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_serializable(v) for v in obj]
+            elif hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            elif isinstance(obj, (str, int, float, bool, type(None))):
+                return obj
+            else:
+                return str(obj)
+
+        job_data = make_serializable(job_data)
+        
+        # Proxy GCS image URL if present
+        if "result" in job_data and isinstance(job_data["result"], dict):
+            res = job_data["result"]
+            if res.get("image_url") and res["image_url"].startswith("https://storage.googleapis.com/"):
+                gcs_uri = res["image_url"]
+                bucket_name = "ai-agentic-hackathon-4-bk"
+                prefix = f"https://storage.googleapis.com/{bucket_name}/"
+                
+                if gcs_uri.startswith(prefix):
+                    blob_path = gcs_uri[len(prefix):]
+                    import urllib.parse
+                    encoded_path = urllib.parse.quote(blob_path)
+                    res["image_url"] = f"/api/character/image?path={encoded_path}"
+                    if "image_base64" in res:
+                        del res["image_base64"]
+
+        debug(f"Character job {job_id} status: {job_data.get('status')}")
+        return job_data
+    except HTTPException:
+        raise
+    except Exception as e:
+        error(f"Failed to fetch character job {job_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 @app.get("/api/character/list")
 async def list_characters():
     """Returns a list of all completed character jobs."""
@@ -1435,6 +1487,7 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
                         # We use the research_doc_id in "vegetables" collection
                         # Structure it inside 'result' so frontend checks pass
                         await db.collection("vegetables").document(research_doc_id).set({
+                            "name": vegetable_name,
                             "result": {
                                 "name": vegetable_name,
                                 "difficulty_level": analysis_data.get("difficulty_level"),
