@@ -19,6 +19,22 @@ interface UnifiedJobStatus {
     character: { status: string; result?: any; error?: string }
 }
 
+const getProxiedImageUrl = (url?: string) => {
+    if (!url) return "";
+    if (url.startsWith("https://storage.googleapis.com/ai-agentic-hackathon-4-bk/seed-guides/output/")) {
+        // Extract job_id and index from URL: .../output/{job_id}_{timestamp}_{index}.jpg
+        const parts = url.split("/");
+        const fileName = parts[parts.length - 1];
+        const fileParts = fileName.split("_");
+        if (fileParts.length >= 3) {
+            const jobId = fileParts[0];
+            const indexStr = fileParts[fileParts.length - 1].split(".")[0];
+            return `/api/seed-guide/image/${jobId}/${indexStr}`;
+        }
+    }
+    return url;
+};
+
 export default function UnifiedPage() {
     const [file, setFile] = useState<File | null>(null)
     const [preview, setPreview] = useState<string | null>(null)
@@ -536,7 +552,7 @@ export default function UnifiedPage() {
                                                                         {step.image_url && (
                                                                             <div className="mt-4">
                                                                                 <img
-                                                                                    src={step.image_url}
+                                                                                    src={getProxiedImageUrl(step.image_url)}
                                                                                     alt={step.title}
                                                                                     className="rounded-lg max-h-64 w-full object-cover border-2 border-green-200 shadow-md"
                                                                                 />

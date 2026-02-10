@@ -25,6 +25,22 @@ interface SavedGuide {
     steps: Step[];
 }
 
+const getProxiedImageUrl = (url?: string) => {
+    if (!url) return "";
+    if (url.startsWith("https://storage.googleapis.com/ai-agentic-hackathon-4-bk/seed-guides/output/")) {
+        // Extract job_id and index from URL: .../output/{job_id}_{timestamp}_{index}.jpg
+        const parts = url.split("/");
+        const fileName = parts[parts.length - 1];
+        const fileParts = fileName.split("_");
+        if (fileParts.length >= 3) {
+            const jobId = fileParts[0];
+            const indexStr = fileParts[fileParts.length - 1].split(".")[0];
+            return `/api/seed-guide/image/${jobId}/${indexStr}`;
+        }
+    }
+    return url;
+};
+
 export default function SeedGuidePage() {
     // View State: 'create' | 'list' | 'detail'
     // Default to 'list' for the unified dashboard view
@@ -417,12 +433,12 @@ export default function SeedGuidePage() {
                                                             />
                                                         );
                                                     } else if (imageUrl) {
-                                                        // Should rely on parent loading state, but safe fallback
                                                         return (
-                                                            <div className="flex flex-col items-center justify-center h-full w-full bg-muted/50 text-muted-foreground animate-pulse">
-                                                                <Loader2 className="h-10 w-10 mb-3 animate-spin text-primary/50" />
-                                                                <span className="text-sm font-medium">画像を読み込み中...</span>
-                                                            </div>
+                                                            <img
+                                                                src={getProxiedImageUrl(imageUrl)}
+                                                                alt={step.title}
+                                                                className="w-full h-full object-cover animate-in fade-in duration-500"
+                                                            />
                                                         );
                                                     } else {
                                                         return (

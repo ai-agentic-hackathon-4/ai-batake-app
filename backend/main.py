@@ -482,9 +482,10 @@ async def process_seed_guide(job_id: str, image_source: str, image_model: str = 
                             "image/jpeg"
                         )
                         
-                        # Replace base64 with URL
-                        step["image_url"] = image_url
-                        del step["image_base64"]
+                        # Replace base64 with Proxy URL
+                        step["image_url"] = f"/api/seed-guide/image/{job_id}/{i}"
+                        if "image_base64" in step:
+                            del step["image_base64"]
                     except Exception as img_e:
                         warning(f"Failed to upload output image {i}: {img_e}")
             info(f"[SeedGuide] completed job={job_id} steps={len(steps)}")
@@ -1084,6 +1085,42 @@ async def get_diary_image(date: str):
         raise
     except Exception as e:
         error(f"Error serving diary image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/seed-guide/image/{job_id}/{step_index}")
+async def get_seed_guide_image(job_id: str, step_index: int):
+    """
+    Serve seed guide step image from GCS via proxy.
+    """
+    try:
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        # Search for blob starting with "seed-guides/output/{job_id}_" and ending with "_{step_index}.jpg"
+        prefix = f"seed-guides/output/{job_id}_"
+        
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        # Use prefix for efficient listing
+        blobs = bucket.list_blobs(prefix=prefix)
+        
+        target_suffix = f"_{step_index}.jpg"
+        target_blob = None
+        for blob in blobs:
+            if blob.name.endswith(target_suffix):
+                target_blob = blob
+                break
+        
+        if not target_blob:
+             raise HTTPException(status_code=404, detail=f"Image for step {step_index} not found")
+             
+        img_bytes = await asyncio.to_thread(target_blob.download_as_bytes)
+        from fastapi import Response
+        return Response(content=img_bytes, media_type="image/jpeg")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error(f"Error serving seed guide image: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
