@@ -145,7 +145,7 @@ export default function ResearchDashboard() {
         };
 
         Object.entries(instructions).forEach(([key, value]) => {
-            if (key === "original_analysis" || key === "name" || key === "volumetric_water_content" || key === "description") return;
+            if (key === "original_analysis" || key === "name" || key === "volumetric_water_content" || key === "description" || key === "raw_report" || key === "grounding_metadata") return;
 
             const lowerKey = key.toLowerCase();
             if (lowerKey.includes("water") || lowerKey.includes("soil") || lowerKey.includes("moisture") || lowerKey.includes("ph")) {
@@ -517,7 +517,7 @@ export default function ResearchDashboard() {
                                                     <div className={`p-1 rounded bg-muted group-hover:bg-muted/80 transition-colors ${showRawReport ? 'rotate-90' : ''}`}>
                                                         <ChevronRight className="h-3 w-3 transition-transform" />
                                                     </div>
-                                                    Show Raw Research Report
+                                                    AIの調査レポート原文を表示
                                                 </button>
 
                                                 {showRawReport && (

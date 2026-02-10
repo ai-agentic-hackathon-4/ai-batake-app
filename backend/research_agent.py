@@ -146,7 +146,7 @@ def analyze_seed_packet(image_bytes: bytes) -> str:
         error(f"Error in analyze_seed_packet: {e}", exc_info=True)
         return '{"name": "不明な野菜", "visible_instructions": "API Error"}'
 
-def extract_structured_research_data(vegetable_name: str, report_text: str, query_param: str, headers: dict, grounding_metadata: dict = None) -> dict:
+def extract_structured_research_data(vegetable_name: str, report_text: str, query_param: str, headers: dict, grounding_metadata: dict = None, raw_json_report: str = None) -> dict:
     """
     調査レポートから、アプリで利用しやすいJSON形式のデータを抽出します。
     """
@@ -190,8 +190,8 @@ def extract_structured_research_data(vegetable_name: str, report_text: str, quer
         extracted_text = gen_data['candidates'][0]['content']['parts'][0]['text']
         result = json.loads(extracted_text)
         
-        # Preserve original report and metadata
-        result["raw_report"] = report_text
+        # Preserve original report (JSON or Text) and metadata
+        result["raw_report"] = raw_json_report if raw_json_report else report_text
         if grounding_metadata:
             result["grounding_metadata"] = grounding_metadata
             
@@ -250,14 +250,18 @@ def perform_web_grounding_research(vegetable_name: str, packet_info: str) -> dic
             grounding_text = candidates[0]['content']['parts'][0]['text']
             grounding_metadata = candidates[0].get("groundingMetadata")
             
+            # Prepare full JSON response for logging/storage
+            full_response_json = json.dumps(data, ensure_ascii=False)
+            
             # Log raw response for traceability
-            debug(f"Full Web Grounding Response for {vegetable_name}: {json.dumps(data, ensure_ascii=False)}")
+            debug(f"Full Web Grounding Response for {vegetable_name}: {full_response_json}")
             
             info(f"Web Grounding research completed for {vegetable_name}")
             
             # AI Studio のクエリパラメータを使用して構造化データを抽出 (互換性のため)
             _, studio_query_param = get_auth_headers()
-            return extract_structured_research_data(vegetable_name, grounding_text, studio_query_param, headers, grounding_metadata=grounding_metadata)
+            # 保存用に生レポートテキトではなく JSON 全体を渡す
+            return extract_structured_research_data(vegetable_name, grounding_text, studio_query_param, headers, grounding_metadata=grounding_metadata, raw_json_report=full_response_json)
             
         except (KeyError, IndexError) as e:
             error(f"Failed to parse Web Grounding response: {e}, Data: {data}")
@@ -337,7 +341,9 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
             return {"name": vegetable_name, "error": "Research Timeout"}
 
         # 3. データ抽出 (REST)
-        return extract_structured_research_data(vegetable_name, final_text, query_param, headers)
+        # Deep Research の全レスポンスデータを JSON 文字列として保持
+        full_json = json.dumps(data, ensure_ascii=False)
+        return extract_structured_research_data(vegetable_name, final_text, query_param, headers, raw_json_report=full_json)
 
     except Exception as e:
         error(f"Error in perform_deep_research for {vegetable_name}: {e}", exc_info=True)

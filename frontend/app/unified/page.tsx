@@ -619,7 +619,7 @@ export default function UnifiedPage() {
                                                             <div className={`p-1 rounded bg-slate-100 group-hover:bg-slate-200 transition-colors ${showRawReport ? 'rotate-90' : ''}`}>
                                                                 <ChevronRight className="h-3.5 w-3.5 transition-transform" />
                                                             </div>
-                                                            調査レポートの原文を表示
+                                                            AIの調査レポート原文を表示
                                                         </button>
 
                                                         {showRawReport && (
