@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search, LayoutDashboard } from 'lucide-react';
+import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search, LayoutDashboard, Heart } from 'lucide-react';
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,7 +16,7 @@ interface UnifiedJobStatus {
     image_url?: string
     research: { status: string; id?: string; result?: any; error?: string }
     guide: { status: string; result?: any; steps?: any[]; error?: string }
-    character: { status: string; result?: any; error?: string }
+    character: { status: string; id?: string; result?: any; error?: string }
 }
 
 const getProxiedImageUrl = (url?: string) => {
@@ -47,6 +47,8 @@ export default function UnifiedPage() {
     const [imageModel, setImageModel] = useState<string>("pro");
     const [showRawReport, setShowRawReport] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
+    const [isSelectingChar, setIsSelectingChar] = useState(false);
+    const [charSelected, setCharSelected] = useState(false);
 
     // Poll for status
     useEffect(() => {
@@ -128,6 +130,26 @@ export default function UnifiedPage() {
             alert("エラーが発生しました。");
         } finally {
             setIsApplying(false);
+        }
+    };
+
+    const handleSelectCharacterForDiary = async () => {
+        if (!status?.character?.id) return;
+        setIsSelectingChar(true);
+        try {
+            const res = await fetch(`/api/character/${status.character.id}/select`, {
+                method: 'POST',
+            });
+            if (res.ok) {
+                setCharSelected(true);
+            } else {
+                alert("キャラクターの登録に失敗しました。");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("通信エラーが発生しました。");
+        } finally {
+            setIsSelectingChar(false);
         }
     };
 
@@ -457,6 +479,28 @@ export default function UnifiedPage() {
                                                                 </div>
                                                             </div>
                                                         </div>
+
+                                                        {/* Select for Diary Button */}
+                                                        {status.character.id && (
+                                                            <div className="pt-4 border-t border-amber-200/50">
+                                                                <button
+                                                                    onClick={handleSelectCharacterForDiary}
+                                                                    disabled={isSelectingChar || charSelected}
+                                                                    className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm transition-all duration-300 shadow-md ${charSelected
+                                                                            ? 'bg-green-100 text-green-700 border-2 border-green-300 cursor-default'
+                                                                            : 'bg-gradient-to-r from-pink-400 to-rose-400 text-white hover:from-pink-500 hover:to-rose-500 hover:shadow-lg transform hover:-translate-y-0.5'
+                                                                        }`}
+                                                                >
+                                                                    {isSelectingChar ? (
+                                                                        <><Loader2 className="h-4 w-4 animate-spin" /> 登録中...</>
+                                                                    ) : charSelected ? (
+                                                                        <><CheckCircle2 className="h-4 w-4" /> 日記のパートナーに登録しました！</>
+                                                                    ) : (
+                                                                        <><Heart className="h-4 w-4" /> この子を日記で使う 💕</>
+                                                                    )}
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

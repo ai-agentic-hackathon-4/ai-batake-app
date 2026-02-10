@@ -757,6 +757,54 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
             "message": str(e)
         })
 
+@app.get("/api/character/list")
+async def list_characters():
+    """Returns a list of all completed character jobs."""
+    try:
+        from backend.db import get_all_character_jobs
+    except ImportError:
+        from db import get_all_character_jobs
+        
+    jobs = get_all_character_jobs()
+    
+    # Proxy URLs for all jobs
+    for job in jobs:
+        if "result" in job and isinstance(job["result"], dict):
+            res = job["result"]
+            if res.get("image_url") and res["image_url"].startswith("https://storage.googleapis.com/"):
+                gcs_uri = res["image_url"]
+                bucket_name = "ai-agentic-hackathon-4-bk"
+                prefix = f"https://storage.googleapis.com/{bucket_name}/"
+                
+                if gcs_uri.startswith(prefix):
+                    blob_path = gcs_uri[len(prefix):]
+                    import urllib.parse
+                    encoded_path = urllib.parse.quote(blob_path)
+                    res["image_url"] = f"/api/character/image?path={encoded_path}"
+                    
+                    # Ensure compatibility with frontend expectations
+                    if "image_uri" not in res:
+                        res["image_uri"] = res["image_url"]
+    
+    return jobs
+
+@app.post("/api/character/{job_id}/select")
+async def select_character_endpoint(job_id: str):
+    """Selects the specified character job results as the active character for the diary."""
+    info(f"Selecting character {job_id} for diary")
+    try:
+        from backend.db import select_character_for_diary as select_func
+    except ImportError:
+        from db import select_character_for_diary as select_func
+
+    success = select_func(job_id)
+    if not success:
+        warning(f"Failed to select character {job_id}")
+        raise HTTPException(status_code=404, detail="Failed to select character (not found or not completed).")
+    
+    info(f"Successfully selected character {job_id}")
+    return {"status": "success", "message": f"Diary character updated to {job_id}"}
+
 @app.get("/api/character")
 async def get_character():
     """
@@ -1577,6 +1625,8 @@ async def get_unified_job_status(job_id: str):
                         char_result["image_url"] = f"/api/character/image?path={encoded_path}"
                         
             results["character"] = make_serializable(c_data)
+            # Include the character job ID so frontend can select it for diary
+            results["character"]["id"] = char_id
             
         return results
         

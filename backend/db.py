@@ -438,6 +438,77 @@ if __name__ == "__main__":
     else:
         print("Firestore client is not initialized.")
 
+def get_all_character_jobs():
+    """Retrieves all completed character jobs sorted by creation date."""
+    if db is None: return []
+
+    try:
+        debug("Fetching character jobs from Firestore")
+        # Fetch only by status (single-field query, no composite index needed)
+        docs = db.collection("character_jobs")\
+            .where("status", "==", "COMPLETED")\
+            .stream()
+            
+        results = []
+        for doc in docs:
+            d = doc.to_dict()
+            d['id'] = doc.id
+            # Handle timestamps
+            if 'created_at' in d and hasattr(d['created_at'], 'isoformat'):
+                d['created_at'] = d['created_at'].isoformat()
+            if 'updated_at' in d and hasattr(d['updated_at'], 'isoformat'):
+                d['updated_at'] = d['updated_at'].isoformat()
+            results.append(d)
+        # Sort client-side by created_at descending
+        results.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        debug(f"Retrieved {len(results)} character jobs")
+        return results
+    except Exception as e:
+        error(f"Error listing character jobs: {e}", exc_info=True)
+        return []
+
+def select_character_for_diary(job_id: str) -> bool:
+    """
+    Selects a character from character_jobs and sets it as the active diary character.
+    """
+    if db is None: return False
+
+    try:
+        debug(f"Selecting character job {job_id} for diary")
+        doc_ref = db.collection("character_jobs").document(job_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            error(f"Character job {job_id} not found.")
+            return False
+            
+        job_data = doc.to_dict()
+        if job_data.get("status") != "COMPLETED":
+            error(f"Character job {job_id} is not completed.")
+            return False
+            
+        result = job_data.get("result")
+        if not result:
+            error(f"Character job {job_id} has no result.")
+            return False
+            
+        # Update growing_diaries/Character
+        char_doc_ref = db.collection("growing_diaries").document("Character")
+        char_doc_ref.set({
+            "name": result.get("character_name"),
+            "image_uri": result.get("image_url"), # Note: image_url in result is the GCS URL
+            "personality": result.get("personality"),
+            "updated_at": firestore.SERVER_TIMESTAMP,
+            "selected_from_job_id": job_id
+        }, merge=True)
+        
+        info(f"Successfully selected character {result.get('character_name')} for diary (from job {job_id})")
+        return True
+        
+    except Exception as e:
+        error(f"Error selecting character for diary: {e}", exc_info=True)
+        return False
+
 def get_edge_agent_config() -> dict:
     """
     Retrieves the current edge agent configuration from Firestore.
