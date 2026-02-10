@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search, LayoutDashboard, UserPlus } from 'lucide-react';
+import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search, LayoutDashboard, UserPlus, ArrowLeft } from 'lucide-react';
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -177,8 +178,25 @@ export default function UnifiedPage() {
         status.character.status.toLowerCase() === "completed";
 
     return (
-        <div className="container mx-auto p-6 max-w-6xl">
-            {/* Title Removed */}
+        <div className="min-h-screen bg-background">
+            {/* Header */}
+            <header className="border-b border-border bg-card">
+                <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-3">
+                    <Link href="/" className="mr-2 p-1 hover:bg-accent rounded-full transition-colors">
+                        <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+                    </Link>
+                    <div className="p-2 rounded-lg bg-primary/10">
+                        <Sparkles className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-semibold text-card-foreground">野菜を育て始める</h1>
+                        <p className="text-sm text-muted-foreground">種袋スキャンで栽培ガイド・キャラクターを一括生成</p>
+                    </div>
+                </div>
+            </header>
+
+            {/* Main Content */}
+            <main className="max-w-6xl mx-auto p-6">
 
             {/* Upload Section */}
             {!jobId && (
@@ -848,6 +866,7 @@ export default function UnifiedPage() {
                 </div >
             )
             }
+            </main>
         </div >
     )
 }
