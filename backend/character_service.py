@@ -36,20 +36,30 @@ async def analyze_seed_and_generate_character(image_bytes: bytes):
         import time
         import random
         base_delay = 2
-        max_retries = 5
+        max_delay = 15.0
+        max_retries = 100
+        max_elapsed_seconds = 1800  # 30 minutes
+        start_time = time.time()
         
         for attempt in range(max_retries):
+            elapsed = time.time() - start_time
+            if elapsed >= max_elapsed_seconds:
+                raise RuntimeError(f"API call failed: retry budget exceeded ({max_elapsed_seconds}s)")
             try:
                 response = requests.post(url, headers=headers, json=payload, timeout=60)
                 if response.status_code == 200:
                     return response
                 elif response.status_code == 429 or response.status_code >= 500:
-                    time.sleep((base_delay * (2 ** attempt)) + random.uniform(0, 1))
+                    delay = min(base_delay * (2 ** attempt), max_delay) + random.uniform(0, 1)
+                    warning(f"API {response.status_code}. Retrying in {delay:.1f}s... (attempt {attempt+1}/{max_retries}, elapsed={elapsed:.0f}s)")
+                    time.sleep(delay)
                     continue
                 else:
                     return response
-            except requests.exceptions.RequestException:
-                time.sleep((base_delay * (2 ** attempt)) + random.uniform(0, 1))
+            except requests.exceptions.RequestException as e:
+                delay = min(base_delay * (2 ** attempt), max_delay) + random.uniform(0, 1)
+                warning(f"Request error: {e}. Retrying in {delay:.1f}s... (attempt {attempt+1}/{max_retries}, elapsed={elapsed:.0f}s)")
+                time.sleep(delay)
         raise RuntimeError(f"API call failed after {max_retries} retries")
 
     # 1. Identify Vegetable & Character Personality (Gemini 3 Pro)

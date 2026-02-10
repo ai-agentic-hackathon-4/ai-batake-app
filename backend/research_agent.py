@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import random
 import requests
 import base64
 
@@ -42,43 +43,41 @@ def request_with_retry(method, url, **kwargs):
     """
     リクエストを再試行するラッパー関数。
     APIレート制限 (429) やサーバーエラー (5xx) の場合に、指数バックオフ (exponential backoff) を用いて再試行します。
+    最長30分間リトライを継続します。
     """
-    max_retries = 5
+    max_retries = 100
+    max_elapsed_seconds = 1800  # 30 minutes
     backoff_factor = 2
+    max_delay = 15.0
+    start_time = time.time()
     
     for i in range(max_retries):
+        elapsed = time.time() - start_time
+        if elapsed >= max_elapsed_seconds:
+            warning(f"[LLM] ⏰ Retry budget exceeded ({max_elapsed_seconds}s)")
+            break
         try:
             response = requests.request(method, url, **kwargs)
             
             # 429 (Too Many Requests) および 5xx (Server Error) の場合に再試行
             if response.status_code == 429 or (500 <= response.status_code < 600):
-                sleep_time = (backoff_factor ** i) + (i * 0.5)  # 線形増加/ジッターを少し追加
-                if i < max_retries - 1:
-                    warning(f"Request failed with status {response.status_code}. Retrying in {sleep_time}s... (attempt {i+1}/{max_retries})")
-                    time.sleep(sleep_time)
-                    continue
+                sleep_time = min(backoff_factor ** i, max_delay) + random.uniform(0, 0.5)
+                warning(f"Request failed with status {response.status_code}. Retrying in {sleep_time:.1f}s... (attempt {i+1}/{max_retries}, elapsed={elapsed:.0f}s)")
+                time.sleep(sleep_time)
+                continue
             
             return response
             
         except requests.exceptions.RequestException as e:
-            sleep_time = (backoff_factor ** i)
-            if i < max_retries - 1:
-                warning(f"Request exception: {e}. Retrying in {sleep_time}s... (attempt {i+1}/{max_retries})")
-                time.sleep(sleep_time)
-            elif i == max_retries - 1:
-                # 最後の試行の場合は、ループを終了させて最後のリクエストを行う
-                pass
+            sleep_time = min(backoff_factor ** i, max_delay) + random.uniform(0, 0.5)
+            warning(f"Request exception: {e}. Retrying in {sleep_time:.1f}s... (attempt {i+1}/{max_retries}, elapsed={elapsed:.0f}s)")
+            time.sleep(sleep_time)
 
-    # 最後の試行、または利用可能な場合は最後のレスポンスを返す
+    # 最後の試行
     try:
         info(f"[LLM] 🔄 Final retry attempt for {method} {url[:80]}...")
         return requests.request(method, url, **kwargs)
     except requests.exceptions.RequestException as e:
-        # 最後の試行も例外で失敗した場合、再送出するかNoneを返すか？
-        # 呼び出し元のコードはレスポンスオブジェクトを期待しているか、レスポンス使用時にエラーを発生させる。
-        # しかし requests.request は例外を発生させる。
-        # 安全のためにログ記録して再送出するか、エラー状態のモックレスポンスを返すべきか？
-        # 標準的な requests の振る舞いとして再送出する。
         error(f"Final request attempt failed: {e}")
         raise
 

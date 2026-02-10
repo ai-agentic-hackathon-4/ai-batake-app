@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from google.cloud import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 from datetime import datetime
 
 import google.auth.exceptions
@@ -276,7 +277,7 @@ def get_sensor_history(hours: int = 24):
         # Query: specific range and order
         # Note: In Firestore, if you have a range filter on a field, you must order by that field first.
         docs = db.collection(collection_name)\
-            .where("unix_timestamp", ">=", cutoff_time)\
+            .where(filter=FieldFilter("unix_timestamp", ">=", cutoff_time))\
             .order_by("unix_timestamp", direction=firestore.Query.ASCENDING)\
             .stream()
         
@@ -446,7 +447,7 @@ def get_all_character_jobs():
         debug("Fetching character jobs from Firestore")
         # Fetch only by status (single-field query, no composite index needed)
         docs = db.collection("character_jobs")\
-            .where("status", "==", "COMPLETED")\
+            .where(filter=FieldFilter("status", "==", "COMPLETED"))\
             .stream()
             
         results = []

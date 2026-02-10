@@ -33,10 +33,10 @@ def call_api_with_backoff(
     url,
     payload,
     headers,
-    max_retries=5,
-    max_elapsed_seconds=30,
-    base_delay=1.0,
-    max_delay=6.0,
+    max_retries=100,
+    max_elapsed_seconds=1800,
+    base_delay=2.0,
+    max_delay=15.0,
     request_timeout=60,
 ):
     start_time = time.time()

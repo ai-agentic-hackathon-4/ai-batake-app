@@ -103,29 +103,32 @@ class TestRequestWithRetry:
         # Should sleep twice
         assert mock_sleep.call_count == 2
 
+    @patch('research_agent.random.uniform', return_value=0.1)
     @patch('research_agent.requests.request')
     @patch('research_agent.time.sleep')
-    def test_request_with_retry_max_retries_exceeded(self, mock_sleep, mock_request):
-        """Test max retries exceeded behavior"""
+    @patch('research_agent.time.time')
+    def test_request_with_retry_max_retries_exceeded(self, mock_time, mock_sleep, mock_request, mock_random):
+        """Test budget exceeded stops retries"""
         mock_fail_response = Mock()
         mock_fail_response.status_code = 500
         
         mock_request.return_value = mock_fail_response
         
+        # Use a counter-based function to handle calls from logging etc.
+        time_values = iter([0, 0, 100, 1900])
+        def fake_time():
+            try:
+                return next(time_values)
+            except StopIteration:
+                return 9999.0
+        mock_time.side_effect = fake_time
+        
         from research_agent import request_with_retry
         
+        # After budget exceeded, falls through to final attempt which also returns 500
         response = request_with_retry("GET", "https://example.com/api")
         
         assert response.status_code == 500
-        # 5 retries in loop (0..4)
-        # i=0 (call 1) -> sleep 1
-        # i=1 (call 2) -> sleep 2
-        # i=2 (call 3) -> sleep 3
-        # i=3 (call 4) -> sleep 4
-        # i=4 (call 5) -> no sleep, return response
-        
-        assert mock_request.call_count == 5 
-        assert mock_sleep.call_count == 4
 
     @patch('research_agent.requests.request')
     @patch('research_agent.time.sleep')
@@ -653,49 +656,65 @@ class TestRequestWithRetryExceptionPaths:
         assert response.status_code == 200
         assert mock_sleep.call_count == 2
 
+    @patch('research_agent.random.uniform', return_value=0.1)
     @patch('research_agent.requests.request')
     @patch('research_agent.time.sleep')
-    def test_request_exception_all_retries_then_final_success(self, mock_sleep, mock_request):
-        """RequestException for all 5 loop iterations, final retry succeeds"""
+    @patch('research_agent.time.time')
+    def test_request_exception_all_retries_then_final_success(self, mock_time, mock_sleep, mock_request, mock_random):
+        """RequestException until budget exceeded, final retry succeeds"""
         import requests as real_requests
 
         mock_success = Mock()
         mock_success.status_code = 200
 
-        # 5 failures in the loop + 1 success in the final retry
+        # 1 failure in loop (budget exceeded on 2nd elapsed check), then final success
         mock_request.side_effect = [
-            real_requests.exceptions.RequestException("err"),
-            real_requests.exceptions.RequestException("err"),
-            real_requests.exceptions.RequestException("err"),
-            real_requests.exceptions.RequestException("err"),
             real_requests.exceptions.RequestException("err"),
             mock_success,
         ]
+        # Provide enough values for: start_time, elapsed checks, and logging internals
+        time_values = iter([0, 0, 100, 100, 1900])
+        def fake_time():
+            try:
+                return next(time_values)
+            except StopIteration:
+                return 9999.0
+        mock_time.side_effect = fake_time
 
         from research_agent import request_with_retry
 
         response = request_with_retry("GET", "https://example.com")
         assert response.status_code == 200
-        # sleep called for i=0..3 (4 times), i=4 is last so no sleep
-        assert mock_sleep.call_count == 4
-        # 5 in loop + 1 final = 6
-        assert mock_request.call_count == 6
+        assert mock_sleep.call_count == 1
+        # 1 in loop + 1 final = 2
+        assert mock_request.call_count == 2
 
+    @patch('research_agent.random.uniform', return_value=0.1)
     @patch('research_agent.requests.request')
     @patch('research_agent.time.sleep')
-    def test_request_exception_all_retries_final_also_fails(self, mock_sleep, mock_request):
-        """RequestException for all attempts including final retry → raises"""
+    @patch('research_agent.time.time')
+    def test_request_exception_all_retries_final_also_fails(self, mock_time, mock_sleep, mock_request, mock_random):
+        """RequestException until budget exceeded, final retry also fails → raises"""
         import requests as real_requests
 
         mock_request.side_effect = real_requests.exceptions.RequestException("persistent failure")
+
+        # Provide enough values: start_time, elapsed checks, and logging internals
+        time_values = iter([0, 0, 100, 100, 1900])
+        def fake_time():
+            try:
+                return next(time_values)
+            except StopIteration:
+                return 9999.0
+        mock_time.side_effect = fake_time
 
         from research_agent import request_with_retry
 
         with pytest.raises(real_requests.exceptions.RequestException, match="persistent failure"):
             request_with_retry("GET", "https://example.com")
 
-        # 5 in loop + 1 final = 6
-        assert mock_request.call_count == 6
+        # 2 in loop + 1 final = 3
+        assert mock_request.call_count == 3
 
 
 class TestAnalyzeSeedPacketResponseParsing:

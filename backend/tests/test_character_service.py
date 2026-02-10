@@ -154,9 +154,10 @@ class TestAnalyzeSeedAndGenerateCharacter:
         img_fail.status_code = 500
         img_fail.text = "fail"
 
-        mock_post.side_effect = [text_resp, img_fail, img_fail, img_fail, img_fail, img_fail]
+        # 100 retries + budget exceeded
+        mock_post.side_effect = [text_resp] + [img_fail] * 101
 
-        with pytest.raises(RuntimeError, match="retries"):
+        with pytest.raises(RuntimeError, match="retry budget exceeded|retries"):
             await analyze_seed_and_generate_character(b"img")
 
     @pytest.mark.asyncio

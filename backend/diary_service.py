@@ -2,6 +2,7 @@ import os
 import logging
 import json
 import time
+import random
 import httpx
 import asyncio
 from datetime import datetime, date, timedelta
@@ -9,6 +10,7 @@ from typing import Dict, List, Any, Optional
 
 import google.auth
 import google.auth.transport.requests
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 # Setup logging
 try:
@@ -35,26 +37,36 @@ async def get_auth_headers_async():
 
 
 async def request_with_retry_async(method: str, url: str, **kwargs) -> httpx.Response:
-    """Make HTTP request with exponential backoff retry for rate limiting using httpx."""
-    max_retries = 5
-    backoff_factor = 2
+    """Make HTTP request with full-jitter retry for rate limiting using httpx.
+    Retries up to 30 minutes with randomized delay (1~max_delay s).
+    """
+    max_retries = 100
+    max_elapsed_seconds = 1800  # 30 minutes
+    max_delay = 15.0
+    min_delay = 1.0
+    start_time = time.time()
     
     async with httpx.AsyncClient() as client:
         for i in range(max_retries):
+            elapsed = time.time() - start_time
+            if elapsed >= max_elapsed_seconds:
+                warning(f"[LLM] ⏰ Retry budget exceeded ({max_elapsed_seconds}s)")
+                break
             try:
-                info(f"[LLM] 🔄 API Request attempt {i+1}/{max_retries}: {method} {url[:80]}...")
+                info(f"[LLM] 🔄 API Request attempt {i+1}/{max_retries}: {method} {url[:80]}... (elapsed={elapsed:.0f}s)")
                 response = await client.request(method, url, **kwargs)
                 info(f"[LLM] API Response status: {response.status_code}")
                 
-                if response.status_code == 429:
-                    sleep_time = backoff_factor ** i
-                    warning(f"429 Too Many Requests. Retrying in {sleep_time}s...")
+                if response.status_code == 429 or response.status_code >= 500:
+                    sleep_time = random.uniform(min_delay, max_delay)
+                    warning(f"{response.status_code} error. Retrying in {sleep_time:.1f}s...")
                     await asyncio.sleep(sleep_time)
                     continue
                 return response
             except httpx.RequestError as e:
-                warning(f"Request failed: {e}. Retrying...")
-                await asyncio.sleep(backoff_factor ** i)
+                sleep_time = random.uniform(min_delay, max_delay)
+                warning(f"Request failed: {e}. Retrying in {sleep_time:.1f}s...")
+                await asyncio.sleep(sleep_time)
         
         # Final attempt
         info("Final API Request attempt...")
@@ -512,7 +524,7 @@ def get_all_diaries(limit: int = 30, offset: int = 0) -> List[Dict]:
     """Get all diaries from Firestore (sync)."""
     if db is None: return []
     try:
-        query = db.collection("growing_diaries").where("generation_status", "==", "completed").limit(limit)
+        query = db.collection("growing_diaries").where(filter=FieldFilter("generation_status", "==", "completed")).limit(limit)
         if offset > 0: query = query.offset(offset)
         docs = query.stream()
         diaries = []
