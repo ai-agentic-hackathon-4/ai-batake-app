@@ -50,6 +50,7 @@ export default function SeedGuidePage() {
     // Create Mode State
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [imageModel, setImageModel] = useState<string>("pro");
+    const [guideImageMode, setGuideImageMode] = useState<string>("single");
     const [error, setError] = useState<string | null>(null);
 
     // List/Detail Mode State
@@ -113,7 +114,7 @@ export default function SeedGuidePage() {
 
         try {
             // Updated endpoint name
-            const response = await fetch(`/api/seed-guide/generate?image_model=${imageModel}`, {
+            const response = await fetch(`/api/seed-guide/generate?image_model=${imageModel}&guide_image_mode=${guideImageMode}`, {
                 method: 'POST',
                 body: formData,
             });
@@ -319,13 +320,29 @@ export default function SeedGuidePage() {
                                         />
                                     </div>
                                     <div className="grid w-full items-center gap-1.5 text-left pb-4">
-                                        <label className="text-xs font-medium text-muted-foreground ml-1">画像生成モデル</label>
-                                        <Tabs value={imageModel} onValueChange={(val) => setImageModel(val)} className="w-full">
-                                            <TabsList className="grid w-full grid-cols-2">
-                                                <TabsTrigger value="pro" className="text-sm">NanoBanana Pro</TabsTrigger>
-                                                <TabsTrigger value="flash" className="text-sm">NanoBanana</TabsTrigger>
-                                            </TabsList>
-                                        </Tabs>
+                                        <label className="text-xs font-medium text-muted-foreground ml-1">🎨 図解モード</label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setGuideImageMode("single")}
+                                                className={`flex-1 text-sm px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "single"
+                                                        ? "bg-primary text-primary-foreground border-primary shadow-md"
+                                                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                                    }`}
+                                            >
+                                                🖼️ 1枚絵（Pro）
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setGuideImageMode("per_step")}
+                                                className={`flex-1 text-sm px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "per_step"
+                                                        ? "bg-primary text-primary-foreground border-primary shadow-md"
+                                                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                                    }`}
+                                            >
+                                                📸 ステップ別
+                                            </button>
+                                        </div>
                                     </div>
                                     <button
                                         onClick={handleUpload}

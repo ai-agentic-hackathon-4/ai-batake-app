@@ -45,6 +45,7 @@ export default function UnifiedPage() {
     const [currentStep, setCurrentStep] = useState(0); // For carousel navigation
     const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
     const [imageModel, setImageModel] = useState<string>("pro");
+    const [guideImageMode, setGuideImageMode] = useState<string>("single");
     const [showRawReport, setShowRawReport] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
     const [isSelectingChar, setIsSelectingChar] = useState(false);
@@ -97,7 +98,7 @@ export default function UnifiedPage() {
         formData.append("file", file)
 
         try {
-            const res = await fetch(`/api/unified/start?research_mode=${researchMode}&image_model=${imageModel}`, {
+            const res = await fetch(`/api/unified/start?research_mode=${researchMode}&image_model=${imageModel}&guide_image_mode=${guideImageMode}`, {
                 method: "POST",
                 body: formData,
             })
@@ -225,13 +226,29 @@ export default function UnifiedPage() {
                             </div>
 
                             <div className="space-y-3 pb-2 pt-1 border-t border-slate-100">
-                                <p className="text-sm font-medium text-slate-700">図解生成モデルの選択</p>
-                                <Tabs value={imageModel} onValueChange={(val) => setImageModel(val)} className="w-full">
-                                    <TabsList className="grid w-full grid-cols-2">
-                                        <TabsTrigger value="pro" className="text-xs">NanoBanana Pro</TabsTrigger>
-                                        <TabsTrigger value="flash" className="text-xs">NanoBanana</TabsTrigger>
-                                    </TabsList>
-                                </Tabs>
+                                <p className="text-sm font-medium text-slate-700">🎨 図解モード</p>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setGuideImageMode("single")}
+                                        className={`flex-1 text-xs px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "single"
+                                                ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-md"
+                                                : "bg-white text-slate-600 border-slate-200 hover:border-green-300"
+                                            }`}
+                                    >
+                                        🖼️ 1枚絵（Pro）
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setGuideImageMode("per_step")}
+                                        className={`flex-1 text-xs px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "per_step"
+                                                ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-md"
+                                                : "bg-white text-slate-600 border-slate-200 hover:border-green-300"
+                                            }`}
+                                    >
+                                        📸 ステップ別
+                                    </button>
+                                </div>
                             </div>
 
                             {error && (
