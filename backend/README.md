@@ -11,6 +11,10 @@ FastAPIで構築されたAI Batake Appのバックエンドサーバーです。
 - **種袋解析**: Gemini APIを使用した種袋画像の解析
 - **Deep Research**: AIによる詳細な栽培条件の調査
 - **栽培ガイド生成**: 非同期ジョブによるステップバイステップガイドの生成
+- **キャラクター生成**: 種袋画像からの野菜AIキャラクター生成
+- **栽培日記自動生成**: Cloud Scheduler連携による毎日の栽培日記の自動生成
+- **絵日記画像生成**: AIキャラクターを含む絵日記風画像の生成
+- **統合シード機能**: Research・Guide・Character の並列実行
 - **アクティブ野菜設定**: エッジエージェント設定（`configurations/edge_agent`）に基づく日記生成（過去の野菜を選択した場合でもその野菜名を優先）
 
 ## 🛠️ 技術スタック
@@ -23,7 +27,7 @@ FastAPIで構築されたAI Batake Appのバックエンドサーバーです。
 | Google Cloud Firestore | - | NoSQL データベース |
 | Google Cloud Storage | - | 画像ストレージ |
 | Google Vertex AI | - | AI エージェント基盤 |
-| Gemini API | - | 画像解析・Deep Research |
+| Gemini API | - | 画像解析・Deep Research・日記/画像生成 |
 | pytest | 7.4+ | テストフレームワーク |
 
 ## 📁 ファイル構成
@@ -35,14 +39,29 @@ backend/
 ├── db.py                # Firestore データベース操作
 ├── research_agent.py    # 種袋解析・Deep Research ロジック
 ├── seed_service.py      # 非同期栽培ガイド生成サービス
+├── diary_service.py     # 栽培日記自動生成サービス
+├── image_service.py     # 絵日記画像生成サービス (GCS + Gemini)
+├── character_service.py # AIキャラクター生成サービス
+├── logger.py            # 構造化ロギング・JSON Formatter
 ├── requirements.txt     # Python 依存関係
 ├── pytest.ini           # pytest 設定
 ├── tests/               # テストファイル
-│   ├── test_main.py     # API エンドポイントテスト
-│   ├── test_db.py       # データベース操作テスト
-│   ├── test_agent.py    # エージェント連携テスト
-│   ├── test_seed_service.py  # 栽培ガイドサービステスト
-│   └── test_utils.py    # ユーティリティテスト
+│   ├── conftest.py              # テスト共通設定
+│   ├── test_main.py             # API エンドポイントテスト
+│   ├── test_db.py               # データベース操作テスト
+│   ├── test_agent.py            # エージェント連携テスト
+│   ├── test_seed_service.py     # 栽培ガイドサービステスト
+│   ├── test_research_agent.py   # 種袋解析・Deep Researchテスト
+│   ├── test_diary_service.py    # 日記サービステスト
+│   ├── test_image_service.py    # 画像サービステスト
+│   ├── test_character_service.py # キャラクターサービステスト
+│   ├── test_logger.py           # ロガーテスト
+│   ├── test_select_feature.py   # 野菜選択機能テスト
+│   ├── test_seed_guide_persistence.py # 栽培ガイド永続化テスト
+│   ├── test_character_api.py    # キャラクター生成APIテスト
+│   ├── test_vegetable_config.py # 野菜設定・日記生成優先順位テスト
+│   ├── test_utils.py            # ユーティリティテスト
+│   └── test_async_flow.py       # 非同期フローテスト
 └── README.md            # このファイル
 ```
 
@@ -70,6 +89,9 @@ export AGENT_ENDPOINT="projects/{PROJECT_ID}/locations/us-central1/reasoningEngi
 # Gemini API (オプション - ADC使用時は不要)
 export GEMINI_API_KEY="your-api-key"
 export SEED_GUIDE_GEMINI_KEY="your-api-key"
+
+# 日記自動生成 (Cloud Scheduler用)
+export DIARY_API_KEY="your-secret-key"
 ```
 
 ### インストール
@@ -118,7 +140,11 @@ python -m uvicorn backend.main:app --host 0.0.0.0 --port 8081
 | GET | `/api/vegetables` | 登録された全野菜リストを取得 |
 | GET | `/api/vegetables/latest` | 最新の野菜データを取得 |
 | POST | `/api/register-seed` | 種袋画像を登録しDeep Researchを開始 |
+| POST | `/api/vegetables/{doc_id}/select` | 育成情報の選択・エージェント適用 |
+| DELETE | `/api/vegetables/{doc_id}` | 野菜データ削除 |
 | GET | `/api/plant-camera/latest` | 最新の植物カメラ画像を取得 |
+| GET | `/api/agent-logs` | エージェント実行ログ取得 |
+| GET | `/api/agent-logs/oldest` | 最古のエージェントログ取得 |
 
 ### 栽培ガイド (非同期ジョブ)
 
@@ -126,12 +152,46 @@ python -m uvicorn backend.main:app --host 0.0.0.0 --port 8081
 |---------|---------------|------|
 | POST | `/api/seed-guide/jobs` | 栽培ガイド生成ジョブを作成 |
 | GET | `/api/seed-guide/jobs/{job_id}` | ジョブのステータスと結果を取得 |
+| POST | `/api/seed-guide/save` | 栽培ガイドの保存 |
+| GET | `/api/seed-guide/saved` | 保存済みガイド一覧 |
+| GET | `/api/seed-guide/saved/{doc_id}` | 保存済みガイド取得 (画像ハイドレート付き) |
+| DELETE | `/api/seed-guide/saved/{doc_id}` | 保存済みガイド削除 |
+| GET | `/api/seed-guide/image/{job_id}/{step_index}` | ガイド画像プロキシ |
 
 **ジョブステータス:**
 - `PENDING`: ジョブ作成済み、処理待ち
 - `PROCESSING`: 処理中
 - `COMPLETED`: 完了
 - `FAILED`: 失敗
+
+### キャラクター生成
+
+| メソッド | エンドポイント | 説明 |
+|---------|---------------|------|
+| POST | `/api/seed-guide/character` | キャラクター生成ジョブ作成 |
+| GET | `/api/seed-guide/character/{job_id}` | キャラクタージョブステータス |
+| GET | `/api/characters` | キャラクター一覧取得 |
+| POST | `/api/characters/{job_id}/select` | キャラクター選択 |
+| GET | `/api/character` | 最新キャラクター情報取得 |
+| GET | `/api/character/image` | キャラクター画像プロキシ |
+
+### 統合シード機能
+
+| メソッド | エンドポイント | 説明 |
+|---------|---------------|------|
+| POST | `/api/unified/start` | 統合ジョブ開始 (Research + Guide + Character) |
+| GET | `/api/unified/jobs/{job_id}` | 統合ジョブステータス取得 |
+
+### 栽培日記
+
+| メソッド | エンドポイント | 説明 |
+|---------|---------------|------|
+| POST | `/api/diary/auto-generate` | 栽培日記自動生成 (Scheduler用・APIキー認証) |
+| POST | `/api/diary/generate-manual` | 栽培日記手動生成 (SSEストリーミング) |
+| POST | `/api/diary/generate-daily` | 日次日記生成 |
+| GET | `/api/diary/list` | 栽培日記一覧取得 |
+| GET | `/api/diary/{date}` | 指定日の日記取得 |
+| GET | `/api/diary/{date}/image` | 日記絵日記画像プロキシ |
 
 ## 📊 処理フロー
 
@@ -147,6 +207,10 @@ graph LR
         AGT[agent.py<br/>天気エージェント]
         RES[research_agent.py<br/>種袋解析・Deep Research]
         SEED[seed_service.py<br/>栽培ガイド生成]
+        DIARY[diary_service.py<br/>日記生成]
+        IMG[image_service.py<br/>絵日記画像生成]
+        CHAR[character_service.py<br/>キャラクター生成]
+        LOG[logger.py<br/>構造化ロギング]
     end
 
     subgraph "Data Layer"
@@ -163,80 +227,22 @@ graph LR
     MAIN --> AGT
     MAIN --> RES
     MAIN --> SEED
+    MAIN --> DIARY
+    MAIN --> IMG
+    MAIN --> CHAR
     MAIN --> DB
+    MAIN --> LOG
 
     AGT --> VAI
     RES --> GEM
     SEED --> GEM
+    DIARY --> GEM
+    IMG --> GEM
+    CHAR --> GEM
 
     DB --> FS
     MAIN --> GCS
-```
-
-### 種袋登録フロー (POST /api/register-seed)
-
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant M as main.py
-    participant R as research_agent.py
-    participant D as db.py
-    participant G as Gemini API
-    participant F as Firestore
-
-    C->>M: POST /api/register-seed (画像)
-    M->>R: analyze_seed_packet(image)
-    R->>G: 画像解析リクエスト
-    G-->>R: 野菜名・基本情報 (JSON)
-    R-->>M: 解析結果
-    M->>D: init_vegetable_status(name)
-    D->>F: ドキュメント作成 (status: processing)
-    D-->>M: document_id
-    M-->>C: {document_id, vegetable, status: accepted}
-
-    Note over M: BackgroundTask
-    M->>R: perform_deep_research(name, info)
-    R->>G: Deep Research API
-    G-->>R: 詳細栽培情報
-    R-->>M: research_result
-    M->>D: update_vegetable_status(completed)
-    M->>D: update_edge_agent_config()
-    D->>F: 結果保存
-```
-
-### 栽培ガイド生成フロー (POST /api/seed-guide/jobs)
-
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant M as main.py
-    participant S as seed_service.py
-    participant G as Gemini 3 Pro
-    participant I as Nanobanana Pro
-    participant F as Firestore
-
-    C->>M: POST /api/seed-guide/jobs (画像)
-    M->>F: ジョブ作成 (PENDING)
-    M-->>C: {job_id}
-
-    Note over M: BackgroundTask
-    M->>F: ステータス更新 (PROCESSING)
-    M->>S: analyze_seed_and_generate_guide()
-    S->>G: 画像解析 + ステップ生成
-    G-->>S: 栽培ステップ (JSON)
-
-    loop 並列処理 (max 8)
-        S->>I: 画像生成リクエスト
-        I-->>S: Base64 画像
-    end
-
-    S-->>M: steps[]
-    M->>F: 結果保存 (COMPLETED)
-
-    C->>M: GET /api/seed-guide/jobs/{job_id}
-    M->>F: ドキュメント取得
-    F-->>M: ジョブデータ
-    M-->>C: {status, result}
+    IMG --> GCS
 ```
 
 ### 統合シード機能フロー (POST /api/unified/start)
@@ -266,12 +272,9 @@ sequenceDiagram
     
     Note over M: Phase 1 完了待ち (await gather)
 
-    opt Phase 2: Deep Research
+    par Phase 2 & 3: Deep Research & Guide (並列)
         M->>R: perform_deep_research()
         R->>F: Vegetable Doc 更新 (Status: completed)
-    end
-
-    opt Phase 3: Cultivation Guide
         M->>S: process_seed_guide()
         S->>F: Guide Job 完了
     end
@@ -291,7 +294,11 @@ sequenceDiagram
 | `seed_guide_jobs` | UUID (prefix: `guide-`) | 栽培ガイド生成 (`guide-`) のジョブステータス・結果 |
 | `character_jobs` | UUID (prefix: `char-`) | キャラクター生成 (`char-`) のジョブステータス・結果 |
 | `vegetables` | UUID | 野菜の基本情報、Deep Research 結果、ステータス |
-| `growing_diaries` | `Character` (固定) | 生成された最新のキャラクター情報（エッジエージェント表示用） |
+| `growing_diaries` | 日付 (`YYYY-MM-DD`) / `Character` | 栽培日記 / キャラクター情報 |
+| `configurations` | `edge_agent` | エッジエージェント設定（アクティブ野菜情報等） |
+| `sensor_logs` | UUID | センサーデータ (温度・湿度・土壌水分・照度) |
+| `agent_execution_logs` | UUID | エッジエージェント実行ログ |
+| `saved_seed_guides` | UUID | 保存済み栽培ガイド |
 
 
 ## 🧪 テスト
@@ -314,17 +321,22 @@ pytest --cov=. --cov-report=html
 
 | ファイル | テスト数 | 内容 |
 |---------|---------|------|
-| test_main.py | 30+ | APIエンドポイントテスト |
-| test_db.py | 11 | Firestore操作テスト |
-| test_agent.py | 10 | エージェント連携テスト |
-| test_seed_service.py | 4 | 栽培ガイドサービステスト |
-| test_seed_guide_persistence.py | 4 | 栽培ガイド永続化テスト |
-| test_diary_service.py | 10+ | 日記サービステスト |
-| test_async_flow.py | 3 | 非同期フローテスト |
+| test_main.py | 131 | APIエンドポイントテスト |
+| test_db.py | 75 | Firestore操作テスト |
+| test_diary_service.py | 71 | 日記サービステスト |
+| test_seed_service.py | 38 | 栽培ガイドサービステスト |
+| test_research_agent.py | 37 | 種袋解析・Deep Researchテスト |
+| test_logger.py | 34 | 構造化ロギングテスト |
+| test_image_service.py | 27 | 絵日記画像生成テスト |
+| test_agent.py | 24 | エージェント連携テスト |
+| test_character_service.py | 10 | キャラクター生成サービステスト |
 | test_select_feature.py | 5 | 野菜選択機能テスト |
+| test_seed_guide_persistence.py | 4 | 栽培ガイド永続化テスト |
+| test_character_api.py | 4 | キャラクター生成APIテスト |
 | test_vegetable_config.py | 4 | 野菜設定・日記生成優先順位テスト |
-| test_logger.py | 5 | ロガーテスト |
 | test_utils.py | 4 | ユーティリティテスト |
+| test_async_flow.py | 3 | 非同期フローテスト |
+| **合計** | **473** | |
 
 
 ## 🔒 権限設定

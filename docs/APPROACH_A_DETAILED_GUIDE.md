@@ -1,4 +1,8 @@
-# アプローチA詳細実装ガイド: Cloud Scheduler + HTTP Endpoint
+> [!NOTE]
+> **[HISTORICAL DOCUMENT]** この実装ガイドは設計段階で作成されたものです。
+> 方式Aは **実装済み** です。ガイド内のコード例は実装の参考であり、最終実装と異なる部分があります。現在のコードは `backend/diary_service.py`, `backend/image_service.py`, `backend/main.py` を参照してください。
+
+# 方式A 詳細実装ガイド: Cloud Scheduler + HTTP Endpoint
 
 ## 📋 目次
 

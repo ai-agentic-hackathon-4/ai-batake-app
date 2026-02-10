@@ -8,6 +8,10 @@ This is an AI-powered smart farming platform that provides:
 - AI-driven seed packet analysis and deep research for optimal growing conditions
 - **Manual instruction selection** to apply specific research results to the edge agent
 - Step-by-step planting guide generation using async AI jobs
+- AI character generation from seed packet images
+- Unified seed feature (one-click Research + Guide + Character)
+- Automated daily growing diary generation (via Cloud Scheduler)
+- Illustrated diary image generation with AI characters
 
 ## 2. Tech Stack & Versions
 
@@ -36,6 +40,7 @@ This is an AI-powered smart farming platform that provides:
 ### Infrastructure
 - **Container**: Docker
 - **Deployment**: Google Cloud Run
+- **Scheduler**: Google Cloud Scheduler (daily diary generation)
 - **Analytics**: Vercel Analytics
 
 ## 3. Coding Guidelines
@@ -64,21 +69,22 @@ This is an AI-powered smart farming platform that provides:
 
 ### Testing
 - **Backend**:
-  - **Framework**: FastAPI TestClient for API endpoint testing
-  - **Test Files**: Files should be prefixed with `test_` (e.g., `test_api.py`) or `verify_` (e.g., `verify_async_jobs.py`)
-  - **Location**: Test files are placed in `backend/` directory alongside the modules they test
-  - **Verification Scripts**: 
-    - `verify_async_jobs.py` - Tests async job flow (POST job creation, polling, completion)
-    - `verify_seed_api.py` - Tests seed guide API endpoints
+  - **Framework**: pytest with pytest-asyncio (473 tests, 96% coverage)
+  - **Test Files**: Files should be prefixed with `test_` and placed in `backend/tests/`
   - **Running Tests**:
     ```bash
     cd backend
-    python test_api.py <image_path>           # Run API tests with test image
-    python verify_async_jobs.py               # Verify async job processing
-    python verify_seed_api.py                 # Verify seed API endpoints
+    pytest                                    # Run all tests
+    pytest --cov=. --cov-report=html          # With coverage
     ```
-- **Frontend**: ESLint for static code analysis
-  - Run with `npm run lint` in the `frontend/` directory
+  - **Verification Scripts** (in `backend/`):
+    - `verify_unified_api.py` - Tests unified seed feature flow
+    - `verify_character_gen.py` - Tests character generation
+    - `verify_save_logic.py` - Tests persistence logic
+    - `verify_proxy.py` - Tests image proxy endpoints
+- **Frontend**: Jest (42 tests) + ESLint
+  - Run tests with `npm test` in the `frontend/` directory
+  - Run lint with `npm run lint` in the `frontend/` directory
 
 ### Formatting
 - **Frontend**: Use consistent indentation (4 spaces for TypeScript)
@@ -108,7 +114,12 @@ This is an AI-powered smart farming platform that provides:
 │   ├── agent.py            # Vertex AI Agent Engine integration
 │   ├── research_agent.py   # Gemini API for seed analysis & research
 │   ├── seed_service.py     # Async seed guide generation service
-│   └── requirements.txt    # Python dependencies
+│   ├── diary_service.py    # Automated growing diary generation
+│   ├── image_service.py    # Illustrated diary image generation
+│   ├── character_service.py # AI character generation
+│   ├── logger.py           # Structured logging (JSON formatter)
+│   ├── requirements.txt    # Python dependencies
+│   └── tests/              # Test files (473 tests)
 │
 ├── frontend/               # Next.js frontend
 │   ├── app/               # Next.js App Router pages
@@ -116,13 +127,17 @@ This is an AI-powered smart farming platform that provides:
 │   │   ├── page.tsx       # Landing page
 │   │   ├── dashboard/     # Dashboard page
 │   │   ├── research_agent/# Research agent page
-│   │   └── seed_guide/    # Seed guide page
+│   │   ├── seed_guide/    # Seed guide page
+│   │   ├── unified/       # Unified seed feature page
+│   │   ├── diary/         # Growing diary page
+│   │   └── character/     # Character management page
 │   ├── components/        # React components
 │   │   ├── ui/           # Radix UI-based primitives
 │   │   └── *.tsx         # Feature components
 │   ├── lib/              # Utility functions
 │   └── public/           # Static assets
 │
+├── docs/                  # Documentation
 ├── Dockerfile            # Container build definition
 ├── start.sh             # Startup script for backend & frontend
 └── package-lock.json    # Root lock file
@@ -139,13 +154,15 @@ This is an AI-powered smart farming platform that provides:
   - RESTful API design with FastAPI
   - Background tasks for long-running operations (async job processing)
   - Repository pattern for database operations (db.py)
-  - Service layer for AI integrations (agent.py, research_agent.py)
+  - Service layer for AI integrations (agent.py, research_agent.py, diary_service.py, image_service.py, character_service.py)
+  - Structured logging with JSON formatter (logger.py)
 
 ### API Design
 - Base path: `/api/`
 - Endpoints follow RESTful conventions
 - Use Pydantic models for request/response validation
-- Background tasks for heavy processing (seed analysis, deep research)
+- Background tasks for heavy processing (seed analysis, deep research, diary generation)
+- SSE (Server-Sent Events) for real-time progress streaming (diary generation)
 
 ## 6. External Documentation & Resources
 - **Next.js Documentation**: https://nextjs.org/docs
