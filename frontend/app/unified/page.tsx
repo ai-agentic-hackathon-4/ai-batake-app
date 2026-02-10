@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search, LayoutDashboard, Heart } from 'lucide-react';
+import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search, LayoutDashboard, UserPlus } from 'lucide-react';
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -45,6 +45,7 @@ export default function UnifiedPage() {
     const [currentStep, setCurrentStep] = useState(0); // For carousel navigation
     const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
     const [imageModel, setImageModel] = useState<string>("pro");
+    const [guideImageMode, setGuideImageMode] = useState<string>("single");
     const [showRawReport, setShowRawReport] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
     const [isSelectingChar, setIsSelectingChar] = useState(false);
@@ -97,7 +98,7 @@ export default function UnifiedPage() {
         formData.append("file", file)
 
         try {
-            const res = await fetch(`/api/unified/start?research_mode=${researchMode}&image_model=${imageModel}`, {
+            const res = await fetch(`/api/unified/start?research_mode=${researchMode}&image_model=${imageModel}&guide_image_mode=${guideImageMode}`, {
                 method: "POST",
                 body: formData,
             })
@@ -225,13 +226,29 @@ export default function UnifiedPage() {
                             </div>
 
                             <div className="space-y-3 pb-2 pt-1 border-t border-slate-100">
-                                <p className="text-sm font-medium text-slate-700">図解生成モデルの選択</p>
-                                <Tabs value={imageModel} onValueChange={(val) => setImageModel(val)} className="w-full">
-                                    <TabsList className="grid w-full grid-cols-2">
-                                        <TabsTrigger value="pro" className="text-xs">NanoBanana Pro</TabsTrigger>
-                                        <TabsTrigger value="flash" className="text-xs">NanoBanana</TabsTrigger>
-                                    </TabsList>
-                                </Tabs>
+                                <p className="text-sm font-medium text-slate-700">🎨 図解モード</p>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setGuideImageMode("single")}
+                                        className={`flex-1 text-xs px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "single"
+                                            ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-md"
+                                            : "bg-white text-slate-600 border-slate-200 hover:border-green-300"
+                                            }`}
+                                    >
+                                        🖼️ 1枚絵（Pro）
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setGuideImageMode("per_step")}
+                                        className={`flex-1 text-xs px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "per_step"
+                                            ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-md"
+                                            : "bg-white text-slate-600 border-slate-200 hover:border-green-300"
+                                            }`}
+                                    >
+                                        📸 ステップ別
+                                    </button>
+                                </div>
                             </div>
 
                             {error && (
@@ -425,8 +442,8 @@ export default function UnifiedPage() {
                                                         />
                                                     </div>
                                                 ) : (
-                                                    <div className="w-64 h-64 bg-pink-50 rounded-full flex items-center justify-center mx-auto animate-pulse">
-                                                        <Sparkles className="h-16 w-16 text-pink-200" />
+                                                    <div className="w-64 h-64 bg-emerald-50 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                                                        <Sparkles className="h-16 w-16 text-emerald-200" />
                                                     </div>
                                                 )}
                                             </div>
@@ -453,16 +470,16 @@ export default function UnifiedPage() {
                                                     <div className="ml-8 space-y-4">
                                                         {/* Title Banner */}
                                                         <div className="relative inline-block">
-                                                            <div className="absolute -top-2 -left-2 w-full h-full bg-pink-400/20 transform rotate-1 rounded"></div>
-                                                            <h3 className="relative text-3xl font-bold text-pink-700 px-4 py-2 bg-white/60 rounded border-2 border-pink-300 shadow-sm"
+                                                            <div className="absolute -top-2 -left-2 w-full h-full bg-emerald-400/20 transform rotate-1 rounded"></div>
+                                                            <h3 className="relative text-3xl font-bold text-emerald-800 px-4 py-2 bg-white/60 rounded border-2 border-emerald-300 shadow-sm"
                                                                 style={{ fontFamily: '"Noto Sans JP", sans-serif' }}>
-                                                                📝 {status.character.result.character_name || "名無しさん"}
+                                                                🌱 {status.character.result.character_name || "名無しさん"}
                                                             </h3>
                                                         </div>
 
                                                         {/* Personality Section */}
-                                                        <div className="bg-white/50 p-4 rounded-lg border-l-4 border-pink-400 shadow-sm">
-                                                            <p className="text-sm text-pink-600 font-semibold mb-2">性格:</p>
+                                                        <div className="bg-white/50 p-4 rounded-lg border-l-4 border-emerald-500 shadow-sm">
+                                                            <p className="text-sm text-emerald-700 font-semibold mb-2">性格:</p>
                                                             <p className="text-slate-700 text-base leading-relaxed italic">
                                                                 "{status.character.result.personality}"
                                                             </p>
@@ -487,8 +504,8 @@ export default function UnifiedPage() {
                                                                     onClick={handleSelectCharacterForDiary}
                                                                     disabled={isSelectingChar || charSelected}
                                                                     className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm transition-all duration-300 shadow-md ${charSelected
-                                                                            ? 'bg-green-100 text-green-700 border-2 border-green-300 cursor-default'
-                                                                            : 'bg-gradient-to-r from-pink-400 to-rose-400 text-white hover:from-pink-500 hover:to-rose-500 hover:shadow-lg transform hover:-translate-y-0.5'
+                                                                        ? 'bg-green-100 text-green-700 border-2 border-green-300 cursor-default'
+                                                                        : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 hover:shadow-lg transform hover:-translate-y-0.5'
                                                                         }`}
                                                                 >
                                                                     {isSelectingChar ? (
@@ -496,7 +513,7 @@ export default function UnifiedPage() {
                                                                     ) : charSelected ? (
                                                                         <><CheckCircle2 className="h-4 w-4" /> 日記のパートナーに登録しました！</>
                                                                     ) : (
-                                                                        <><Heart className="h-4 w-4" /> この子を日記で使う 💕</>
+                                                                        <><UserPlus className="h-4 w-4" /> この子を日記で使う</>
                                                                     )}
                                                                 </button>
                                                             </div>
@@ -515,7 +532,7 @@ export default function UnifiedPage() {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Loader2 className="h-12 w-12 animate-spin text-pink-300" />
+                                                    <Loader2 className="h-12 w-12 animate-spin text-emerald-300" />
                                                     <p className="text-lg">種から命が芽吹いています...</p>
                                                     <p className="text-sm">種の声を聞いています</p>
                                                 </>
@@ -568,6 +585,25 @@ export default function UnifiedPage() {
                                     <CardContent>
                                         {status.guide.status === 'COMPLETED' && status.guide.result && Array.isArray(status.guide.result) && status.guide.result.length > 0 ? (
                                             <div className="relative">
+                                                {/* Single Guide Image (if only step 0 has image) */}
+                                                {(() => {
+                                                    const stepsWithImages = status.guide.result.filter((s: any) => s.image_url);
+                                                    const isSingleImageMode = stepsWithImages.length <= 1 && status.guide.result[0]?.image_url;
+                                                    if (isSingleImageMode) {
+                                                        return (
+                                                            <div className="mb-6">
+                                                                <p className="text-sm text-slate-500 mb-2 text-center font-medium">🎨 NanoBanana Pro によるガイド画像</p>
+                                                                <img
+                                                                    src={getProxiedImageUrl(status.guide.result[0].image_url)}
+                                                                    alt="栽培ガイド"
+                                                                    className="rounded-xl w-full object-contain border-2 border-green-200 shadow-lg bg-white"
+                                                                />
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+
                                                 {/* Carousel Container */}
                                                 <div className="overflow-hidden">
                                                     <div
@@ -590,15 +626,21 @@ export default function UnifiedPage() {
                                                                                 ⏱️ 目安: {step.duration}
                                                                             </span>
                                                                         )}
-                                                                        {step.image_url && (
-                                                                            <div className="mt-4">
-                                                                                <img
-                                                                                    src={getProxiedImageUrl(step.image_url)}
-                                                                                    alt={step.title}
-                                                                                    className="rounded-lg max-h-64 w-full object-cover border-2 border-green-200 shadow-md"
-                                                                                />
-                                                                            </div>
-                                                                        )}
+                                                                        {/* Per-step image (only in per_step mode, skip step 0 in single mode) */}
+                                                                        {step.image_url && (() => {
+                                                                            const stepsWithImages = status.guide.result.filter((s: any) => s.image_url);
+                                                                            const isSingleImageMode = stepsWithImages.length <= 1;
+                                                                            if (isSingleImageMode && idx === 0) return null; // Already shown above
+                                                                            return (
+                                                                                <div className="mt-4">
+                                                                                    <img
+                                                                                        src={getProxiedImageUrl(step.image_url)}
+                                                                                        alt={step.title}
+                                                                                        className="rounded-lg max-h-80 w-full object-contain border-2 border-green-200 shadow-md bg-white"
+                                                                                    />
+                                                                                </div>
+                                                                            );
+                                                                        })()}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -790,7 +832,7 @@ export default function UnifiedPage() {
                                                     </div>
                                                 ) : (
                                                     <>
-                                                        <Loader2 className="h-10 w-10 animate-spin text-purple-300" />
+                                                        <Loader2 className="h-12 w-12 animate-spin text-purple-300" />
                                                         <p className="text-lg">詳細リサーチ実行中...</p>
                                                         <p className="text-sm">※完了まで少し時間がかかります</p>
                                                     </>

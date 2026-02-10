@@ -242,7 +242,7 @@ def perform_web_grounding_research(vegetable_name: str, packet_info: str) -> dic
             "parts": [{"text": research_topic}]
         }],
         "tools": [
-            {"google_search": {}}
+            {"googleSearch": {}}
         ]
     }
 

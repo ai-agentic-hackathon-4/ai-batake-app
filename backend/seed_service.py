@@ -226,19 +226,77 @@ def _generate_images_parallel(steps, primary_img_url, fallback_img_url, headers)
     # We need to pass img_url and headers to each thread
     map_args = [(step, primary_img_url, fallback_img_url, headers) for step in steps]
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         # map preserves the order of results corresponding to 'steps'
         final_steps = list(executor.map(process_step, map_args))
         
     return final_steps
 
-async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=None, image_model: str = "pro"):
+
+def _generate_single_guide_image(guide_title, steps, api_key, headers):
+    """Generates a single infographic-style image summarizing all steps using NanoBanana Pro."""
+    info(f"Generating single guide image for: {guide_title} ({len(steps)} steps)")
+    
+    # Build a comprehensive prompt from all steps
+    steps_description = "\n".join(
+        f"Step {i+1}: {s.get('step_title', s.get('title', ''))} - {s.get('description', '')[:100]}"
+        for i, s in enumerate(steps)
+    )
+    
+    prompt = (
+        f"Create a beautiful, detailed infographic-style illustration for a home gardening guide: '{guide_title}'.\n"
+        f"The image should show the complete growing process in a single visual, with numbered steps arranged in a clear flow.\n"
+        f"Steps:\n{steps_description}\n\n"
+        f"Style: Soft watercolor illustration, warm pastel colors, numbered steps with small icons, "
+        f"clean white background, Japanese home gardening context, cute and friendly style, "
+        f"high quality infographic layout, step numbers clearly visible, "
+        f"arrows or flow lines connecting each step."
+    )
+    
+    model_id = "gemini-3-pro-image-preview"
+    url = (
+        f"https://{API_ENDPOINT}/v1/publishers/google/"
+        f"models/{model_id}:generateContent?key={api_key}"
+    )
+    
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {}
+    }
+    
+    try:
+        response = call_api_with_backoff(
+            url, payload, headers,
+            max_retries=6,
+            max_elapsed_seconds=120,
+            base_delay=2.0,
+            max_delay=10.0,
+        )
+        
+        if response.status_code == 200:
+            resp_json = response.json()
+            parts = resp_json['candidates'][0]['content']['parts']
+            for part in parts:
+                if 'inlineData' in part:
+                    b64_data = part['inlineData']['data']
+                    info(f"Single guide image generated successfully for: {guide_title}")
+                    return b64_data
+            warning(f"No inline image data in single guide response for: {guide_title}")
+        else:
+            warning(f"Single guide image generation failed: {response.status_code}")
+    except Exception as e:
+        error(f"Single guide image generation error: {e}")
+    
+    return None
+
+async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=None, image_model: str = "pro", guide_image_mode: str = "single"):
     """
     Analyzes a seed image and generates a step-by-step planting guide with images using Vertex AI REST API.
     Args:
         image_bytes: The image content.
         progress_callback: Optional async function(message: str) to report progress.
         image_model: "pro" for gemini-3-pro-image-preview or "flash" for gemini-2.5-flash-image
+        guide_image_mode: "single" for one infographic image (NanoBanana Pro), "per_step" for per-step images
     """
     info(f"Starting seed analysis and guide generation ({len(image_bytes)} bytes, model={image_model})")
     if progress_callback: await progress_callback("🌱 AI is analyzing the seed image (Gemini 3 Pro)...")
@@ -359,44 +417,77 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         error(f"Seed analysis failed: {e}", exc_info=True)
         raise e
 
-    if progress_callback: await progress_callback(f"🎨 Generating illustrations for {len(steps)} steps...")
-
-    # 2. Generate Images based on selected model
-    if image_model == "flash":
-        primary_img_model_id = "gemini-2.5-flash-image"
-        fallback_img_model_id = "gemini-3-pro-image-preview"  # Fallback to Pro if Flash fails
-        model_name_for_log = "Gemini 2.5 Flash Image (with Pro fallback)"
-    else:
-        # Default to pro
-        primary_img_model_id = "gemini-3-pro-image-preview"
-        fallback_img_model_id = "gemini-2.5-flash-image"
-        model_name_for_log = "Gemini 3 Pro Image (with Flash fallback)"
+    if guide_image_mode == "single":
+        # --- Single Image Mode: Generate one infographic using NanoBanana Pro ---
+        if progress_callback: await progress_callback("🎨 NanoBanana Pro で栽培ガイド画像を生成中...")
         
-    info(f"Using {model_name_for_log} for image generation")
-    
-    primary_img_url = (
-        f"https://{API_ENDPOINT}/v1/publishers/google/"
-        f"models/{primary_img_model_id}:generateContent?key={api_key}"
-    )
-    fallback_img_url = None
-    if fallback_img_model_id:
-        fallback_img_url = (
-            f"https://{API_ENDPOINT}/v1/publishers/google/"
-            f"models/{fallback_img_model_id}:generateContent?key={api_key}"
+        info(f"Using SINGLE image mode (NanoBanana Pro) for guide: {guide_title}")
+        
+        single_image_b64 = await asyncio.to_thread(
+            _generate_single_guide_image,
+            guide_title,
+            steps,
+            api_key,
+            headers
         )
+        
+        # Build final steps with text only, attach single image to first step
+        final_steps = []
+        for i, step in enumerate(steps):
+            step_data = {
+                "title": step.get('step_title', step.get('title', f'Step {i+1}')),
+                "description": step.get('description', ''),
+            }
+            if i == 0 and single_image_b64:
+                step_data["image_base64"] = single_image_b64
+            final_steps.append(step_data)
+        
+        has_image = single_image_b64 is not None
+        info(f"Single image guide complete: {len(final_steps)} steps, image={'yes' if has_image else 'no'}")
+        
+        if progress_callback: await progress_callback("✨ Guide generation complete!")
+        return guide_title, guide_description, final_steps
     
-    # Offload parallel image generation to thread
-    final_steps = await asyncio.to_thread(
-        _generate_images_parallel,
-        steps,
-        primary_img_url,
-        fallback_img_url,
-        headers
-    )
-    
-    successful_images = sum(1 for step in final_steps if step.get('image_base64'))
-    info(f"Guide generation complete: {len(final_steps)} steps, {successful_images} images generated")
-    
-    if progress_callback: await progress_callback("✨ Guide generation complete!")
+    else:
+        # --- Per-Step Image Mode (Original): Generate image for each step ---
+        if progress_callback: await progress_callback(f"🎨 Generating illustrations for {len(steps)} steps...")
+
+        # 2. Generate Images based on selected model
+        if image_model == "flash":
+            primary_img_model_id = "gemini-2.5-flash-image"
+            fallback_img_model_id = "gemini-3-pro-image-preview"  # Fallback to Pro if Flash fails
+            model_name_for_log = "Gemini 2.5 Flash Image (with Pro fallback)"
+        else:
+            # Default to pro
+            primary_img_model_id = "gemini-3-pro-image-preview"
+            fallback_img_model_id = "gemini-2.5-flash-image"
+            model_name_for_log = "Gemini 3 Pro Image (with Flash fallback)"
             
-    return guide_title, guide_description, final_steps
+        info(f"Using {model_name_for_log} for image generation")
+        
+        primary_img_url = (
+            f"https://{API_ENDPOINT}/v1/publishers/google/"
+            f"models/{primary_img_model_id}:generateContent?key={api_key}"
+        )
+        fallback_img_url = None
+        if fallback_img_model_id:
+            fallback_img_url = (
+                f"https://{API_ENDPOINT}/v1/publishers/google/"
+                f"models/{fallback_img_model_id}:generateContent?key={api_key}"
+            )
+        
+        # Offload parallel image generation to thread
+        final_steps = await asyncio.to_thread(
+            _generate_images_parallel,
+            steps,
+            primary_img_url,
+            fallback_img_url,
+            headers
+        )
+        
+        successful_images = sum(1 for step in final_steps if step.get('image_base64'))
+        info(f"Guide generation complete: {len(final_steps)} steps, {successful_images} images generated")
+        
+        if progress_callback: await progress_callback("✨ Guide generation complete!")
+                
+        return guide_title, guide_description, final_steps

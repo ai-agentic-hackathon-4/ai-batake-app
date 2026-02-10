@@ -50,6 +50,7 @@ export default function SeedGuidePage() {
     // Create Mode State
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [imageModel, setImageModel] = useState<string>("pro");
+    const [guideImageMode, setGuideImageMode] = useState<string>("single");
     const [error, setError] = useState<string | null>(null);
 
     // List/Detail Mode State
@@ -113,7 +114,7 @@ export default function SeedGuidePage() {
 
         try {
             // Updated endpoint name
-            const response = await fetch(`/api/seed-guide/generate?image_model=${imageModel}`, {
+            const response = await fetch(`/api/seed-guide/generate?image_model=${imageModel}&guide_image_mode=${guideImageMode}`, {
                 method: 'POST',
                 body: formData,
             });
@@ -319,13 +320,29 @@ export default function SeedGuidePage() {
                                         />
                                     </div>
                                     <div className="grid w-full items-center gap-1.5 text-left pb-4">
-                                        <label className="text-xs font-medium text-muted-foreground ml-1">画像生成モデル</label>
-                                        <Tabs value={imageModel} onValueChange={(val) => setImageModel(val)} className="w-full">
-                                            <TabsList className="grid w-full grid-cols-2">
-                                                <TabsTrigger value="pro" className="text-sm">NanoBanana Pro</TabsTrigger>
-                                                <TabsTrigger value="flash" className="text-sm">NanoBanana</TabsTrigger>
-                                            </TabsList>
-                                        </Tabs>
+                                        <label className="text-xs font-medium text-muted-foreground ml-1">🎨 図解モード</label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setGuideImageMode("single")}
+                                                className={`flex-1 text-sm px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "single"
+                                                        ? "bg-primary text-primary-foreground border-primary shadow-md"
+                                                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                                    }`}
+                                            >
+                                                🖼️ 1枚絵（Pro）
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setGuideImageMode("per_step")}
+                                                className={`flex-1 text-sm px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "per_step"
+                                                        ? "bg-primary text-primary-foreground border-primary shadow-md"
+                                                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                                    }`}
+                                            >
+                                                📸 ステップ別
+                                            </button>
+                                        </div>
                                     </div>
                                     <button
                                         onClick={handleUpload}
@@ -419,23 +436,29 @@ export default function SeedGuidePage() {
                                             <div className="aspect-video bg-muted relative flex items-center justify-center border-b border-border">
                                                 {(() => {
                                                     const step = selectedGuide.steps[currentStepIndex];
-                                                    const imageUrl = step.image_url;
-                                                    const imageBase64 = step.image_base64;
+                                                    // Detect single image mode: only step 0 has image
+                                                    const stepsWithImages = selectedGuide.steps.filter((s: any) => s.image_url || s.image_base64);
+                                                    const isSingleImageMode = stepsWithImages.length <= 1 && (selectedGuide.steps[0]?.image_url || selectedGuide.steps[0]?.image_base64);
+
+                                                    // In single mode, always show step 0's image; in per_step mode, show current step's image
+                                                    const displayStep = isSingleImageMode ? selectedGuide.steps[0] : step;
+                                                    const imageUrl = displayStep.image_url;
+                                                    const imageBase64 = displayStep.image_base64;
 
                                                     if (imageBase64) {
                                                         return (
                                                             <img
                                                                 src={`data:image/jpeg;base64,${imageBase64}`}
-                                                                alt={step.title}
-                                                                className="w-full h-full object-cover animate-in fade-in duration-500"
+                                                                alt={isSingleImageMode ? "栽培ガイド" : step.title}
+                                                                className="w-full h-full object-contain bg-white animate-in fade-in duration-500"
                                                             />
                                                         );
                                                     } else if (imageUrl) {
                                                         return (
                                                             <img
                                                                 src={getProxiedImageUrl(imageUrl)}
-                                                                alt={step.title}
-                                                                className="w-full h-full object-cover animate-in fade-in duration-500"
+                                                                alt={isSingleImageMode ? "栽培ガイド" : step.title}
+                                                                className="w-full h-full object-contain bg-white animate-in fade-in duration-500"
                                                             />
                                                         );
                                                     } else {
