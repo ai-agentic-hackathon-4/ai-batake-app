@@ -152,14 +152,8 @@ def generate_picture_diary(date_str: str, summary: str):
         image_b64 = base64.b64encode(image_bytes).decode('utf-8')
 
         # 3. Call NanoBanana-pro (gemini-3-pro-image-preview)
-        # Endpoint structure from seed_service.py
-        # 3. Call NanoBanana-pro (gemini-3-pro-image-preview) with Fallback
-        # Endpoint structure from seed_service.py
-        primary_model_id = "gemini-3-pro-image-preview"
-        fallback_model_id = "gemini-2.5-flash-image"
-        
-        primary_url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{primary_model_id}:generateContent?key={api_key}"
-        fallback_url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{fallback_model_id}:generateContent?key={api_key}"
+        model_id = "gemini-3-pro-image-preview"
+        url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{model_id}:generateContent?key={api_key}"
         
         # Prompt based on Seed Service and User requirement
         prompt_text = f"NanoBanana-pro. Please generate a picture diary style illustration for the date {date_str}. Based on this character image, create an illustration that depicts the following event: {summary}. Maintain the character's appearance. Soft digital illustration style."
@@ -179,71 +173,26 @@ def generate_picture_diary(date_str: str, summary: str):
 
         headers = {"Content-Type": "application/json"}
         
-        info(f"[LLM] 🎨 Requesting diary image generation (Primary: {primary_model_id})...")
+        info(f"[LLM] 🎨 Requesting diary image generation (model: {model_id})...")
         
         response = None
-        primary_failed = False
 
         try:
             response = call_api_with_backoff(
-                primary_url,
+                url,
                 payload,
                 headers,
-                max_retries=6,
-                max_elapsed_seconds=90,
-                base_delay=1.5,
-                max_delay=8.0
+                max_retries=100,
+                max_elapsed_seconds=1800,
+                base_delay=2.0,
+                max_delay=15.0,
             )
-            
-            if response.status_code != 200:
-                warning(f"Primary model failed with status: {response.status_code}")
-                primary_failed = True
-                
         except Exception as e:
-            warning(f"Primary model execution failed: {e}")
-            primary_failed = True
+            warning(f"Diary image generation failed: {e}")
 
-        if primary_failed:
-            info(f"[LLM] 🔄 Retrying with fallback model: {fallback_model_id}...")
-            try:
-                response = call_api_with_backoff(
-                    fallback_url,
-                    payload,
-                    headers,
-                    max_retries=4,
-                    max_elapsed_seconds=60,
-                    base_delay=1.5,
-                    max_delay=8.0
-                )
-            except Exception as e:
-                warning(f"Fallback model execution failed: {e}")
-                # Try tertiary fallback
-
-        # Tertiary Fallback: Flash with Simplified Prompt
-        if not response or response.status_code != 200:
-            try:
-                info(f"[LLM] 🔄 Trying tertiary (Flash + simple prompt) for diary...")
-                simple_prompt = f"A simple garden diary illustration, {summary}, soft colors"
-                simple_payload = {
-                    "contents": [{ "role": "user", "parts": [{"text": simple_prompt}] }],
-                    "generationConfig": {}
-                }
-                response = call_api_with_backoff(
-                    fallback_url,
-                    simple_payload,
-                    headers,
-                    max_retries=3,
-                    max_elapsed_seconds=45,
-                    base_delay=1.0,
-                    max_delay=5.0
-                )
-            except Exception as e:
-                warning(f"Tertiary fallback failed for diary: {e}")
-
-        # Final check before parsing/placeholder
         if not response or response.status_code != 200:
             status = response.status_code if response else "Unknown"
-            warning(f"All AI generation attempts failed for diary (status: {status}). Using placeholder.")
+            warning(f"AI generation failed for diary (status: {status}). Using placeholder.")
             generated_bytes = base64.b64decode(DEFAULT_PLACEHOLDER_B64)
         else:
             resp_json = response.json()
