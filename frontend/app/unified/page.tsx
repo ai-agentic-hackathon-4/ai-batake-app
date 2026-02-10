@@ -181,7 +181,7 @@ export default function UnifiedPage() {
         <div className="min-h-screen bg-background">
             {/* Header */}
             <header className="border-b border-border bg-card">
-                <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-3">
+                <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3">
                     <Link href="/" className="mr-2 p-1 hover:bg-accent rounded-full transition-colors">
                         <ArrowLeft className="h-5 w-5 text-muted-foreground" />
                     </Link>
@@ -196,27 +196,26 @@ export default function UnifiedPage() {
             </header>
 
             {/* Main Content */}
-            <main className="max-w-6xl mx-auto p-6">
+            <main className="max-w-6xl mx-auto px-4 py-3">
 
             {/* Upload Section */}
             {!jobId && (
-                <div className="min-h-[70vh] flex items-center justify-center">
+                <div className="flex items-center justify-center">
                     <Card className="max-w-xl w-full border-dashed border-2">
-                        <CardHeader>
-                            <CardTitle className="text-center">種の袋をスキャン</CardTitle>
-                            {/* Description Removed */}
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-center text-lg">種の袋をスキャン</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors border border-slate-200"
+                        <CardContent className="space-y-3">
+                            <div className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors border border-slate-200"
                                 onClick={() => document.getElementById('file-upload')?.click()}>
                                 {preview ? (
-                                    <img src={preview} alt="Preview" className="max-h-64 rounded shadow-md" />
+                                    <img src={preview} alt="Preview" className="max-h-40 rounded shadow-md" />
                                 ) : (
-                                    <div className="text-center space-y-2">
-                                        <div className="bg-white p-4 rounded-full shadow-sm inline-block">
-                                            <Upload className="h-8 w-8 text-primary" />
+                                    <div className="text-center space-y-1">
+                                        <div className="bg-white p-3 rounded-full shadow-sm inline-block">
+                                            <Upload className="h-6 w-6 text-primary" />
                                         </div>
-                                        <p className="text-sm text-slate-500">クリックして画像をアップロード</p>
+                                        <p className="text-xs text-slate-500">クリックして画像をアップロード</p>
                                     </div>
                                 )}
                                 <input
@@ -228,8 +227,8 @@ export default function UnifiedPage() {
                                 />
                             </div>
 
-                            <div className="space-y-3 pb-2">
-                                <p className="text-sm font-medium text-slate-700">リサーチモードの選択</p>
+                            <div className="space-y-2 pb-1">
+                                <p className="text-xs font-medium text-slate-700">リサーチモードの選択</p>
                                 <Tabs value={researchMode} onValueChange={(val) => setResearchMode(val as any)} className="w-full">
                                     <TabsList className="grid w-full grid-cols-2">
                                         <TabsTrigger value="agent" className="text-xs">Deep Research</TabsTrigger>
@@ -249,8 +248,8 @@ export default function UnifiedPage() {
                                 )}
                             </div>
 
-                            <div className="space-y-3 pb-2 pt-1 border-t border-slate-100">
-                                <p className="text-sm font-medium text-slate-700">🎨 図解モード</p>
+                            <div className="space-y-2 pb-1 pt-1 border-t border-slate-100">
+                                <p className="text-xs font-medium text-slate-700">🎨 図解モード</p>
                                 <div className="flex gap-2">
                                     <button
                                         type="button"
@@ -289,7 +288,7 @@ export default function UnifiedPage() {
                             )}
 
                             <Button
-                                className="w-full h-12 text-lg"
+                                className="w-full h-10 text-base"
                                 disabled={!file || isUploading}
                                 onClick={startAnalysis}
                             >
@@ -312,30 +311,30 @@ export default function UnifiedPage() {
 
             {/* Post-Upload Processing State */}
             {jobId && !status && (
-                <div className="flex flex-col items-center justify-center py-24 space-y-6 animate-in fade-in zoom-in-95 duration-700">
+                <div className="flex flex-col items-center justify-center py-12 space-y-4 animate-in fade-in zoom-in-95 duration-700">
                     <div className="relative">
                         <div className="absolute inset-0 bg-green-100 rounded-full animate-ping opacity-75"></div>
-                        <div className="relative bg-white p-6 rounded-full shadow-xl border-4 border-green-50">
-                            <Sprout className="h-16 w-16 text-green-600 animate-bounce" />
+                        <div className="relative bg-white p-4 rounded-full shadow-xl border-4 border-green-50">
+                            <Sprout className="h-10 w-10 text-green-600 animate-bounce" />
                         </div>
                     </div>
-                    <div className="text-center space-y-2">
-                        <h2 className="text-3xl font-bold text-slate-700">解析を開始しています...</h2>
-                        <p className="text-slate-500 text-lg">種の袋から情報を読み取っています</p>
+                    <div className="text-center space-y-1">
+                        <h2 className="text-xl font-bold text-slate-700">解析を開始しています...</h2>
+                        <p className="text-slate-500 text-sm">種の袋から情報を読み取っています</p>
                     </div>
                 </div>
             )}
 
             {/* Progress & Results Section */}
             {jobId && status && (
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                     {/* Sidebar Status */}
                     <Card className="lg:col-span-1 h-fit">
-                        <CardHeader>
-                            <CardTitle className="text-lg">進行状況</CardTitle>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-base">進行状況</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-6">
+                        <CardContent className="space-y-4">
 
                             {/* CAHARCTER Status (First) */}
                             <div className="flex items-start gap-3">
@@ -411,19 +410,19 @@ export default function UnifiedPage() {
                     </Card>
 
                     {/* Main Content Area */}
-                    <div className="lg:col-span-3 space-y-8">
+                    <div className="lg:col-span-3 space-y-4">
 
                         {/* 1. Immediate Seed Summary (Shows as soon as Research is done) */}
                         {status.research.result && (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <Card className="bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-100">
-                                    <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-                                        <div className="flex items-center gap-4">
-                                            <div className="p-3 bg-white rounded-full shadow-sm">
-                                                <Sprout className="h-8 w-8 text-green-600" />
+                                    <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-white rounded-full shadow-sm">
+                                                <Sprout className="h-6 w-6 text-green-600" />
                                             </div>
                                             <div>
-                                                <h2 className="text-2xl font-bold text-slate-800">
+                                                <h2 className="text-lg font-bold text-slate-800">
                                                     {status.research.result.name}
                                                 </h2>
                                             </div>
@@ -442,12 +441,12 @@ export default function UnifiedPage() {
                             </TabsList>
 
                             {/* Summary Tab */}
-                            <TabsContent value="summary" className="mt-6 space-y-8">
+                            <TabsContent value="summary" className="mt-3 space-y-4">
 
                                 {/* Refined Character Display - Horizontal Layout */}
                                 <div className="flex items-center justify-center">
                                     {status.character.result ? (
-                                        <div className="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center animate-in fade-in duration-700">
+                                        <div className="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 items-center animate-in fade-in duration-700">
 
                                             {/* Left: Character Image */}
                                             <div className="flex justify-center items-center">
@@ -457,8 +456,8 @@ export default function UnifiedPage() {
                                                         <img
                                                             src={status.character.result.image_url.startsWith('http') && !status.character.result.image_url.includes('/api/') ? status.character.result.image_url : `${status.character.result.image_url}`}
                                                             alt="Character"
-                                                            className="w-full max-w-md mx-auto object-contain z-0 hover:scale-105 transition-transform duration-500 rounded-3xl border-8 border-white shadow-[0_0_0_8px_rgba(255,182,193,0.4)] bg-white"
-                                                            style={{ maxHeight: '400px' }}
+                                                            className="w-full max-w-md mx-auto object-contain z-0 hover:scale-105 transition-transform duration-500 rounded-2xl border-4 border-white shadow-[0_0_0_4px_rgba(255,182,193,0.4)] bg-white"
+                                                            style={{ maxHeight: '280px' }}
                                                         />
                                                     </div>
                                                 ) : status.character.result.image_base64 ? (
@@ -467,8 +466,8 @@ export default function UnifiedPage() {
                                                         <img
                                                             src={`data:image/png;base64,${status.character.result.image_base64}`}
                                                             alt="Character"
-                                                            className="w-full max-w-md mx-auto object-contain z-0 rounded-3xl border-8 border-white shadow-[0_0_0_8px_rgba(255,182,193,0.4)] bg-white"
-                                                            style={{ maxHeight: '400px' }}
+                                                            className="w-full max-w-md mx-auto object-contain z-0 rounded-2xl border-4 border-white shadow-[0_0_0_4px_rgba(255,182,193,0.4)] bg-white"
+                                                            style={{ maxHeight: '280px' }}
                                                         />
                                                     </div>
                                                 ) : (
@@ -479,9 +478,9 @@ export default function UnifiedPage() {
                                             </div>
 
                                             {/* Right: Character Profile - Notebook Style */}
-                                            <div className="space-y-6">
+                                            <div className="space-y-3">
                                                 {/* Profile Notebook Card */}
-                                                <div className="relative bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-8 rounded-lg shadow-2xl border-4 border-amber-900/20"
+                                                <div className="relative bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-5 rounded-lg shadow-xl border-2 border-amber-900/20"
                                                     style={{
                                                         backgroundImage: `repeating-linear-gradient(transparent, transparent 31px, #f59e0b15 31px, #f59e0b15 32px)`,
                                                         backgroundSize: '100% 32px'
@@ -497,20 +496,20 @@ export default function UnifiedPage() {
                                                     <div className="absolute left-12 top-0 bottom-0 w-0.5 bg-red-300/40"></div>
 
                                                     {/* Content */}
-                                                    <div className="ml-8 space-y-4">
+                                                    <div className="ml-8 space-y-3">
                                                         {/* Title Banner */}
                                                         <div className="relative inline-block">
-                                                            <div className="absolute -top-2 -left-2 w-full h-full bg-emerald-400/20 transform rotate-1 rounded"></div>
-                                                            <h3 className="relative text-3xl font-bold text-emerald-800 px-4 py-2 bg-white/60 rounded border-2 border-emerald-300 shadow-sm"
+                                                            <div className="absolute -top-1 -left-1 w-full h-full bg-emerald-400/20 transform rotate-1 rounded"></div>
+                                                            <h3 className="relative text-xl font-bold text-emerald-800 px-3 py-1.5 bg-white/60 rounded border-2 border-emerald-300 shadow-sm"
                                                                 style={{ fontFamily: '"Noto Sans JP", sans-serif' }}>
                                                                 🌱 {status.character.result.character_name || "名無しさん"}
                                                             </h3>
                                                         </div>
 
                                                         {/* Personality Section */}
-                                                        <div className="bg-white/50 p-4 rounded-lg border-l-4 border-emerald-500 shadow-sm">
-                                                            <p className="text-sm text-emerald-700 font-semibold mb-2">性格:</p>
-                                                            <p className="text-slate-700 text-base leading-relaxed italic">
+                                                        <div className="bg-white/50 p-3 rounded-lg border-l-4 border-emerald-500 shadow-sm">
+                                                            <p className="text-xs text-emerald-700 font-semibold mb-1">性格:</p>
+                                                            <p className="text-slate-700 text-sm leading-relaxed italic">
                                                                 "{status.character.result.personality}"
                                                             </p>
                                                         </div>
@@ -519,7 +518,7 @@ export default function UnifiedPage() {
                                                         <div className="flex justify-end">
                                                             <div className="relative">
                                                                 <div className="absolute inset-0 bg-yellow-300 transform rotate-2 rounded-lg"></div>
-                                                                <div className="relative bg-gradient-to-br from-yellow-200 to-yellow-300 px-5 py-3 rounded-lg shadow-lg border-2 border-yellow-400 transform -rotate-1">
+                                                                <div className="relative bg-gradient-to-br from-yellow-200 to-yellow-300 px-4 py-2 rounded-lg shadow-lg border-2 border-yellow-400 transform -rotate-1">
                                                                     <p className="text-sm font-bold text-yellow-900 text-center">
                                                                         ✨ {status.character.result.catchphrase || "あなたの栽培パートナー"} ✨
                                                                     </p>
@@ -529,11 +528,11 @@ export default function UnifiedPage() {
 
                                                         {/* Select for Diary Button */}
                                                         {status.character.id && (
-                                                            <div className="pt-4 border-t border-amber-200/50">
+                                                            <div className="pt-3 border-t border-amber-200/50">
                                                                 <button
                                                                     onClick={handleSelectCharacterForDiary}
                                                                     disabled={isSelectingChar || charSelected}
-                                                                    className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm transition-all duration-300 shadow-md ${charSelected
+                                                                    className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-bold text-sm transition-all duration-300 shadow-md ${charSelected
                                                                         ? 'bg-green-100 text-green-700 border-2 border-green-300 cursor-default'
                                                                         : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 hover:shadow-lg transform hover:-translate-y-0.5'
                                                                         }`}
@@ -554,17 +553,17 @@ export default function UnifiedPage() {
 
                                         </div>
                                     ) : (
-                                        <div className="flex flex-col items-center justify-center p-12 text-slate-400 space-y-4">
+                                        <div className="flex flex-col items-center justify-center p-8 text-slate-400 space-y-3">
                                             {status.character.status === 'FAILED' ? (
                                                 <>
-                                                    <AlertCircle className="h-12 w-12 text-red-300" />
+                                                    <AlertCircle className="h-10 w-10 text-red-300" />
                                                     <p>キャラクター召喚に失敗しました...</p>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Loader2 className="h-12 w-12 animate-spin text-emerald-300" />
-                                                    <p className="text-lg">種から命が芽吹いています...</p>
-                                                    <p className="text-sm">種の声を聞いています</p>
+                                                    <Loader2 className="h-10 w-10 animate-spin text-emerald-300" />
+                                                    <p className="text-base">種から命が芽吹いています...</p>
+                                                    <p className="text-xs">種の声を聞いています</p>
                                                 </>
                                             )}
                                         </div>
@@ -602,13 +601,13 @@ export default function UnifiedPage() {
                             </TabsContent>
 
                             {/* Guide Tab */}
-                            <TabsContent value="guide" className="mt-6">
+                            <TabsContent value="guide" className="mt-3">
                                 <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2 text-green-600">
-                                            <Sprout className="h-5 w-5" /> ステップバイステップ・ガイド
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="flex items-center gap-2 text-green-600 text-base">
+                                            <Sprout className="h-4 w-4" /> ステップバイステップ・ガイド
                                         </CardTitle>
-                                        <CardDescription>
+                                        <CardDescription className="text-xs">
                                             {status.guide.result?.description || "AIが作成した栽培プランです"}
                                         </CardDescription>
                                     </CardHeader>
@@ -641,16 +640,16 @@ export default function UnifiedPage() {
                                                         style={{ transform: `translateX(-${currentStep * 100}%)` }}
                                                     >
                                                         {status.guide.result.map((step: any, idx: number) => (
-                                                            <div key={idx} className="flex-shrink-0 w-full p-4">
-                                                                <div className="flex gap-4 border rounded-lg p-6 bg-gradient-to-br from-green-50 to-emerald-50">
+                                                            <div key={idx} className="flex-shrink-0 w-full p-2">
+                                                                <div className="flex gap-3 border rounded-lg p-4 bg-gradient-to-br from-green-50 to-emerald-50">
                                                                     <div className="flex-shrink-0">
-                                                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 text-white flex items-center justify-center font-bold text-lg shadow-lg">
+                                                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-lg">
                                                                             {idx + 1}
                                                                         </div>
                                                                     </div>
-                                                                    <div className="space-y-3 flex-1">
-                                                                        <h3 className="font-bold text-xl text-green-700">{step.title}</h3>
-                                                                        <p className="text-slate-700 leading-relaxed">{step.description}</p>
+                                                                    <div className="space-y-2 flex-1">
+                                                                        <h3 className="font-bold text-base text-green-700">{step.title}</h3>
+                                                                        <p className="text-slate-700 text-sm leading-relaxed">{step.description}</p>
                                                                         {step.duration && (
                                                                             <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-full font-medium">
                                                                                 ⏱️ 目安: {step.duration}
@@ -679,17 +678,17 @@ export default function UnifiedPage() {
                                                 </div>
 
                                                 {/* Navigation Controls */}
-                                                <div className="flex items-center justify-between mt-6">
+                                                <div className="flex items-center justify-between mt-3">
                                                     <button
                                                         onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
                                                         disabled={currentStep === 0}
-                                                        className="p-3 rounded-full bg-green-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors shadow-lg"
+                                                        className="p-2 rounded-full bg-green-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors shadow"
                                                     >
-                                                        <ChevronLeft className="h-6 w-6" />
+                                                        <ChevronLeft className="h-5 w-5" />
                                                     </button>
 
                                                     <div className="text-center">
-                                                        <p className="text-sm text-slate-600 font-medium">
+                                                        <p className="text-xs text-slate-600 font-medium">
                                                             ステップ {currentStep + 1} / {status.guide.result.length}
                                                         </p>
                                                     </div>
@@ -697,16 +696,16 @@ export default function UnifiedPage() {
                                                     <button
                                                         onClick={() => setCurrentStep(Math.min(status.guide.result.length - 1, currentStep + 1))}
                                                         disabled={currentStep === status.guide.result.length - 1}
-                                                        className="p-3 rounded-full bg-green-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors shadow-lg"
+                                                        className="p-2 rounded-full bg-green-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors shadow"
                                                     >
-                                                        <ChevronRight className="h-6 w-6" />
+                                                        <ChevronRight className="h-5 w-5" />
                                                     </button>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="py-12 text-center text-slate-400 space-y-4">
-                                                <Loader2 className="h-12 w-12 animate-spin mx-auto text-green-300" />
-                                                <p className="text-lg">栽培ガイド執筆中...</p>
+                                            <div className="py-8 text-center text-slate-400 space-y-3">
+                                                <Loader2 className="h-10 w-10 animate-spin mx-auto text-green-300" />
+                                                <p className="text-base">栽培ガイド執筆中...</p>
                                             </div>
                                         )}
                                     </CardContent>
@@ -714,9 +713,9 @@ export default function UnifiedPage() {
                             </TabsContent>
 
                             {/* Research Tab */}
-                            <TabsContent value="research" className="mt-6">
+                            <TabsContent value="research" className="mt-3">
                                 <Card>
-                                    <CardHeader>
+                                    <CardHeader className="pb-2">
                                         <div className="flex items-center justify-between">
                                             <CardTitle className="flex items-center gap-2 text-purple-600">
                                                 <Microscope className="h-5 w-5" /> 詳細リサーチデータ
@@ -739,10 +738,10 @@ export default function UnifiedPage() {
                                     </CardHeader>
                                     <CardContent>
                                         {status.research.status?.toLowerCase() === 'completed' && status.research.result ? (
-                                            <div className="space-y-6">
+                                            <div className="space-y-3">
                                                 {/* Name */}
                                                 {status.research.result.name && (
-                                                    <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+                                                    <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
                                                         <h3 className="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
                                                             <Sprout className="h-4 w-4" /> 野菜名
                                                         </h3>
@@ -752,7 +751,7 @@ export default function UnifiedPage() {
 
                                                 {/* Temperature */}
                                                 {status.research.result.optimal_temp_range && (
-                                                    <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                                                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
                                                         <h3 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
                                                             <Activity className="h-4 w-4" /> 最適温度
                                                         </h3>
@@ -762,7 +761,7 @@ export default function UnifiedPage() {
 
                                                 {/* Humidity */}
                                                 {status.research.result.optimal_humidity_range && (
-                                                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                                                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                                                         <h3 className="font-semibold text-blue-800 mb-2">💧 最適湿度</h3>
                                                         <p className="text-slate-700">{status.research.result.optimal_humidity_range}</p>
                                                     </div>
@@ -770,7 +769,7 @@ export default function UnifiedPage() {
 
                                                 {/* Soil Moisture */}
                                                 {status.research.result.soil_moisture_standard && (
-                                                    <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                                                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
                                                         <h3 className="font-semibold text-amber-800 mb-2">🌱 土壌水分量</h3>
                                                         <p className="text-slate-700">{status.research.result.soil_moisture_standard}</p>
                                                     </div>
@@ -778,7 +777,7 @@ export default function UnifiedPage() {
 
                                                 {/* Watering */}
                                                 {status.research.result.watering_instructions && (
-                                                    <div className="bg-cyan-50 p-4 rounded-lg border border-cyan-200">
+                                                    <div className="bg-cyan-50 p-3 rounded-lg border border-cyan-200">
                                                         <h3 className="font-semibold text-cyan-800 mb-2">💦 水やり方法</h3>
                                                         <p className="text-slate-700 whitespace-pre-wrap">{status.research.result.watering_instructions}</p>
                                                     </div>
@@ -786,7 +785,7 @@ export default function UnifiedPage() {
 
                                                 {/* Light Requirements */}
                                                 {status.research.result.light_requirements && (
-                                                    <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                                                    <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                                                         <h3 className="font-semibold text-yellow-800 mb-2">☀️ 日照条件</h3>
                                                         <p className="text-slate-700">{status.research.result.light_requirements}</p>
                                                     </div>
@@ -794,7 +793,7 @@ export default function UnifiedPage() {
 
                                                 {/* Care Tips */}
                                                 {status.research.result.care_tips && (
-                                                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                                                    <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
                                                         <h3 className="font-semibold text-purple-800 mb-2">📝 栽培のコツ</h3>
                                                         <p className="text-slate-700 whitespace-pre-wrap">{status.research.result.care_tips}</p>
                                                     </div>
@@ -802,7 +801,7 @@ export default function UnifiedPage() {
 
                                                 {/* Summary Prompt */}
                                                 {status.research.result.summary_prompt && (
-                                                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                                                         <h3 className="font-semibold text-slate-800 mb-2">📋 詳細情報</h3>
                                                         <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{status.research.result.summary_prompt}</p>
                                                     </div>
@@ -837,10 +836,10 @@ export default function UnifiedPage() {
                                                 )}
                                             </div>
                                         ) : (
-                                            <div className="py-12 flex flex-col items-center justify-center text-slate-400 space-y-4">
+                                            <div className="py-8 flex flex-col items-center justify-center text-slate-400 space-y-3">
                                                 {status.research.status?.toLowerCase() === 'failed' ? (
-                                                    <div className="text-center space-y-4">
-                                                        <AlertCircle className="h-16 w-16 text-red-400 mx-auto" />
+                                                    <div className="text-center space-y-3">
+                                                        <AlertCircle className="h-12 w-12 text-red-400 mx-auto" />
                                                         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
                                                             <h3 className="text-lg font-bold text-red-800 mb-2">読み取りエラー</h3>
                                                             <p className="text-red-700 font-medium">
