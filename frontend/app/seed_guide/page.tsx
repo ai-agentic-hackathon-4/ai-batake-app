@@ -5,6 +5,7 @@ import { Upload, ArrowLeft, ArrowRight, Sprout, AlertCircle, Loader2, BookOpen, 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from 'next/link';
 
 interface Step {
@@ -317,17 +318,14 @@ export default function SeedGuidePage() {
                                             onChange={handleFileChange}
                                         />
                                     </div>
-                                    <div className="grid w-full items-center gap-1.5 text-left">
+                                    <div className="grid w-full items-center gap-1.5 text-left pb-4">
                                         <label className="text-xs font-medium text-muted-foreground ml-1">画像生成モデル</label>
-                                        <Select value={imageModel} onValueChange={setImageModel}>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="モデルを選択" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="pro">Gemini 3 Pro (高品質)</SelectItem>
-                                                <SelectItem value="flash">Gemini 2.5 Flash (高速)</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <Tabs value={imageModel} onValueChange={(val) => setImageModel(val)} className="w-full">
+                                            <TabsList className="grid w-full grid-cols-2">
+                                                <TabsTrigger value="pro" className="text-sm">NanoBanana Pro</TabsTrigger>
+                                                <TabsTrigger value="flash" className="text-sm">NanoBanana</TabsTrigger>
+                                            </TabsList>
+                                        </Tabs>
                                     </div>
                                     <button
                                         onClick={handleUpload}

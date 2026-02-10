@@ -204,15 +204,12 @@ export default function UnifiedPage() {
 
                             <div className="space-y-3 pb-2 pt-1 border-t border-slate-100">
                                 <p className="text-sm font-medium text-slate-700">図解生成モデルの選択</p>
-                                <Select value={imageModel} onValueChange={setImageModel}>
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="モデルを選択" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="pro">Gemini 3 Pro (高品質)</SelectItem>
-                                        <SelectItem value="flash">Gemini 2.5 Flash (高速)</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <Tabs value={imageModel} onValueChange={(val) => setImageModel(val)} className="w-full">
+                                    <TabsList className="grid w-full grid-cols-2">
+                                        <TabsTrigger value="pro" className="text-xs">NanoBanana Pro</TabsTrigger>
+                                        <TabsTrigger value="flash" className="text-xs">NanoBanana</TabsTrigger>
+                                    </TabsList>
+                                </Tabs>
                             </div>
 
                             {error && (
