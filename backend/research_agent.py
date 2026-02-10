@@ -188,6 +188,13 @@ def extract_structured_research_data(vegetable_name: str, report_text: str, quer
         
         gen_data = gen_resp.json()
         extracted_text = gen_data['candidates'][0]['content']['parts'][0]['text']
+        
+        # Clean up markdown if present
+        if "```json" in extracted_text:
+            extracted_text = extracted_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in extracted_text:
+            extracted_text = extracted_text.split("```")[1].split("```")[0].strip()
+            
         result = json.loads(extracted_text)
         
         # Preserve original report (JSON or Text) and metadata
@@ -198,8 +205,13 @@ def extract_structured_research_data(vegetable_name: str, report_text: str, quer
         info(f"Successfully extracted research data for {vegetable_name}")
         return result
     except Exception as e:
-        warning(f"Failed to parse extraction result for {vegetable_name}: {e}")
-        return {"name": vegetable_name, "raw_research": report_text, "error": "Extraction Parsing Failed"}
+        error(f"Failed to parse extraction result for {vegetable_name}: {e}. Text: {extracted_text if 'extracted_text' in locals() else 'N/A'}")
+        # Return partial data so frontend can still show what was found
+        return {
+            "name": vegetable_name, 
+            "raw_report": raw_json_report if raw_json_report else report_text,
+            "error": f"Extraction Parsing Failed: {str(e)}"
+        }
 
 def perform_web_grounding_research(vegetable_name: str, packet_info: str) -> dict:
     """
