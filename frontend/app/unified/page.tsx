@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search, LayoutDashboard } from 'lucide-react';
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
@@ -18,6 +19,22 @@ interface UnifiedJobStatus {
     character: { status: string; result?: any; error?: string }
 }
 
+const getProxiedImageUrl = (url?: string) => {
+    if (!url) return "";
+    if (url.startsWith("https://storage.googleapis.com/ai-agentic-hackathon-4-bk/seed-guides/output/")) {
+        // Extract job_id and index from URL: .../output/{job_id}_{timestamp}_{index}.jpg
+        const parts = url.split("/");
+        const fileName = parts[parts.length - 1];
+        const fileParts = fileName.split("_");
+        if (fileParts.length >= 3) {
+            const jobId = fileParts[0];
+            const indexStr = fileParts[fileParts.length - 1].split(".")[0];
+            return `/api/seed-guide/image/${jobId}/${indexStr}`;
+        }
+    }
+    return url;
+};
+
 export default function UnifiedPage() {
     const [file, setFile] = useState<File | null>(null)
     const [preview, setPreview] = useState<string | null>(null)
@@ -27,6 +44,7 @@ export default function UnifiedPage() {
     const [error, setError] = useState<string>('');
     const [currentStep, setCurrentStep] = useState(0); // For carousel navigation
     const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
+    const [imageModel, setImageModel] = useState<string>("pro");
     const [showRawReport, setShowRawReport] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
 
@@ -77,7 +95,7 @@ export default function UnifiedPage() {
         formData.append("file", file)
 
         try {
-            const res = await fetch(`/api/unified/start?research_mode=${researchMode}`, {
+            const res = await fetch(`/api/unified/start?research_mode=${researchMode}&image_model=${imageModel}`, {
                 method: "POST",
                 body: formData,
             })
@@ -182,6 +200,16 @@ export default function UnifiedPage() {
                                         ? "Deep Research: AIが時間をかけて徹底的に調査します (約2-3分)"
                                         : "Web Grounding: 最新のGoogle検索結果を元に素早く回答します (約1分)"}
                                 </p>
+                            </div>
+
+                            <div className="space-y-3 pb-2 pt-1 border-t border-slate-100">
+                                <p className="text-sm font-medium text-slate-700">図解生成モデルの選択</p>
+                                <Tabs value={imageModel} onValueChange={(val) => setImageModel(val)} className="w-full">
+                                    <TabsList className="grid w-full grid-cols-2">
+                                        <TabsTrigger value="pro" className="text-xs">NanoBanana Pro</TabsTrigger>
+                                        <TabsTrigger value="flash" className="text-xs">NanoBanana</TabsTrigger>
+                                    </TabsList>
+                                </Tabs>
                             </div>
 
                             {error && (
@@ -521,7 +549,7 @@ export default function UnifiedPage() {
                                                                         {step.image_url && (
                                                                             <div className="mt-4">
                                                                                 <img
-                                                                                    src={step.image_url}
+                                                                                    src={getProxiedImageUrl(step.image_url)}
                                                                                     alt={step.title}
                                                                                     className="rounded-lg max-h-64 w-full object-cover border-2 border-green-200 shadow-md"
                                                                                 />
@@ -582,7 +610,7 @@ export default function UnifiedPage() {
                                                 size="sm"
                                                 className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
                                                 onClick={handleApplyToAgent}
-                                                disabled={isApplying || !status.research.id}
+                                                disabled={isApplying || !status.research.id || status.research.status?.toLowerCase() !== 'completed'}
                                             >
                                                 {isApplying ? (
                                                     <Loader2 className="h-4 w-4 animate-spin mr-2" />

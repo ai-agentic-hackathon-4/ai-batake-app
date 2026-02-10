@@ -452,7 +452,7 @@ def _upload_to_gcs_sync(bucket_name, blob_name, content, content_type):
 
 # --- feature/#5 Endpoints (Async Firestore Jobs) ---
 
-async def process_seed_guide(job_id: str, image_source: str):
+async def process_seed_guide(job_id: str, image_source: str, image_model: str = "pro"):
     """Background task to process seed guide generation (Feature #5)."""
     # Set session ID for background task tracing
     task_session_id = f"job-{job_id[:8]}"
@@ -501,7 +501,7 @@ async def process_seed_guide(job_id: str, image_source: str):
             analyze_start_ts = time.time()
             
             # Unpack the new return values (title, description, steps)
-            guide_title, guide_description, steps = await analyze_seed_and_generate_guide(image_bytes, progress_callback)
+            guide_title, guide_description, steps = await analyze_seed_and_generate_guide(image_bytes, progress_callback, image_model=image_model)
             analyze_elapsed_ms = (time.time() - analyze_start_ts) * 1000
             info(f"[SeedGuide][LLM] analyze done job={job_id} ms={analyze_elapsed_ms:.0f}")
             
@@ -524,9 +524,10 @@ async def process_seed_guide(job_id: str, image_source: str):
                             "image/jpeg"
                         )
                         
-                        # Replace base64 with URL
-                        step["image_url"] = image_url
-                        del step["image_base64"]
+                        # Replace base64 with Proxy URL
+                        step["image_url"] = f"/api/seed-guide/image/{job_id}/{i}"
+                        if "image_base64" in step:
+                            del step["image_base64"]
                     except Exception as img_e:
                         warning(f"Failed to upload output image {i}: {img_e}")
             info(f"[SeedGuide] completed job={job_id} steps={len(steps)}")
@@ -561,7 +562,7 @@ async def process_seed_guide(job_id: str, image_source: str):
         }, merge=True)
 
 @app.post("/api/seed-guide/generate")
-async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: UploadFile = File(...), image_model: str = "pro"):
     """Starts an async seed guide generation, persisting immediately to Saved Guides."""
     try:
         # Upload to GCS (streaming)
@@ -605,7 +606,7 @@ async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: 
         })
         
         # Pass blob_name (str) instead of content (bytes)
-        background_tasks.add_task(process_seed_guide, job_id, blob_name)
+        background_tasks.add_task(process_seed_guide, job_id, blob_name, image_model=image_model)
         debug(f"Background task queued for job {job_id}")
 
         return {"job_id": job_id, "status": "PENDING"}
@@ -1128,6 +1129,42 @@ async def get_diary_image(date: str):
         error(f"Error serving diary image: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/seed-guide/image/{job_id}/{step_index}")
+async def get_seed_guide_image(job_id: str, step_index: int):
+    """
+    Serve seed guide step image from GCS via proxy.
+    """
+    try:
+        bucket_name = "ai-agentic-hackathon-4-bk"
+        # Search for blob starting with "seed-guides/output/{job_id}_" and ending with "_{step_index}.jpg"
+        prefix = f"seed-guides/output/{job_id}_"
+        
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        # Use prefix for efficient listing
+        blobs = bucket.list_blobs(prefix=prefix)
+        
+        target_suffix = f"_{step_index}.jpg"
+        target_blob = None
+        for blob in blobs:
+            if blob.name.endswith(target_suffix):
+                target_blob = blob
+                break
+        
+        if not target_blob:
+             raise HTTPException(status_code=404, detail=f"Image for step {step_index} not found")
+             
+        img_bytes = await asyncio.to_thread(target_blob.download_as_bytes)
+        from fastapi import Response
+        return Response(content=img_bytes, media_type="image/jpeg")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error(f"Error serving seed guide image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/diary/generate-daily")
 async def generate_daily_diary_endpoint(background_tasks: BackgroundTasks):
@@ -1220,7 +1257,7 @@ async def get_character_image_endpoint(path: str):
 # --- Unified Seed Feature Endpoints ---
 
 @app.post("/api/unified/start")
-async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile = File(...), research_mode: str = "agent"):
+async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile = File(...), research_mode: str = "agent", image_model: str = "pro"):
     """
     Unified endpoint to start Research, Guide, and Character generation from a single image.
     """
@@ -1408,7 +1445,7 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
             info(f"[Unified][LLM] deep_research start job={job_id} research={research_doc_id} mode={research_mode}")
             research_start_ts = time.time()
             research_task = asyncio.to_thread(process_research, research_doc_id, veg_name, analysis_data, mode=research_mode)
-            guide_task = process_seed_guide(guide_job_id, blob_name)
+            guide_task = process_seed_guide(guide_job_id, blob_name, image_model=image_model)
             research_result, guide_result = await asyncio.gather(
                 research_task,
                 guide_task,
