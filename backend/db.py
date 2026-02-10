@@ -38,7 +38,7 @@ def init_vegetable_status(vegetable_name: str) -> str:
             "created_at": datetime.now(),
             "status": "processing"
         })
-        debug(f"Initialized vegetable status for {vegetable_name} with ID: {doc_ref.id}")
+        info(f"Initialized vegetable status for {vegetable_name} with ID: {doc_ref.id}")
         return doc_ref.id
     except Exception as e:
         error(f"Error initializing status for {vegetable_name}: {e}", exc_info=True)
@@ -198,7 +198,7 @@ def select_vegetable_instruction(doc_id: str) -> bool:
     if db is None: return False
 
     try:
-        debug(f"Selecting vegetable instruction for doc: {doc_id}")
+        info(f"Selecting vegetable instruction for doc: {doc_id}")
         doc_ref = db.collection("vegetables").document(doc_id)
         doc = doc_ref.get()
         
@@ -474,7 +474,7 @@ def select_character_for_diary(job_id: str) -> bool:
     if db is None: return False
 
     try:
-        debug(f"Selecting character job {job_id} for diary")
+        info(f"Selecting character job {job_id} for diary")
         doc_ref = db.collection("character_jobs").document(job_id)
         doc = doc_ref.get()
         

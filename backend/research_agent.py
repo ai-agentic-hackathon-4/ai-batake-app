@@ -71,7 +71,7 @@ def request_with_retry(method, url, **kwargs):
 
     # 最後の試行、または利用可能な場合は最後のレスポンスを返す
     try:
-        debug(f"Final retry attempt for {method} {url}")
+        info(f"[LLM] 🔄 Final retry attempt for {method} {url[:80]}...")
         return requests.request(method, url, **kwargs)
     except requests.exceptions.RequestException as e:
         # 最後の試行も例外で失敗した場合、再送出するかNoneを返すか？
@@ -87,7 +87,7 @@ def analyze_seed_packet(image_bytes: bytes) -> str:
     種袋の画像を分析し、野菜の名前と育て方のポイントを抽出します。
     Gemini 3 Flash (Preview) の REST API を使用して画像解析を行います。
     """
-    info(f"Analyzing seed packet image ({len(image_bytes)} bytes)")
+    debug(f"Analyzing seed packet image ({len(image_bytes)} bytes)")
     headers, query_param = get_auth_headers()
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent{query_param}"
@@ -135,8 +135,8 @@ def analyze_seed_packet(image_bytes: bytes) -> str:
         # 構造: candidates[0].content.parts[0].text
         try:
             text = result_json['candidates'][0]['content']['parts'][0]['text']
-            info(f"Seed packet analysis completed successfully")
-            debug(f"Analysis result preview: {text[:200]}...")
+            info(f"[LLM] Seed packet analysis completed successfully")
+            info(f"[LLM] Analysis result preview: {text[:200]}...")
             return text
         except (KeyError, IndexError):
              error(f"Unexpected response format: {result_json}")
@@ -150,9 +150,9 @@ def extract_structured_research_data(vegetable_name: str, report_text: str, quer
     """
     調査レポートから、アプリで利用しやすいJSON形式のデータを抽出します。
     """
-    info(f"Extracting structured data for {vegetable_name}")
+    debug(f"Extracting structured data for {vegetable_name}")
     # Raw report logging
-    debug(f"Raw report for extraction ({vegetable_name}):\n{report_text}")
+    info(f"[LLM] Raw report for extraction ({vegetable_name}):\n{report_text}")
     extraction_prompt = f"""
     以下の調査レポートに基づいて、野菜「{vegetable_name}」の育て方情報を抽出してJSON形式でまとめてください。
     特にsummary_promptには最適な気温、湿度、土壌水分量、水やり頻度、日照条件について数値を含めてこれだけで野菜を育てることができるほど詳しく記載してください。
@@ -203,7 +203,7 @@ def extract_structured_research_data(vegetable_name: str, report_text: str, quer
         if grounding_metadata:
             result["grounding_metadata"] = grounding_metadata
             
-        info(f"Successfully extracted research data for {vegetable_name}")
+        debug(f"Successfully extracted research data for {vegetable_name}")
         return result
     except Exception as e:
         error(f"Failed to parse extraction result for {vegetable_name}: {e}. Text: {extracted_text if 'extracted_text' in locals() else 'N/A'}")
@@ -218,7 +218,7 @@ def perform_web_grounding_research(vegetable_name: str, packet_info: str) -> dic
     """
     Vertex AI の Google Search Grounding を使用して、野菜の詳細な育て方を調査します。
     """
-    info(f"Starting Web Grounding research for: {vegetable_name}")
+    debug(f"Starting Web Grounding research for: {vegetable_name}")
     
     # Web Grounding 用に特定のキーを取得
     api_key = os.environ.get("SEED_GUIDE_GEMINI_KEY")
@@ -267,9 +267,9 @@ def perform_web_grounding_research(vegetable_name: str, packet_info: str) -> dic
             full_response_json = json.dumps(data, ensure_ascii=False)
             
             # Log raw response for traceability
-            debug(f"Full Web Grounding Response for {vegetable_name}: {full_response_json}")
+            info(f"[LLM] Full Web Grounding Response for {vegetable_name}: {full_response_json}")
             
-            info(f"Web Grounding research completed for {vegetable_name}")
+            debug(f"Web Grounding research completed for {vegetable_name}")
             
             # AI Studio のクエリパラメータを使用して構造化データを抽出 (互換性のため)
             _, studio_query_param = get_auth_headers()
@@ -288,7 +288,7 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
     """
     Deep Research Agent の REST API を使用して、野菜の詳細な育て方を調査します。
     """
-    info(f"Starting deep research for: {vegetable_name}")
+    debug(f"Starting deep research for: {vegetable_name}")
     headers, query_param = get_auth_headers()
 
     research_topic = f"「{vegetable_name}」の育て方について、家庭菜園や農業の専門的な情報を詳しく調べてください。特に最適な気温、湿度、土壌水分量、水やり頻度、日照条件について数値を含めて調査してください。"
@@ -320,7 +320,7 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
             if interaction_id:
                 interaction_name = f"interactions/{interaction_id}"
 
-        info(f"Research started: {interaction_name}")
+        debug(f"Research started: {interaction_name}")
         
         # 2. ポーリング (GET)
         poll_url = f"https://generativelanguage.googleapis.com/v1beta/{interaction_name}{query_param}"
@@ -343,7 +343,7 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
                 outputs = data.get("outputs", [])
                 if outputs:
                     final_text = outputs[-1].get("text", "")
-                    info(f"Research completed for {vegetable_name}")
+                    debug(f"Research completed for {vegetable_name}")
                 break
             elif status == "failed":
                 error_msg = data.get('error')

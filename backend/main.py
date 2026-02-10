@@ -172,7 +172,7 @@ async def get_weather(request: WeatherRequest):
     try:
         debug(f"Weather request for region: {request.region}")
         weather_info = get_weather_from_agent(request.region)
-        info(f"Weather response received for {request.region}")
+        debug(f"Weather response received for {request.region}")
         return {"message": weather_info}
     except Exception as e:
         error(f"Weather request failed: {str(e)}", exc_info=True)
@@ -197,7 +197,7 @@ async def get_sensor_history_endpoint(hours: int = 24):
     try:
         debug(f"Fetching sensor history for {hours} hours")
         data = get_sensor_history(hours=hours)
-        info(f"Sensor history retrieved: {len(data)} records")
+        debug(f"Sensor history retrieved: {len(data)} records")
         return {"data": data}
     except Exception as e:
         error(f"Failed to fetch sensor history: {str(e)}", exc_info=True)
@@ -209,7 +209,7 @@ async def get_latest_vegetable_endpoint():
         debug("Fetching latest vegetable")
         data = get_latest_vegetable()
         if data:
-            info(f"Latest vegetable found: {data.get('name')}")
+            debug(f"Latest vegetable found: {data.get('name')}")
             return data
         else:
             debug("No vegetables found")
@@ -224,7 +224,7 @@ async def get_agent_logs_endpoint():
     try:
         debug("Fetching agent execution logs")
         logs = get_agent_execution_logs(limit=20)
-        info(f"Agent logs retrieved: {len(logs)} entries")
+        debug(f"Agent logs retrieved: {len(logs)} entries")
         return {"logs": logs}
     except Exception as e:
         error(f"Failed to fetch agent logs: {str(e)}", exc_info=True)
@@ -257,7 +257,7 @@ def process_research(doc_id: str, vegetable_name: str, analysis_data: dict, mode
             research_result["original_analysis"] = analysis_data
         
         # Update DB to completed (UPPERCASE for frontend compatibility)
-        debug(f"Updating vegetable status to completed for {doc_id}")
+        info(f"Updating vegetable status to COMPLETED for {doc_id}")
         update_vegetable_status(doc_id, "COMPLETED", research_result)
         
         # Update Edge Agent Configuration -> DISABLED per user request (manual selection only)
@@ -281,9 +281,9 @@ async def register_seed(background_tasks: BackgroundTasks, file: UploadFile = Fi
         info(f"Received seed image: {file.filename}, size: {len(content)} bytes")
         
         # 1. Analyze Seed Packet
-        info("Analyzing seed packet image...")
+        info("[LLM] 📸 Analyzing seed packet image...")
         packet_analysis_json = analyze_seed_packet(content)
-        debug(f"Seed packet analysis result: {packet_analysis_json[:200]}...")
+        info(f"[LLM] ✅ Seed packet analysis completed ({len(packet_analysis_json)} chars)")
         
         # Parse analysis result
         try:
@@ -299,7 +299,7 @@ async def register_seed(background_tasks: BackgroundTasks, file: UploadFile = Fi
         
         # 2. Initialize DB Document (Status: processing)
         doc_id = init_vegetable_status(vegetable_name)
-        debug(f"Created document with ID: {doc_id}")
+        info(f"Created document with ID: {doc_id}")
         
         # 3. Queue Background Task
         background_tasks.add_task(process_research, doc_id, vegetable_name, analysis_data, mode=research_mode)
@@ -343,7 +343,7 @@ async def list_vegetables():
     """Returns list of all vegetables with current status."""
     debug("Fetching all vegetables")
     result = get_all_vegetables()
-    info(f"Retrieved {len(result)} vegetables")
+    debug(f"Retrieved {len(result)} vegetables")
     return result
 
 @app.delete("/api/vegetables/{doc_id}")
@@ -377,7 +377,7 @@ async def get_latest_plant_image():
             return {"error": "No image files found"}
 
         latest_blob = max(image_blobs, key=lambda b: b.time_created)
-        info(f"Serving plant image: {latest_blob.name}")
+        debug(f"Serving plant image: {latest_blob.name}")
         image_data = latest_blob.download_as_bytes()
         b64_image = base64.b64encode(image_data).decode('utf-8')
         content_type = latest_blob.content_type or "image/jpeg"
@@ -579,7 +579,7 @@ async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: 
 async def get_seed_guide_job(job_id: str):
     """Polls the status of a seed guide job from Firestore."""
     try:
-        info(f"Fetching job status: {job_id}")
+        debug(f"Fetching job status: {job_id}")
         doc_ref = db.collection(COLLECTION_NAME).document(job_id)
         doc = await doc_ref.get()
         
@@ -619,7 +619,7 @@ async def get_seed_guide_job(job_id: str):
                     if "image_base64" in res:
                         del res["image_base64"]
 
-        debug(f"Job {job_id} status: {job_data.get('status')}")
+        info(f"Job {job_id} status: {job_data.get('status')}")
         return job_data
     except HTTPException:
         raise
@@ -759,7 +759,7 @@ async def get_character_job_status(job_id: str):
                     if "image_base64" in res:
                         del res["image_base64"]
 
-        debug(f"Character job {job_id} status: {job_data.get('status')}")
+        info(f"Character job {job_id} status: {job_data.get('status')}")
         return job_data
     except HTTPException:
         raise
@@ -1667,7 +1667,7 @@ async def startup_event():
     set_request_id("startup")
     info("AI Batake Backend started successfully")
     info(f"Project ID: {project_id}")
-    debug(f"Firestore collection: {COLLECTION_NAME}")
+    info(f"Firestore collection: {COLLECTION_NAME}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8081)

@@ -119,16 +119,16 @@ def generate_picture_diary(date_str: str, summary: str):
                         gs_prefix = f"gs://{BUCKET_NAME}/"
                         if image_uri.startswith(gcs_https_prefix):
                             character_image_path = image_uri[len(gcs_https_prefix):]
-                            info(f"Using selected character image: {character_image_path}")
+                            debug(f"Using selected character image: {character_image_path}")
                         elif image_uri.startswith(gs_prefix):
                             character_image_path = image_uri[len(gs_prefix):]
-                            info(f"Using selected character image (gs): {character_image_path}")
+                            debug(f"Using selected character image (gs): {character_image_path}")
                         else:
-                            info(f"image_uri format unknown, using default: {image_uri}")
+                            debug(f"image_uri format unknown, using default: {image_uri}")
                     else:
-                        info("No image_uri in Character doc, using default character image.")
+                        debug("No image_uri in Character doc, using default character image.")
                 else:
-                    info("No Character doc in Firestore, using default character image.")
+                    debug("No Character doc in Firestore, using default character image.")
         except Exception as e:
             warning(f"Failed to fetch selected character from Firestore, using default: {e}")
 
@@ -270,7 +270,7 @@ def generate_picture_diary(date_str: str, summary: str):
         output_blob = bucket.blob(output_filename)
         output_blob.upload_from_string(generated_bytes, content_type="image/png")
         
-        info(f"Generated image saved to gs://{BUCKET_NAME}/{output_filename}")
+        debug(f"Generated image saved to gs://{BUCKET_NAME}/{output_filename}")
 
         # Return the GCS path to be stored in Firestore
         return f"gs://{BUCKET_NAME}/{output_filename}"

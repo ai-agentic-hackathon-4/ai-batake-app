@@ -19,7 +19,7 @@ async def analyze_seed_and_generate_character(image_bytes: bytes):
     Analyzes a seed image, identifies the vegetable, and generates a character image.
     Uses Gemini 3 Pro (Text) and Gemini 3 Pro Image (nanoBanana).
     """
-    info(f"Starting character generation ({len(image_bytes)} bytes)")
+    info(f"[LLM] 🎭 Starting character generation ({len(image_bytes)} bytes)")
 
     # API Key Authentication
     api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("SEED_GUIDE_GEMINI_KEY")
@@ -95,7 +95,7 @@ async def analyze_seed_and_generate_character(image_bytes: bytes):
             
         text_content = resp.json()['candidates'][0]['content']['parts'][0]['text']
         data = json.loads(text_content.strip())
-        info(f"Character identified: {data.get('character_name')}")
+        info(f"[LLM] ✅ Character identified: {data.get('character_name')}")
         
     except Exception as e:
         error(f"Character analysis failed: {e}")

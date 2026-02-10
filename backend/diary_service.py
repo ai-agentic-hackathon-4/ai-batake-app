@@ -42,9 +42,9 @@ async def request_with_retry_async(method: str, url: str, **kwargs) -> httpx.Res
     async with httpx.AsyncClient() as client:
         for i in range(max_retries):
             try:
-                info(f"API Request attempt {i+1}/{max_retries}: {method} {url[:50]}...")
+                info(f"[LLM] 🔄 API Request attempt {i+1}/{max_retries}: {method} {url[:80]}...")
                 response = await client.request(method, url, **kwargs)
-                info(f"API Response status: {response.status_code}")
+                info(f"[LLM] API Response status: {response.status_code}")
                 
                 if response.status_code == 429:
                     sleep_time = backoff_factor ** i
@@ -108,7 +108,7 @@ async def get_sensor_data_for_date_async(target_date: date) -> List[Dict]:
         hours_back_to_start = int((now - start_of_day).total_seconds() / 3600) + 1
         
         # Buffer to ensure we get everything
-        info(f"Fetching sensor history for {target_date} (hours back: {hours_back_to_start})")
+        debug(f"Fetching sensor history for {target_date} (hours back: {hours_back_to_start})")
         all_data = await asyncio.to_thread(get_sensor_history, hours=max(hours_back_to_start, 24))
         
         filtered_data = []
@@ -119,7 +119,7 @@ async def get_sensor_data_for_date_async(target_date: date) -> List[Dict]:
                 if reading_date == target_date:
                     filtered_data.append(reading)
         
-        info(f"Retrieved {len(filtered_data)} sensor records for {target_date}")
+        debug(f"Retrieved {len(filtered_data)} sensor records for {target_date}")
         return filtered_data
     except Exception as e:
         logging.error(f"Error fetching sensor data for date: {e}")
@@ -454,7 +454,7 @@ async def process_daily_diary(target_date_str: str, progress_callback=None):
     
     try:
         target_date = date.fromisoformat(target_date_str)
-        info(f"Starting diary generation for {target_date_str}...")
+        info(f"[Diary] 📖 Starting diary generation for {target_date_str}...")
         
         await update_progress("データ収集中...")
         await init_diary_status_async(diary_id)
@@ -501,7 +501,7 @@ async def process_daily_diary(target_date_str: str, progress_callback=None):
         }
         
         await save_diary_async(diary_id, diary_data)
-        info(f"Diary generated successfully for {target_date_str} in {generation_time_ms}ms")
+        info(f"[Diary] ✅ Diary generated successfully for {target_date_str} in {generation_time_ms}ms")
         
     except Exception as e:
         error(f"Failed to generate diary for {target_date_str}: {e}")
