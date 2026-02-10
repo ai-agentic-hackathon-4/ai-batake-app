@@ -716,18 +716,8 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
                     # Update result with URL
                     result["image_url"] = image_url
                     
-                    # Save to Firestore /growing_diaries/Character
-                    # name, image_uri, personality
-                    char_doc_ref = db.collection("growing_diaries").document("Character")
-                    await char_doc_ref.set({
-                        "name": result.get("character_name"),
-                        "vegetable_name": result.get("name"),
-                        "image_uri": image_url,
-                        "personality": result.get("personality"),
-                        "updated_at": firestore.SERVER_TIMESTAMP
-                    }, merge=True)
                     info(
-                        f"[Character] saved job={job_id} name={result.get('character_name')}"
+                        f"[Character] image uploaded job={job_id} url={image_url}"
                     )
                     
                     # Remove base64 from result to save space in job doc
