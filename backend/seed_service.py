@@ -33,10 +33,11 @@ def call_api_with_backoff(
     url,
     payload,
     headers,
-    max_retries=100,
+    max_retries=500,
     max_elapsed_seconds=1800,
-    base_delay=2.0,
-    max_delay=15.0,
+    base_delay=1.0,
+    max_delay=5.0,
+    exp_base=1.1,
     request_timeout=60,
 ):
     start_time = time.time()
@@ -68,9 +69,9 @@ def call_api_with_backoff(
                     try:
                         delay = min(float(retry_after), max_delay)
                     except ValueError:
-                        delay = min(base_delay * (2 ** attempt), max_delay)
+                        delay = min(base_delay * (exp_base ** attempt), max_delay)
                 else:
-                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    delay = min(base_delay * (exp_base ** attempt), max_delay)
 
                 # Add small jitter
                 delay += random.uniform(0, 0.5)
@@ -85,7 +86,7 @@ def call_api_with_backoff(
             return response
         except requests.exceptions.RequestException as e:
             # Network error - retry
-            delay = min(base_delay * (2 ** attempt), max_delay) + random.uniform(0, 0.5)
+            delay = min(base_delay * (exp_base ** attempt), max_delay) + random.uniform(0, 0.5)
             warning(
                 f"Network Error: {e}. Retrying in {delay:.2f}s... "
                 f"(Attempt {attempt+1}/{max_retries})"
@@ -129,10 +130,10 @@ def process_step(args):
                 img_url,
                 img_payload,
                 headers,
-                max_retries=100,
+                max_retries=500,
                 max_elapsed_seconds=1800,
-                base_delay=1.5,
-                max_delay=15.0,
+                base_delay=1.0,
+                max_delay=5.0,
                 request_timeout=180,
             )
             if img_response.status_code != 200:
@@ -234,10 +235,10 @@ def _generate_single_guide_image(guide_title, steps, api_key, headers):
         info(f"Generating single guide image with {model} for: {guide_title}")
         response = call_api_with_backoff(
             url, payload, headers,
-            max_retries=100,
+            max_retries=500,
             max_elapsed_seconds=1800,
-            base_delay=2.0,
-            max_delay=15.0,
+            base_delay=1.0,
+            max_delay=5.0,
             request_timeout=180,
         )
         
@@ -262,13 +263,13 @@ def _generate_single_guide_image(guide_title, steps, api_key, headers):
             "contents": [{"role": "user", "parts": [{"text": simple_prompt}]}],
             "generationConfig": {}
         }
-        warning(f"Trying tertiary (Flash + simple prompt) for single guide image")
+        warning(f"Trying tertiary (Pro + simple prompt) for single guide image")
         response = call_api_with_backoff(
-            fallback_url, simple_payload, headers,
+            url, simple_payload, headers,
             max_retries=2,
             max_elapsed_seconds=180,
-            base_delay=1.5,
-            max_delay=6.0,
+            base_delay=1.0,
+            max_delay=5.0,
             request_timeout=180,
         )
         
