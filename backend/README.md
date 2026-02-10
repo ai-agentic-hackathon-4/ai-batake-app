@@ -388,6 +388,10 @@ sequenceDiagram
     opt SSE Mode
         D-->>Client: Stream: "Done"
     end
+    
+    opt Notification
+        D->>MCP: Notify (Discord)
+    end
 ```
 
 #### 使用する Firestore コレクション
