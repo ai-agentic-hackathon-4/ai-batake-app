@@ -438,6 +438,34 @@ if __name__ == "__main__":
     else:
         print("Firestore client is not initialized.")
 
+def get_all_character_jobs():
+    """Retrieves all completed character jobs sorted by creation date."""
+    if db is None: return []
+
+    try:
+        debug("Fetching character jobs from Firestore")
+        # character_jobs collection is used in main.py
+        docs = db.collection("character_jobs")\
+            .where("status", "==", "COMPLETED")\
+            .order_by("created_at", direction=firestore.Query.DESCENDING)\
+            .stream()
+            
+        results = []
+        for doc in docs:
+            d = doc.to_dict()
+            d['id'] = doc.id
+            # Handle timestamps
+            if 'created_at' in d and hasattr(d['created_at'], 'isoformat'):
+                d['created_at'] = d['created_at'].isoformat()
+            if 'updated_at' in d and hasattr(d['updated_at'], 'isoformat'):
+                d['updated_at'] = d['updated_at'].isoformat()
+            results.append(d)
+        debug(f"Retrieved {len(results)} character jobs")
+        return results
+    except Exception as e:
+        error(f"Error listing character jobs: {e}", exc_info=True)
+        return []
+
 def get_edge_agent_config() -> dict:
     """
     Retrieves the current edge agent configuration from Firestore.

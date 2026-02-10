@@ -26,6 +26,8 @@ export default function CharacterPage() {
     const [jobId, setJobId] = useState<string | null>(null);
     const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
     const [character, setCharacter] = useState<CharacterResult | null>(null);
+    const [savedCharacters, setSavedCharacters] = useState<any[]>([]);
+    const [isLoadingSaved, setIsLoadingSaved] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Animation states
@@ -37,11 +39,27 @@ export default function CharacterPage() {
     const retryCountRef = useRef(0);
 
     useEffect(() => {
+        fetchSavedCharacters();
         return () => {
             if (previewUrl) URL.revokeObjectURL(previewUrl);
             stopPolling();
         };
     }, []);
+
+    const fetchSavedCharacters = async () => {
+        setIsLoadingSaved(true);
+        try {
+            const res = await fetch('/api/character/list');
+            if (res.ok) {
+                const data = await res.json();
+                setSavedCharacters(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch characters", err);
+        } finally {
+            setIsLoadingSaved(false);
+        }
+    };
 
     // Watch status to trigger animations
     useEffect(() => {
@@ -90,6 +108,7 @@ export default function CharacterPage() {
                 if (status.status === 'COMPLETED') {
                     // Success!
                     setCharacter(status.result as CharacterResult);
+                    fetchSavedCharacters(); // Refresh the list
                     stopPolling();
                 } else if (status.status === 'FAILED') {
                     // Fatal failure
@@ -345,6 +364,55 @@ export default function CharacterPage() {
                         </Card>
                     </div>
                 )}
+
+                {/* Character Collection Section */}
+                <div className="w-full mt-20 mb-12 animate-in fade-in slide-in-from-bottom-10 duration-1000">
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="p-2 rounded-lg bg-emerald-100 text-emerald-600">
+                            <Sprout className="h-5 w-5" />
+                        </div>
+                        <h2 className="text-2xl font-black text-gray-800 tracking-tight">図鑑：出会ったお友達</h2>
+                    </div>
+
+                    {isLoadingSaved ? (
+                        <div className="flex justify-center p-12">
+                            <Loader2 className="h-8 w-8 text-green-500 animate-spin" />
+                        </div>
+                    ) : savedCharacters.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                            {savedCharacters.map((job) => {
+                                const char = job.result;
+                                if (!char) return null;
+                                return (
+                                    <Card key={job.id} className="group hover:shadow-xl transition-all duration-300 border-none bg-white/60 backdrop-blur overflow-hidden flex flex-col h-full transform hover:-translate-y-1">
+                                        <div className="relative aspect-square overflow-hidden bg-white">
+                                            <img
+                                                src={char.image_url || char.image_uri || `data:image/jpeg;base64,${char.image_base64}`}
+                                                alt={char.character_name}
+                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                            />
+                                            <div className="absolute top-2 right-2 bg-white/90 backdrop-blur rounded-full px-3 py-1 text-[10px] font-bold text-green-700 shadow-sm border border-green-100">
+                                                {char.name}
+                                            </div>
+                                        </div>
+                                        <CardContent className="p-5 flex flex-col flex-1">
+                                            <h3 className="text-lg font-black text-gray-800 mb-2 truncate">
+                                                {char.character_name}
+                                            </h3>
+                                            <p className="text-sm text-gray-600 font-medium leading-relaxed italic line-clamp-2">
+                                                "{char.personality}"
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="text-center p-12 bg-white/40 rounded-3xl border-2 border-dashed border-green-100">
+                            <p className="text-gray-400">まだ出会ったお友達はいません。新しいキャラクターを生み出してみよう！</p>
+                        </div>
+                    )}
+                </div>
 
             </main>
 
