@@ -902,10 +902,8 @@ async def generate_manual_diary(
            expected_email = "scheduler@PROJECT_ID.iam.gserviceaccount.com"
            if claim.get('email') != expected_email:
                raise HTTPException(status_code=403, detail="Unauthorized")
-      MCP -->|Notification| Discord
-    
-    %% Styling
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;ail="Invalid token")
+       except Exception as e:
+           raise HTTPException(status_code=403, detail="Invalid token")
    ```
 
 2. **レート制限**
