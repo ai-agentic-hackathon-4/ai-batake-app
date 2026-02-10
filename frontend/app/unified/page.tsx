@@ -487,8 +487,8 @@ export default function UnifiedPage() {
                                                                     onClick={handleSelectCharacterForDiary}
                                                                     disabled={isSelectingChar || charSelected}
                                                                     className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm transition-all duration-300 shadow-md ${charSelected
-                                                                            ? 'bg-green-100 text-green-700 border-2 border-green-300 cursor-default'
-                                                                            : 'bg-gradient-to-r from-pink-400 to-rose-400 text-white hover:from-pink-500 hover:to-rose-500 hover:shadow-lg transform hover:-translate-y-0.5'
+                                                                        ? 'bg-green-100 text-green-700 border-2 border-green-300 cursor-default'
+                                                                        : 'bg-gradient-to-r from-pink-400 to-rose-400 text-white hover:from-pink-500 hover:to-rose-500 hover:shadow-lg transform hover:-translate-y-0.5'
                                                                         }`}
                                                                 >
                                                                     {isSelectingChar ? (
@@ -595,7 +595,7 @@ export default function UnifiedPage() {
                                                                                 <img
                                                                                     src={getProxiedImageUrl(step.image_url)}
                                                                                     alt={step.title}
-                                                                                    className="rounded-lg max-h-64 w-full object-cover border-2 border-green-200 shadow-md"
+                                                                                    className="rounded-lg max-h-80 w-full object-contain border-2 border-green-200 shadow-md bg-white"
                                                                                 />
                                                                             </div>
                                                                         )}

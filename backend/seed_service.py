@@ -226,7 +226,7 @@ def _generate_images_parallel(steps, primary_img_url, fallback_img_url, headers)
     # We need to pass img_url and headers to each thread
     map_args = [(step, primary_img_url, fallback_img_url, headers) for step in steps]
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         # map preserves the order of results corresponding to 'steps'
         final_steps = list(executor.map(process_step, map_args))
         
