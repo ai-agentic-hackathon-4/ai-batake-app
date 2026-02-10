@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search, LayoutDashboard, UserPlus } from 'lucide-react';
+import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search, LayoutDashboard, UserPlus, ArrowLeft } from 'lucide-react';
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -43,7 +44,7 @@ export default function UnifiedPage() {
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState<string>('');
     const [currentStep, setCurrentStep] = useState(0); // For carousel navigation
-    const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
+    const [researchMode, setResearchMode] = useState<"agent" | "grounding">("grounding");
     const [imageModel, setImageModel] = useState<string>("pro");
     const [guideImageMode, setGuideImageMode] = useState<string>("single");
     const [showRawReport, setShowRawReport] = useState(false);
@@ -177,28 +178,44 @@ export default function UnifiedPage() {
         status.character.status.toLowerCase() === "completed";
 
     return (
-        <div className="container mx-auto p-6 max-w-6xl">
-            {/* Title Removed */}
+        <div className="min-h-screen bg-background">
+            {/* Header */}
+            <header className="border-b border-border bg-card">
+                <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3">
+                    <Link href="/" className="mr-2 p-1 hover:bg-accent rounded-full transition-colors">
+                        <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+                    </Link>
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
+                        <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                        <h1 className="text-base sm:text-xl font-semibold text-card-foreground truncate">野菜を育て始める</h1>
+                        <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">種袋スキャンで栽培ガイド・キャラクターを一括生成</p>
+                    </div>
+                </div>
+            </header>
+
+            {/* Main Content */}
+            <main className="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-3">
 
             {/* Upload Section */}
             {!jobId && (
-                <div className="min-h-[70vh] flex items-center justify-center">
+                <div className="flex items-center justify-center">
                     <Card className="max-w-xl w-full border-dashed border-2">
-                        <CardHeader>
-                            <CardTitle className="text-center">種の袋をスキャン</CardTitle>
-                            {/* Description Removed */}
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-center text-lg">種の袋をスキャン</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors border border-slate-200"
+                        <CardContent className="space-y-3">
+                            <div className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors border border-slate-200"
                                 onClick={() => document.getElementById('file-upload')?.click()}>
                                 {preview ? (
-                                    <img src={preview} alt="Preview" className="max-h-64 rounded shadow-md" />
+                                    <img src={preview} alt="Preview" className="max-h-40 rounded shadow-md" />
                                 ) : (
-                                    <div className="text-center space-y-2">
-                                        <div className="bg-white p-4 rounded-full shadow-sm inline-block">
-                                            <Upload className="h-8 w-8 text-primary" />
+                                    <div className="text-center space-y-1">
+                                        <div className="bg-white p-3 rounded-full shadow-sm inline-block">
+                                            <Upload className="h-6 w-6 text-primary" />
                                         </div>
-                                        <p className="text-sm text-slate-500">クリックして画像をアップロード</p>
+                                        <p className="text-xs text-slate-500">クリックして画像をアップロード</p>
                                     </div>
                                 )}
                                 <input
@@ -210,8 +227,8 @@ export default function UnifiedPage() {
                                 />
                             </div>
 
-                            <div className="space-y-3 pb-2">
-                                <p className="text-sm font-medium text-slate-700">リサーチモードの選択</p>
+                            <div className="space-y-2 pb-1">
+                                <p className="text-xs font-medium text-slate-700">リサーチモードの選択</p>
                                 <Tabs value={researchMode} onValueChange={(val) => setResearchMode(val as any)} className="w-full">
                                     <TabsList className="grid w-full grid-cols-2">
                                         <TabsTrigger value="agent" className="text-xs">Deep Research</TabsTrigger>
@@ -220,13 +237,19 @@ export default function UnifiedPage() {
                                 </Tabs>
                                 <p className="text-[10px] text-slate-400 text-center italic">
                                     {researchMode === "agent"
-                                        ? "Deep Research: AIが時間をかけて徹底的に調査します (約2-3分)"
+                                        ? "Deep Research: AIが時間をかけて徹底的に調査します (約20-30分)"
                                         : "Web Grounding: 最新のGoogle検索結果を元に素早く回答します (約1分)"}
                                 </p>
+                                {researchMode === "agent" && (
+                                    <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                                        <p className="text-[11px] text-amber-700">⚠️ Deep Researchは処理が非常に重く、完了まで<strong>20〜30分</strong>かかる場合があります。Web Groundingの利用をおすすめします。</p>
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="space-y-3 pb-2 pt-1 border-t border-slate-100">
-                                <p className="text-sm font-medium text-slate-700">🎨 図解モード</p>
+                            <div className="space-y-2 pb-1 pt-1 border-t border-slate-100">
+                                <p className="text-xs font-medium text-slate-700">🎨 図解モード</p>
                                 <div className="flex gap-2">
                                     <button
                                         type="button"
@@ -249,6 +272,12 @@ export default function UnifiedPage() {
                                         📸 ステップ別
                                     </button>
                                 </div>
+                                {guideImageMode === "per_step" && (
+                                    <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                                        <p className="text-[11px] text-amber-700">⚠️ ステップ別は各工程ごとに画像を生成するため、処理に<strong>かなり時間がかかります</strong>。通常は1枚絵（Pro）をおすすめします。</p>
+                                    </div>
+                                )}
                             </div>
 
                             {error && (
@@ -259,7 +288,7 @@ export default function UnifiedPage() {
                             )}
 
                             <Button
-                                className="w-full h-12 text-lg"
+                                className="w-full h-10 text-base"
                                 disabled={!file || isUploading}
                                 onClick={startAnalysis}
                             >
@@ -282,44 +311,46 @@ export default function UnifiedPage() {
 
             {/* Post-Upload Processing State */}
             {jobId && !status && (
-                <div className="flex flex-col items-center justify-center py-24 space-y-6 animate-in fade-in zoom-in-95 duration-700">
+                <div className="flex flex-col items-center justify-center py-12 space-y-4 animate-in fade-in zoom-in-95 duration-700">
                     <div className="relative">
                         <div className="absolute inset-0 bg-green-100 rounded-full animate-ping opacity-75"></div>
-                        <div className="relative bg-white p-6 rounded-full shadow-xl border-4 border-green-50">
-                            <Sprout className="h-16 w-16 text-green-600 animate-bounce" />
+                        <div className="relative bg-white p-4 rounded-full shadow-xl border-4 border-green-50">
+                            <Sprout className="h-10 w-10 text-green-600 animate-bounce" />
                         </div>
                     </div>
-                    <div className="text-center space-y-2">
-                        <h2 className="text-3xl font-bold text-slate-700">解析を開始しています...</h2>
-                        <p className="text-slate-500 text-lg">種の袋から情報を読み取っています</p>
+                    <div className="text-center space-y-1">
+                        <h2 className="text-xl font-bold text-slate-700">解析を開始しています...</h2>
+                        <p className="text-slate-500 text-sm">種の袋から情報を読み取っています</p>
                     </div>
                 </div>
             )}
 
             {/* Progress & Results Section */}
             {jobId && status && (
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                     {/* Sidebar Status */}
                     <Card className="lg:col-span-1 h-fit">
-                        <CardHeader>
-                            <CardTitle className="text-lg">進行状況</CardTitle>
+                        <CardHeader className="pb-2 px-3 sm:px-6">
+                            <CardTitle className="text-sm sm:text-base">進行状況</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-6">
+                        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+                            {/* Mobile: horizontal, Desktop: vertical */}
+                            <div className="flex flex-row lg:flex-col gap-3 sm:gap-4 overflow-x-auto lg:overflow-x-visible">
 
                             {/* CAHARCTER Status (First) */}
-                            <div className="flex items-start gap-3">
-                                <div className="mt-1">{getStatusIcon(status.character.status)}</div>
-                                <div>
-                                    <p className="font-medium flex items-center gap-2">
-                                        <Sparkles className="h-4 w-4" /> キャラクター
+                            <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                                <div className="mt-1 shrink-0">{getStatusIcon(status.character.status)}</div>
+                                <div className="min-w-0">
+                                    <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                                        <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">キャラクター</span>
                                     </p>
-                                    <p className="text-xs text-slate-500 mt-1">
+                                    <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
                                         {status.character.status === 'COMPLETED' ? '完了' :
                                             status.character.status === 'FAILED' ? '失敗' :
                                                 status.character.status === 'PENDING' ? '待機中...' : (
                                                     <span className="flex items-center gap-1">
-                                                        芽吹き中... <Loader2 className="h-4 w-4 animate-spin" />
+                                                        芽吹き中... <Loader2 className="h-3 w-3 animate-spin" />
                                                     </span>
                                                 )}
                                     </p>
@@ -327,17 +358,17 @@ export default function UnifiedPage() {
                             </div>
 
                             {/* RESEARCH Status (Second) */}
-                            <div className="flex items-start gap-3">
-                                <div className="mt-1">
+                            <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                                <div className="mt-1 shrink-0">
                                     {(status.research.status === 'COMPLETED' || status.research.status === 'FAILED')
                                         ? getStatusIcon(status.research.status)
                                         : <Loader2 className="h-4 w-4 animate-spin text-purple-500" />}
                                 </div>
-                                <div>
-                                    <p className="font-medium flex items-center gap-2">
-                                        <Microscope className="h-4 w-4" /> 詳細リサーチ
+                                <div className="min-w-0">
+                                    <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                                        <Microscope className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">リサーチ</span>
                                     </p>
-                                    <p className="text-xs text-slate-500 mt-1">
+                                    <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
                                         {status.research.status === 'COMPLETED' ? '完了' :
                                             status.research.status === 'FAILED' ? '失敗' : '調査中...'}
                                     </p>
@@ -345,22 +376,23 @@ export default function UnifiedPage() {
                             </div>
 
                             {/* GUIDE Status (Third) */}
-                            <div className="flex items-start gap-3">
-                                <div className="mt-1">{getStatusIcon(status.guide.status)}</div>
-                                <div>
-                                    <p className="font-medium flex items-center gap-2">
-                                        <Sprout className="h-4 w-4" /> 栽培ガイド
+                            <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                                <div className="mt-1 shrink-0">{getStatusIcon(status.guide.status)}</div>
+                                <div className="min-w-0">
+                                    <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                                        <Sprout className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">栽培ガイド</span>
                                     </p>
-                                    <p className="text-xs text-slate-500 mt-1">
+                                    <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
                                         {status.guide.status === 'COMPLETED' ? '完了' :
                                             status.guide.status === 'FAILED' ? '失敗' :
                                                 status.guide.status === 'PENDING' ? '待機中...' : '生成中...'}
                                     </p>
                                 </div>
                             </div>
+                            </div>
 
                             {/* Dashboard Link (Enabled only when all done) */}
-                            <div className="pt-4 border-t border-slate-100">
+                            <div className="pt-3 sm:pt-4 mt-3 sm:mt-0 border-t border-slate-100">
                                 <Button
                                     className="w-full justify-between"
                                     variant={isAllCompleted ? "default" : "outline"}
@@ -381,19 +413,19 @@ export default function UnifiedPage() {
                     </Card>
 
                     {/* Main Content Area */}
-                    <div className="lg:col-span-3 space-y-8">
+                    <div className="lg:col-span-3 space-y-4">
 
                         {/* 1. Immediate Seed Summary (Shows as soon as Research is done) */}
                         {status.research.result && (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <Card className="bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-100">
-                                    <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-                                        <div className="flex items-center gap-4">
-                                            <div className="p-3 bg-white rounded-full shadow-sm">
-                                                <Sprout className="h-8 w-8 text-green-600" />
+                                    <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
+                                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                            <div className="p-1.5 sm:p-2 bg-white rounded-full shadow-sm shrink-0">
+                                                <Sprout className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
                                             </div>
-                                            <div>
-                                                <h2 className="text-2xl font-bold text-slate-800">
+                                            <div className="min-w-0">
+                                                <h2 className="text-base sm:text-lg font-bold text-slate-800 truncate">
                                                     {status.research.result.name}
                                                 </h2>
                                             </div>
@@ -406,81 +438,81 @@ export default function UnifiedPage() {
 
                         <Tabs defaultValue="summary" className="w-full">
                             <TabsList className="grid w-full grid-cols-3">
-                                <TabsTrigger value="summary">キャラクター & 概要</TabsTrigger>
-                                <TabsTrigger value="research">詳細リサーチ</TabsTrigger>
-                                <TabsTrigger value="guide">栽培ガイド</TabsTrigger>
+                                <TabsTrigger value="summary" className="text-[11px] sm:text-sm px-1 sm:px-3">キャラクター</TabsTrigger>
+                                <TabsTrigger value="research" className="text-[11px] sm:text-sm px-1 sm:px-3">リサーチ</TabsTrigger>
+                                <TabsTrigger value="guide" className="text-[11px] sm:text-sm px-1 sm:px-3">栽培ガイド</TabsTrigger>
                             </TabsList>
 
                             {/* Summary Tab */}
-                            <TabsContent value="summary" className="mt-6 space-y-8">
+                            <TabsContent value="summary" className="mt-3 space-y-4">
 
                                 {/* Refined Character Display - Horizontal Layout */}
                                 <div className="flex items-center justify-center">
                                     {status.character.result ? (
-                                        <div className="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center animate-in fade-in duration-700">
+                                        <div className="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-center animate-in fade-in duration-700">
 
                                             {/* Left: Character Image */}
                                             <div className="flex justify-center items-center">
                                                 {status.character.result.image_url ? (
-                                                    <div className="relative inline-block">
+                                                    <div className="relative inline-block w-full max-w-[200px] sm:max-w-md">
                                                         <div className="absolute inset-0 bg-yellow-100 rounded-full blur-2xl opacity-50 -z-10 transform scale-110"></div>
                                                         <img
                                                             src={status.character.result.image_url.startsWith('http') && !status.character.result.image_url.includes('/api/') ? status.character.result.image_url : `${status.character.result.image_url}`}
                                                             alt="Character"
-                                                            className="w-full max-w-md mx-auto object-contain z-0 hover:scale-105 transition-transform duration-500 rounded-3xl border-8 border-white shadow-[0_0_0_8px_rgba(255,182,193,0.4)] bg-white"
-                                                            style={{ maxHeight: '400px' }}
+                                                            className="w-full mx-auto object-contain z-0 hover:scale-105 transition-transform duration-500 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-white shadow-[0_0_0_2px_rgba(255,182,193,0.4)] sm:shadow-[0_0_0_4px_rgba(255,182,193,0.4)] bg-white"
+                                                            style={{ maxHeight: '200px' }}
                                                         />
                                                     </div>
                                                 ) : status.character.result.image_base64 ? (
-                                                    <div className="relative inline-block">
+                                                    <div className="relative inline-block w-full max-w-[200px] sm:max-w-md">
                                                         <div className="absolute inset-0 bg-yellow-100 rounded-full blur-2xl opacity-50 -z-10 transform scale-110"></div>
                                                         <img
                                                             src={`data:image/png;base64,${status.character.result.image_base64}`}
                                                             alt="Character"
-                                                            className="w-full max-w-md mx-auto object-contain z-0 rounded-3xl border-8 border-white shadow-[0_0_0_8px_rgba(255,182,193,0.4)] bg-white"
-                                                            style={{ maxHeight: '400px' }}
+                                                            className="w-full mx-auto object-contain z-0 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-white shadow-[0_0_0_2px_rgba(255,182,193,0.4)] sm:shadow-[0_0_0_4px_rgba(255,182,193,0.4)] bg-white"
+                                                            style={{ maxHeight: '200px' }}
                                                         />
                                                     </div>
                                                 ) : (
-                                                    <div className="w-64 h-64 bg-emerald-50 rounded-full flex items-center justify-center mx-auto animate-pulse">
-                                                        <Sparkles className="h-16 w-16 text-emerald-200" />
+                                                    <div className="w-40 h-40 sm:w-64 sm:h-64 bg-emerald-50 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                                                        <Sparkles className="h-10 w-10 sm:h-16 sm:w-16 text-emerald-200" />
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Right: Character Profile - Notebook Style */}
-                                            <div className="space-y-6">
+                                            <div className="space-y-3">
                                                 {/* Profile Notebook Card */}
-                                                <div className="relative bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-8 rounded-lg shadow-2xl border-4 border-amber-900/20"
+                                                <div className="relative bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-3 sm:p-5 rounded-lg shadow-xl border-2 border-amber-900/20"
                                                     style={{
                                                         backgroundImage: `repeating-linear-gradient(transparent, transparent 31px, #f59e0b15 31px, #f59e0b15 32px)`,
                                                         backgroundSize: '100% 32px'
                                                     }}>
-                                                    {/* Notebook Binding Holes */}
-                                                    <div className="absolute left-4 top-0 bottom-0 flex flex-col justify-around py-8">
+                                                    {/* Notebook Binding Holes - hidden on very small screens */}
+                                                    <div className="absolute left-2 sm:left-4 top-0 bottom-0 hidden sm:flex flex-col justify-around py-8">
                                                         <div className="w-3 h-3 rounded-full bg-slate-300 shadow-inner"></div>
                                                         <div className="w-3 h-3 rounded-full bg-slate-300 shadow-inner"></div>
                                                         <div className="w-3 h-3 rounded-full bg-slate-300 shadow-inner"></div>
                                                     </div>
 
-                                                    {/* Red Margin Line */}
-                                                    <div className="absolute left-12 top-0 bottom-0 w-0.5 bg-red-300/40"></div>
+                                                    {/* Red Margin Line - hidden on very small screens */}
+                                                    <div className="absolute left-12 top-0 bottom-0 w-0.5 bg-red-300/40 hidden sm:block"></div>
 
                                                     {/* Content */}
-                                                    <div className="ml-8 space-y-4">
+                                                    <div className="sm:ml-8 space-y-2 sm:space-y-3">
                                                         {/* Title Banner */}
                                                         <div className="relative inline-block">
-                                                            <div className="absolute -top-2 -left-2 w-full h-full bg-emerald-400/20 transform rotate-1 rounded"></div>
-                                                            <h3 className="relative text-3xl font-bold text-emerald-800 px-4 py-2 bg-white/60 rounded border-2 border-emerald-300 shadow-sm"
+                                                            <div className="absolute -top-1 -left-1 w-full h-full bg-emerald-400/20 transform rotate-1 rounded"></div>
+                                                            <h3 className="relative text-base sm:text-xl font-bold text-emerald-800 px-2 sm:px-3 py-1 sm:py-1.5 bg-white/60 rounded border-2 border-emerald-300 shadow-sm"
                                                                 style={{ fontFamily: '"Noto Sans JP", sans-serif' }}>
                                                                 🌱 {status.character.result.character_name || "名無しさん"}
                                                             </h3>
                                                         </div>
 
                                                         {/* Personality Section */}
-                                                        <div className="bg-white/50 p-4 rounded-lg border-l-4 border-emerald-500 shadow-sm">
-                                                            <p className="text-sm text-emerald-700 font-semibold mb-2">性格:</p>
-                                                            <p className="text-slate-700 text-base leading-relaxed italic">
+                                                        <div className="bg-white/50 p-3 rounded-lg border-l-4 border-emerald-500 shadow-sm">
+                                                            <p className="text-xs text-emerald-700 font-semibold mb-1">性格:</p>
+                                                            <p className="text-slate-700 text-sm leading-relaxed italic">
                                                                 "{status.character.result.personality}"
                                                             </p>
                                                         </div>
@@ -489,8 +521,8 @@ export default function UnifiedPage() {
                                                         <div className="flex justify-end">
                                                             <div className="relative">
                                                                 <div className="absolute inset-0 bg-yellow-300 transform rotate-2 rounded-lg"></div>
-                                                                <div className="relative bg-gradient-to-br from-yellow-200 to-yellow-300 px-5 py-3 rounded-lg shadow-lg border-2 border-yellow-400 transform -rotate-1">
-                                                                    <p className="text-sm font-bold text-yellow-900 text-center">
+                                                                <div className="relative bg-gradient-to-br from-yellow-200 to-yellow-300 px-4 py-2 rounded-lg shadow-lg border-2 border-yellow-400 transform -rotate-1">
+                                                                    <p className="text-xs sm:text-sm font-bold text-yellow-900 text-center">
                                                                         ✨ {status.character.result.catchphrase || "あなたの栽培パートナー"} ✨
                                                                     </p>
                                                                 </div>
@@ -499,11 +531,11 @@ export default function UnifiedPage() {
 
                                                         {/* Select for Diary Button */}
                                                         {status.character.id && (
-                                                            <div className="pt-4 border-t border-amber-200/50">
+                                                            <div className="pt-3 border-t border-amber-200/50">
                                                                 <button
                                                                     onClick={handleSelectCharacterForDiary}
                                                                     disabled={isSelectingChar || charSelected}
-                                                                    className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm transition-all duration-300 shadow-md ${charSelected
+                                                                    className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-bold text-sm transition-all duration-300 shadow-md ${charSelected
                                                                         ? 'bg-green-100 text-green-700 border-2 border-green-300 cursor-default'
                                                                         : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 hover:shadow-lg transform hover:-translate-y-0.5'
                                                                         }`}
@@ -524,17 +556,17 @@ export default function UnifiedPage() {
 
                                         </div>
                                     ) : (
-                                        <div className="flex flex-col items-center justify-center p-12 text-slate-400 space-y-4">
+                                        <div className="flex flex-col items-center justify-center p-8 text-slate-400 space-y-3">
                                             {status.character.status === 'FAILED' ? (
                                                 <>
-                                                    <AlertCircle className="h-12 w-12 text-red-300" />
+                                                    <AlertCircle className="h-10 w-10 text-red-300" />
                                                     <p>キャラクター召喚に失敗しました...</p>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Loader2 className="h-12 w-12 animate-spin text-emerald-300" />
-                                                    <p className="text-lg">種から命が芽吹いています...</p>
-                                                    <p className="text-sm">種の声を聞いています</p>
+                                                    <Loader2 className="h-10 w-10 animate-spin text-emerald-300" />
+                                                    <p className="text-base">種から命が芽吹いています...</p>
+                                                    <p className="text-xs">種の声を聞いています</p>
                                                 </>
                                             )}
                                         </div>
@@ -546,22 +578,22 @@ export default function UnifiedPage() {
                                 {status.research.result && (
                                     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
                                         <Card className="bg-white/50 backdrop-blur border-emerald-100/50 shadow-sm">
-                                            <CardHeader>
-                                                <CardTitle className="flex items-center gap-2 text-emerald-700">
-                                                    <Info className="h-5 w-5" /> 基本情報
+                                            <CardHeader className="px-3 sm:px-6">
+                                                <CardTitle className="flex items-center gap-2 text-emerald-700 text-sm sm:text-base">
+                                                    <Info className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" /> 基本情報
                                                 </CardTitle>
                                             </CardHeader>
-                                            <CardContent className="space-y-4">
-                                                <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100">
-                                                    <p className="text-sm text-emerald-600 mb-1 font-medium">野菜の名前</p>
-                                                    <p className="text-lg font-bold text-slate-800">{status.research.result.name}</p>
+                                            <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
+                                                <div className="p-3 sm:p-4 bg-emerald-50/50 rounded-xl border border-emerald-100">
+                                                    <p className="text-xs sm:text-sm text-emerald-600 mb-1 font-medium">野菜の名前</p>
+                                                    <p className="text-base sm:text-lg font-bold text-slate-800">{status.research.result.name}</p>
                                                 </div>
 
                                                 {/* Visible Instructions (if available) */}
                                                 {status.research.result.basic_analysis?.visible_instructions && status.research.result.basic_analysis.visible_instructions !== "unknown" && (
-                                                    <div className="md:col-span-3 p-4 bg-slate-50/50 rounded-xl border border-slate-100">
-                                                        <p className="text-sm text-slate-600 mb-1 font-medium">📋 種袋の育て方ポイント</p>
-                                                        <p className="text-base text-slate-800 whitespace-pre-wrap">{status.research.result.basic_analysis.visible_instructions}</p>
+                                                    <div className="p-3 sm:p-4 bg-slate-50/50 rounded-xl border border-slate-100">
+                                                        <p className="text-xs sm:text-sm text-slate-600 mb-1 font-medium">📋 種袋の育て方ポイント</p>
+                                                        <p className="text-sm sm:text-base text-slate-800 whitespace-pre-wrap">{status.research.result.basic_analysis.visible_instructions}</p>
                                                     </div>
                                                 )}
                                             </CardContent>
@@ -572,13 +604,13 @@ export default function UnifiedPage() {
                             </TabsContent>
 
                             {/* Guide Tab */}
-                            <TabsContent value="guide" className="mt-6">
+                            <TabsContent value="guide" className="mt-3">
                                 <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2 text-green-600">
-                                            <Sprout className="h-5 w-5" /> ステップバイステップ・ガイド
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="flex items-center gap-2 text-green-600 text-base">
+                                            <Sprout className="h-4 w-4" /> ステップバイステップ・ガイド
                                         </CardTitle>
-                                        <CardDescription>
+                                        <CardDescription className="text-xs">
                                             {status.guide.result?.description || "AIが作成した栽培プランです"}
                                         </CardDescription>
                                     </CardHeader>
@@ -611,16 +643,16 @@ export default function UnifiedPage() {
                                                         style={{ transform: `translateX(-${currentStep * 100}%)` }}
                                                     >
                                                         {status.guide.result.map((step: any, idx: number) => (
-                                                            <div key={idx} className="flex-shrink-0 w-full p-4">
-                                                                <div className="flex gap-4 border rounded-lg p-6 bg-gradient-to-br from-green-50 to-emerald-50">
+                                                            <div key={idx} className="flex-shrink-0 w-full p-2">
+                                                                <div className="flex gap-3 border rounded-lg p-4 bg-gradient-to-br from-green-50 to-emerald-50">
                                                                     <div className="flex-shrink-0">
-                                                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 text-white flex items-center justify-center font-bold text-lg shadow-lg">
+                                                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-lg">
                                                                             {idx + 1}
                                                                         </div>
                                                                     </div>
-                                                                    <div className="space-y-3 flex-1">
-                                                                        <h3 className="font-bold text-xl text-green-700">{step.title}</h3>
-                                                                        <p className="text-slate-700 leading-relaxed">{step.description}</p>
+                                                                    <div className="space-y-2 flex-1">
+                                                                        <h3 className="font-bold text-base text-green-700">{step.title}</h3>
+                                                                        <p className="text-slate-700 text-sm leading-relaxed">{step.description}</p>
                                                                         {step.duration && (
                                                                             <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-full font-medium">
                                                                                 ⏱️ 目安: {step.duration}
@@ -632,11 +664,11 @@ export default function UnifiedPage() {
                                                                             const isSingleImageMode = stepsWithImages.length <= 1;
                                                                             if (isSingleImageMode && idx === 0) return null; // Already shown above
                                                                             return (
-                                                                                <div className="mt-4">
+                                                                                <div className="mt-3">
                                                                                     <img
                                                                                         src={getProxiedImageUrl(step.image_url)}
                                                                                         alt={step.title}
-                                                                                        className="rounded-lg max-h-80 w-full object-contain border-2 border-green-200 shadow-md bg-white"
+                                                                                        className="rounded-lg max-h-48 sm:max-h-80 w-full object-contain border-2 border-green-200 shadow-md bg-white"
                                                                                     />
                                                                                 </div>
                                                                             );
@@ -649,17 +681,17 @@ export default function UnifiedPage() {
                                                 </div>
 
                                                 {/* Navigation Controls */}
-                                                <div className="flex items-center justify-between mt-6">
+                                                <div className="flex items-center justify-between mt-3">
                                                     <button
                                                         onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
                                                         disabled={currentStep === 0}
-                                                        className="p-3 rounded-full bg-green-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors shadow-lg"
+                                                        className="p-2 rounded-full bg-green-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors shadow"
                                                     >
-                                                        <ChevronLeft className="h-6 w-6" />
+                                                        <ChevronLeft className="h-5 w-5" />
                                                     </button>
 
                                                     <div className="text-center">
-                                                        <p className="text-sm text-slate-600 font-medium">
+                                                        <p className="text-xs text-slate-600 font-medium">
                                                             ステップ {currentStep + 1} / {status.guide.result.length}
                                                         </p>
                                                     </div>
@@ -667,16 +699,16 @@ export default function UnifiedPage() {
                                                     <button
                                                         onClick={() => setCurrentStep(Math.min(status.guide.result.length - 1, currentStep + 1))}
                                                         disabled={currentStep === status.guide.result.length - 1}
-                                                        className="p-3 rounded-full bg-green-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors shadow-lg"
+                                                        className="p-2 rounded-full bg-green-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors shadow"
                                                     >
-                                                        <ChevronRight className="h-6 w-6" />
+                                                        <ChevronRight className="h-5 w-5" />
                                                     </button>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="py-12 text-center text-slate-400 space-y-4">
-                                                <Loader2 className="h-12 w-12 animate-spin mx-auto text-green-300" />
-                                                <p className="text-lg">栽培ガイド執筆中...</p>
+                                            <div className="py-8 text-center text-slate-400 space-y-3">
+                                                <Loader2 className="h-10 w-10 animate-spin mx-auto text-green-300" />
+                                                <p className="text-base">栽培ガイド執筆中...</p>
                                             </div>
                                         )}
                                     </CardContent>
@@ -684,35 +716,35 @@ export default function UnifiedPage() {
                             </TabsContent>
 
                             {/* Research Tab */}
-                            <TabsContent value="research" className="mt-6">
+                            <TabsContent value="research" className="mt-3">
                                 <Card>
-                                    <CardHeader>
-                                        <div className="flex items-center justify-between">
-                                            <CardTitle className="flex items-center gap-2 text-purple-600">
-                                                <Microscope className="h-5 w-5" /> 詳細リサーチデータ
+                                    <CardHeader className="pb-2 px-3 sm:px-6">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                            <CardTitle className="flex items-center gap-2 text-purple-600 text-sm sm:text-base">
+                                                <Microscope className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" /> リサーチデータ
                                             </CardTitle>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
+                                                className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200 text-xs sm:text-sm w-full sm:w-auto"
                                                 onClick={handleApplyToAgent}
                                                 disabled={isApplying || !status.research.id || status.research.status?.toLowerCase() !== 'completed'}
                                             >
                                                 {isApplying ? (
-                                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                                    <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin mr-1.5" />
                                                 ) : (
-                                                    <Sparkles className="h-4 w-4 mr-2" />
+                                                    <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
                                                 )}
                                                 エージェントに適応
                                             </Button>
                                         </div>
                                     </CardHeader>
-                                    <CardContent>
+                                    <CardContent className="px-3 sm:px-6">
                                         {status.research.status?.toLowerCase() === 'completed' && status.research.result ? (
-                                            <div className="space-y-6">
+                                            <div className="space-y-2 sm:space-y-3">
                                                 {/* Name */}
                                                 {status.research.result.name && (
-                                                    <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+                                                    <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
                                                         <h3 className="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
                                                             <Sprout className="h-4 w-4" /> 野菜名
                                                         </h3>
@@ -722,7 +754,7 @@ export default function UnifiedPage() {
 
                                                 {/* Temperature */}
                                                 {status.research.result.optimal_temp_range && (
-                                                    <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                                                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
                                                         <h3 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
                                                             <Activity className="h-4 w-4" /> 最適温度
                                                         </h3>
@@ -732,7 +764,7 @@ export default function UnifiedPage() {
 
                                                 {/* Humidity */}
                                                 {status.research.result.optimal_humidity_range && (
-                                                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                                                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                                                         <h3 className="font-semibold text-blue-800 mb-2">💧 最適湿度</h3>
                                                         <p className="text-slate-700">{status.research.result.optimal_humidity_range}</p>
                                                     </div>
@@ -740,7 +772,7 @@ export default function UnifiedPage() {
 
                                                 {/* Soil Moisture */}
                                                 {status.research.result.soil_moisture_standard && (
-                                                    <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                                                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
                                                         <h3 className="font-semibold text-amber-800 mb-2">🌱 土壌水分量</h3>
                                                         <p className="text-slate-700">{status.research.result.soil_moisture_standard}</p>
                                                     </div>
@@ -748,7 +780,7 @@ export default function UnifiedPage() {
 
                                                 {/* Watering */}
                                                 {status.research.result.watering_instructions && (
-                                                    <div className="bg-cyan-50 p-4 rounded-lg border border-cyan-200">
+                                                    <div className="bg-cyan-50 p-3 rounded-lg border border-cyan-200">
                                                         <h3 className="font-semibold text-cyan-800 mb-2">💦 水やり方法</h3>
                                                         <p className="text-slate-700 whitespace-pre-wrap">{status.research.result.watering_instructions}</p>
                                                     </div>
@@ -756,7 +788,7 @@ export default function UnifiedPage() {
 
                                                 {/* Light Requirements */}
                                                 {status.research.result.light_requirements && (
-                                                    <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                                                    <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                                                         <h3 className="font-semibold text-yellow-800 mb-2">☀️ 日照条件</h3>
                                                         <p className="text-slate-700">{status.research.result.light_requirements}</p>
                                                     </div>
@@ -764,7 +796,7 @@ export default function UnifiedPage() {
 
                                                 {/* Care Tips */}
                                                 {status.research.result.care_tips && (
-                                                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                                                    <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
                                                         <h3 className="font-semibold text-purple-800 mb-2">📝 栽培のコツ</h3>
                                                         <p className="text-slate-700 whitespace-pre-wrap">{status.research.result.care_tips}</p>
                                                     </div>
@@ -772,7 +804,7 @@ export default function UnifiedPage() {
 
                                                 {/* Summary Prompt */}
                                                 {status.research.result.summary_prompt && (
-                                                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                                                         <h3 className="font-semibold text-slate-800 mb-2">📋 詳細情報</h3>
                                                         <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{status.research.result.summary_prompt}</p>
                                                     </div>
@@ -797,8 +829,8 @@ export default function UnifiedPage() {
                                                         </button>
 
                                                         {showRawReport && (
-                                                            <div className="mt-4 p-5 bg-slate-900 rounded-xl overflow-x-auto border border-slate-800 shadow-inner animate-in fade-in slide-in-from-top-2 duration-300">
-                                                                <pre className="text-xs text-slate-300 font-mono leading-relaxed whitespace-pre-wrap">
+                                                            <div className="mt-3 p-3 sm:p-5 bg-slate-900 rounded-xl overflow-x-auto border border-slate-800 shadow-inner animate-in fade-in slide-in-from-top-2 duration-300">
+                                                                <pre className="text-[10px] sm:text-xs text-slate-300 font-mono leading-relaxed whitespace-pre-wrap break-all sm:break-normal">
                                                                     {status.research.result.raw_report}
                                                                 </pre>
                                                             </div>
@@ -807,10 +839,10 @@ export default function UnifiedPage() {
                                                 )}
                                             </div>
                                         ) : (
-                                            <div className="py-12 flex flex-col items-center justify-center text-slate-400 space-y-4">
+                                            <div className="py-8 flex flex-col items-center justify-center text-slate-400 space-y-3">
                                                 {status.research.status?.toLowerCase() === 'failed' ? (
-                                                    <div className="text-center space-y-4">
-                                                        <AlertCircle className="h-16 w-16 text-red-400 mx-auto" />
+                                                    <div className="text-center space-y-3">
+                                                        <AlertCircle className="h-12 w-12 text-red-400 mx-auto" />
                                                         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
                                                             <h3 className="text-lg font-bold text-red-800 mb-2">読み取りエラー</h3>
                                                             <p className="text-red-700 font-medium">
@@ -848,6 +880,7 @@ export default function UnifiedPage() {
                 </div >
             )
             }
+            </main>
         </div >
     )
 }
