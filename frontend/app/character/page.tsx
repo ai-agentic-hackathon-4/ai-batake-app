@@ -125,7 +125,7 @@ export default function CharacterPage() {
             if (!isPollingRef.current) return;
 
             try {
-                const response = await fetch(`/api/seed-guide/jobs/${id}`);
+                const response = await fetch(`/api/character/jobs/${id}`);
 
                 // Handle non-200 responses
                 if (!response.ok) {
