@@ -1583,6 +1583,8 @@ async def get_unified_job_status(job_id: str):
                         char_result["image_url"] = f"/api/character/image?path={encoded_path}"
                         
             results["character"] = make_serializable(c_data)
+            # Include the character job ID so frontend can select it for diary
+            results["character"]["id"] = char_id
             
         return results
         
