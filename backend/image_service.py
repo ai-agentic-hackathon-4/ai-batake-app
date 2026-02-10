@@ -32,10 +32,11 @@ def call_api_with_backoff(
     url,
     payload,
     headers,
-    max_retries=100,
+    max_retries=500,
     max_elapsed_seconds=1800,
-    base_delay=2.0,
-    max_delay=15.0,
+    base_delay=1.0,
+    max_delay=5.0,
+    exp_base=1.1,
 ):
     start_time = time.time()
 
@@ -46,7 +47,7 @@ def call_api_with_backoff(
             raise RuntimeError("Retry budget exceeded")
 
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=60)
+            response = requests.post(url, headers=headers, json=payload, timeout=240)
 
             if response.status_code == 200:
                 return response
@@ -57,9 +58,9 @@ def call_api_with_backoff(
                     try:
                         delay = min(float(retry_after), max_delay)
                     except ValueError:
-                        delay = min(base_delay * (2 ** attempt), max_delay)
+                        delay = min(base_delay * (exp_base ** attempt), max_delay)
                 else:
-                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    delay = min(base_delay * (exp_base ** attempt), max_delay)
 
                 # Add small jitter
                 delay += random.uniform(0, 0.5)
@@ -74,7 +75,7 @@ def call_api_with_backoff(
             return response
         except requests.exceptions.RequestException as e:
             # Network error - retry
-            delay = min(base_delay * (2 ** attempt), max_delay) + random.uniform(0, 0.5)
+            delay = min(base_delay * (exp_base ** attempt), max_delay) + random.uniform(0, 0.5)
             warning(
                 f"Network Error: {e}. Retrying in {delay:.2f}s... "
                 f"(Attempt {attempt+1}/{max_retries})"
@@ -182,10 +183,11 @@ def generate_picture_diary(date_str: str, summary: str):
                 url,
                 payload,
                 headers,
-                max_retries=100,
+                max_retries=500,
                 max_elapsed_seconds=1800,
-                base_delay=2.0,
-                max_delay=15.0,
+                base_delay=1.0,
+                max_delay=5.0,
+                exp_base=1.1,
             )
         except Exception as e:
             warning(f"Diary image generation failed: {e}")
