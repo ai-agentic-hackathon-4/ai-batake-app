@@ -568,6 +568,25 @@ export default function UnifiedPage() {
                                     <CardContent>
                                         {status.guide.status === 'COMPLETED' && status.guide.result && Array.isArray(status.guide.result) && status.guide.result.length > 0 ? (
                                             <div className="relative">
+                                                {/* Single Guide Image (if only step 0 has image) */}
+                                                {(() => {
+                                                    const stepsWithImages = status.guide.result.filter((s: any) => s.image_url);
+                                                    const isSingleImageMode = stepsWithImages.length <= 1 && status.guide.result[0]?.image_url;
+                                                    if (isSingleImageMode) {
+                                                        return (
+                                                            <div className="mb-6">
+                                                                <p className="text-sm text-slate-500 mb-2 text-center font-medium">🎨 NanoBanana Pro によるガイド画像</p>
+                                                                <img
+                                                                    src={getProxiedImageUrl(status.guide.result[0].image_url)}
+                                                                    alt="栽培ガイド"
+                                                                    className="rounded-xl w-full object-contain border-2 border-green-200 shadow-lg bg-white"
+                                                                />
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+
                                                 {/* Carousel Container */}
                                                 <div className="overflow-hidden">
                                                     <div
@@ -590,15 +609,21 @@ export default function UnifiedPage() {
                                                                                 ⏱️ 目安: {step.duration}
                                                                             </span>
                                                                         )}
-                                                                        {step.image_url && (
-                                                                            <div className="mt-4">
-                                                                                <img
-                                                                                    src={getProxiedImageUrl(step.image_url)}
-                                                                                    alt={step.title}
-                                                                                    className="rounded-lg max-h-80 w-full object-contain border-2 border-green-200 shadow-md bg-white"
-                                                                                />
-                                                                            </div>
-                                                                        )}
+                                                                        {/* Per-step image (only in per_step mode, skip step 0 in single mode) */}
+                                                                        {step.image_url && (() => {
+                                                                            const stepsWithImages = status.guide.result.filter((s: any) => s.image_url);
+                                                                            const isSingleImageMode = stepsWithImages.length <= 1;
+                                                                            if (isSingleImageMode && idx === 0) return null; // Already shown above
+                                                                            return (
+                                                                                <div className="mt-4">
+                                                                                    <img
+                                                                                        src={getProxiedImageUrl(step.image_url)}
+                                                                                        alt={step.title}
+                                                                                        className="rounded-lg max-h-80 w-full object-contain border-2 border-green-200 shadow-md bg-white"
+                                                                                    />
+                                                                                </div>
+                                                                            );
+                                                                        })()}
                                                                     </div>
                                                                 </div>
                                                             </div>
