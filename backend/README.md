@@ -193,95 +193,201 @@ python -m uvicorn backend.main:app --host 0.0.0.0 --port 8081
 | GET | `/api/diary/{date}` | 指定日の日記取得 |
 | GET | `/api/diary/{date}/image` | 日記絵日記画像プロキシ |
 
-## 📊 処理フロー
+## 📊 処理フロー (詳細シーケンス図)
 
-### モジュール依存関係
-
-```mermaid
-graph LR
-    subgraph "API Layer"
-        MAIN[main.py<br/>FastAPI App]
-    end
-
-    subgraph "Service Layer"
-        AGT[agent.py<br/>天気エージェント]
-        RES[research_agent.py<br/>種袋解析・Deep Research]
-        SEED[seed_service.py<br/>栽培ガイド生成]
-        DIARY[diary_service.py<br/>日記生成]
-        IMG[image_service.py<br/>絵日記画像生成]
-        CHAR[character_service.py<br/>キャラクター生成]
-        LOG[logger.py<br/>構造化ロギング]
-    end
-
-    subgraph "Data Layer"
-        DB[db.py<br/>Firestore操作]
-    end
-
-    subgraph "External Services"
-        VAI[Vertex AI<br/>Agent Engine]
-        GEM[Gemini API]
-        FS[(Firestore)]
-        GCS[(Cloud Storage)]
-    end
-
-    MAIN --> AGT
-    MAIN --> RES
-    MAIN --> SEED
-    MAIN --> DIARY
-    MAIN --> IMG
-    MAIN --> CHAR
-    MAIN --> DB
-    MAIN --> LOG
-
-    AGT --> VAI
-    RES --> GEM
-    SEED --> GEM
-    DIARY --> GEM
-    IMG --> GEM
-    CHAR --> GEM
-
-    DB --> FS
-    MAIN --> GCS
-    IMG --> GCS
-```
-
-### 統合シード機能フロー (POST /api/unified/start)
+### 1. センサー・天気データ取得
 
 ```mermaid
 sequenceDiagram
     participant C as Client
     participant M as main.py
-    participant R as research_agent.py (Phase 1/2)
-    participant S as seed_service.py (Phase 3)
-    participant CF as Character Func (Phase 1)
+    participant DB as db.py
+    participant A as agent.py
+    participant V as Vertex AI
     participant F as Firestore
 
-    C->>M: POST /api/unified/start (画像)
-    M->>F: Unified Job 作成 (PROCESSING)
-    M->>F: Sub-Jobs 作成 (Research/Guide/Char)
-    M-->>C: {job_id, sub_job_ids...}
+    %% Sensor Data
+    C->>M: GET /api/sensors/latest
+    M->>DB: get_recent_sensor_logs(limit=1)
+    DB->>F: Query SortBy(timestamp, desc)
+    F-->>DB: Latest Log
+    DB-->>M: Log Data
+    M-->>C: JSON Response
 
-    Note over M: BackgroundTask (Unified Runner)
+    %% Weather Data
+    C->>M: POST /api/weather {region}
+    M->>A: get_weather_from_agent(region)
+    A->>V: Agent Engine (get_weather_tool)
+    V-->>A: Weather Info (Text)
+    A-->>M: Info
+    M-->>C: JSON Response
+```
 
-    par Phase 1: Character & Basic Analysis
-        M->>CF: キャラクター生成
-        CF->>F: Character Job 完了
-        M->>R: 基本解析 (Vegetable Name)
-        R->>F: Vegetable Doc 作成 (Status: researching)
+### 2. 種袋登録 & Deep Research
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant M as main.py
+    participant RA as research_agent.py
+    participant DB as db.py
+    participant G as Gemini API (Flash)
+    participant F as Firestore
+
+    C->>M: POST /api/register-seed (image)
+    
+    Note over M: 同期処理 (高速化のためFlash使用)
+    M->>RA: analyze_seed_packet(image)
+    RA->>G: Generate Content (Vegetable Name?)
+    G-->>RA: JSON {name: "Tomato", ...}
+    RA-->>M: Analysis Result
+    
+    M->>DB: init_vegetable_status(name)
+    DB->>F: Create Doc (status: PROCESSING)
+    F-->>DB: doc_id
+    
+    M->>BackgroundTasks: add_task(process_research)
+    M-->>C: {doc_id, vegetable_name, status: accepted}
+
+    Note over M: 非同期バックグラウンド処理
+    M->>RA: process_research(doc_id, name)
+    RA->>G: perform_deep_research(name)
+    Note right of RA: 詳細な栽培条件、気温、湿度、<br>土壌酸度などをWeb検索併用で調査
+    G-->>RA: Detailed Research JSON
+    RA->>DB: update_vegetable_status(COMPLETED)
+    DB->>F: Update Doc
+```
+
+### 3. 栽培ガイド生成 (非同期ジョブ)
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant M as main.py
+    participant S as seed_service.py
+    participant G as Gemini API
+    participant CS as Cloud Storage
+    participant F as Firestore
+
+    C->>M: POST /api/seed-guide/jobs (image)
+    M->>CS: Upload Input Image
+    M->>F: Create Job Doc (status: PENDING)
+    M->>BackgroundTasks: add_task(process_seed_guide)
+    M-->>C: {job_id, status: PENDING}
+
+    Note over M: 非同期バックグラウンド処理
+    M->>S: process_seed_guide(job_id)
+    S->>G: analyze_seed_and_generate_guide
+    G-->>S: Steps (Title, Desc, Image Prompts)
+    
+    loop 各ステップの画像生成
+        S->>G: Generate Image (Imagen/Gemini)
+        G-->>S: Image Data
+        S->>CS: Upload Step Image
     end
     
-    Note over M: Phase 1 完了待ち (await gather)
+    S->>F: Update Job Doc (status: COMPLETED, steps with URLs)
+```
 
-    par Phase 2 & 3: Deep Research & Guide (並列)
-        M->>R: perform_deep_research()
-        R->>F: Vegetable Doc 更新 (Status: completed)
-        M->>S: process_seed_guide()
-        S->>F: Guide Job 完了
+### 4. キャラクター生成
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant M as main.py
+    participant CH as character_service.py
+    participant G as Gemini API
+    participant CS as Cloud Storage
+    participant F as Firestore
+
+    C->>M: POST /api/seed-guide/character (image)
+    M->>F: Create Job Doc (status: PENDING)
+    M->>BackgroundTasks: add_task(process_character_generation)
+    M-->>C: {job_id}
+
+    Note over M: 非同期バックグラウンド処理
+    M->>CH: process_character_generation(job_id)
+    CH->>G: analyze_seed_and_generate_character
+    G-->>CH: Characteristics & Image Base64
+    CH->>CS: Upload Character Image
+    CH->>F: Update Job Doc (status: COMPLETED, result)
+```
+
+### 5. 統合シード機能 (Unified Job)
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant M as main.py
+    participant F as Firestore
+    participant BG as BackgroundTasks
+
+    C->>M: POST /api/unified/start
+    M->>CS: Input Image Upload
+    M->>F: Create Docs (Unified, Research, Guide, Char)
+    M->>BG: add_task(unified_runner)
+    M-->>C: {job_ids...}
+
+    Note over BG: Unified Runner (Parallel Execution)
+    
+    rect rgb(240, 248, 255)
+        note right of BG: Phase 1: Basic Analysis & Char (Parallel)
+        par Character Gen
+            BG->>CH: process_character_generation()
+        and Basic Analysis
+            BG->>RA: analyze_seed_packet()
+            RA->>F: Update Vegetable Name
+        end
     end
 
-    C->>M: GET /api/unified/jobs/{job_id}
-    M->>F: Unified Job & Sub-Jobs 状態取得
-    M-->>C: {job_status, research_status, guide_status, char_status}
+    rect rgb(255, 250, 240)
+        note right of BG: Phase 2: Deep Research & Guide (Parallel)
+        par Deep Research
+            BG->>RA: perform_deep_research()
+        and Guide Gen
+            BG->>S: process_seed_guide()
+        end
+    end
+    
+    BG->>F: Update Unified Job (COMPLETED)
+```
+
+### 6. 栽培日記 自動生成 & 手動生成
+
+```mermaid
+sequenceDiagram
+    participant SCH as Cloud Scheduler / Client
+    participant M as main.py
+    participant D as diary_service.py
+    participant I as image_service.py
+    participant G as Gemini API
+    participant DB as db.py
+
+    alt Auto Generation
+        SCH->>M: POST /api/diary/auto-generate (key)
+        M->>BG: add_task(process_daily_diary)
+        M-->>SCH: 202 Accepted
+    else Manual Generation (SSE)
+        Client->>M: POST /api/diary/generate-manual
+        M-->>Client: SSE Stream Connection
+    end
+
+    Note over D: process_daily_diary
+    D->>DB: collect_daily_data (Sensor, Agent Logs, Vegetable Info)
+    D->>G: generate_diary_with_ai (Stats + Events + Prompt)
+    G-->>D: Diary Text (Summary, Obs, Recs)
+    
+    D->>I: generate_picture_diary(Summary)
+    I->>G: Generate Illustration
+    G-->>I: Image
+    I->>CS: Upload Image
+    I-->>D: Image URL
+    
+    D->>DB: save_diary (status: COMPLETED)
+    
+    opt SSE Mode
+        D-->>Client: Stream: "Done"
+    end
 ```
 
 #### 使用する Firestore コレクション
