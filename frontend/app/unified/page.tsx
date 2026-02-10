@@ -232,8 +232,8 @@ export default function UnifiedPage() {
                                         type="button"
                                         onClick={() => setGuideImageMode("single")}
                                         className={`flex-1 text-xs px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "single"
-                                                ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-md"
-                                                : "bg-white text-slate-600 border-slate-200 hover:border-green-300"
+                                            ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-md"
+                                            : "bg-white text-slate-600 border-slate-200 hover:border-green-300"
                                             }`}
                                     >
                                         🖼️ 1枚絵（Pro）
@@ -242,8 +242,8 @@ export default function UnifiedPage() {
                                         type="button"
                                         onClick={() => setGuideImageMode("per_step")}
                                         className={`flex-1 text-xs px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "per_step"
-                                                ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-md"
-                                                : "bg-white text-slate-600 border-slate-200 hover:border-green-300"
+                                            ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-md"
+                                            : "bg-white text-slate-600 border-slate-200 hover:border-green-300"
                                             }`}
                                     >
                                         📸 ステップ別
@@ -832,7 +832,7 @@ export default function UnifiedPage() {
                                                     </div>
                                                 ) : (
                                                     <>
-                                                        <Loader2 className="h-10 w-10 animate-spin text-purple-300" />
+                                                        <Loader2 className="h-12 w-12 animate-spin text-purple-300" />
                                                         <p className="text-lg">詳細リサーチ実行中...</p>
                                                         <p className="text-sm">※完了まで少し時間がかかります</p>
                                                     </>
