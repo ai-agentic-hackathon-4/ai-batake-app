@@ -107,7 +107,7 @@ class ReadableFormatter(logging.Formatter):
 
 def setup_logger(
     name: str = "ai_batake",
-    level: int = logging.DEBUG,
+    level: int = logging.INFO,
     use_json: bool = False
 ) -> logging.Logger:
     """
@@ -115,7 +115,7 @@ def setup_logger(
     
     Args:
         name: Logger name
-        level: Logging level (default: DEBUG for detailed output)
+        level: Logging level (default: INFO)
         use_json: If True, use JSON format; otherwise use readable format
         
     Returns:

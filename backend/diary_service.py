@@ -344,6 +344,7 @@ async def generate_diary_with_ai_async(
     headers = {"Content-Type": "application/json"}
     prompt = build_diary_prompt(date_str, statistics, events, vegetable_info, character_info)
     url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-3-flash-preview:generateContent?key={api_key}"
+    info(f"[LLM] 📝 Generating diary text via gemini-3-flash-preview for {date_str}")
     
     payload = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -363,6 +364,7 @@ async def generate_diary_with_ai_async(
         
         result = response.json()
         generated_text = result["candidates"][0]["content"]["parts"][0]["text"]
+        info(f"[LLM] ✅ Diary text generated successfully for {date_str}")
         return parse_diary_response(generated_text)
     except Exception as e:
         error(f"Error calling Gemini API: {e}")
@@ -464,12 +466,14 @@ async def process_daily_diary(target_date_str: str, progress_callback=None):
         events = extract_key_events(daily_data["agent_logs"])
         
         await update_progress("成長記録を執筆中...")
+        info(f"[LLM] ✍️ Starting AI diary text generation for {target_date_str}")
         ai_content = await generate_diary_with_ai_async(
             target_date_str, statistics, events, daily_data["vegetable"], daily_data.get("character")
         )
         
         try:
             await update_progress("絵日記のイラストを生成中...")
+            info(f"[LLM] 🎨 Starting diary illustration generation for {target_date_str}")
             # Note: generate_picture_diary is sync, using to_thread
             generated_image_url = await asyncio.to_thread(generate_picture_diary, target_date_str, ai_content["summary"])
             if generated_image_url:

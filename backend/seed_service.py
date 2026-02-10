@@ -40,17 +40,26 @@ def call_api_with_backoff(
     request_timeout=60,
 ):
     start_time = time.time()
+    # Extract model name from URL for logging
+    _model_name = "unknown"
+    if "/models/" in url:
+        _model_name = url.split("/models/")[1].split(":")[0]
 
     for attempt in range(max_retries):
         elapsed = time.time() - start_time
         if elapsed >= max_elapsed_seconds:
-            error(f"Retry budget exceeded ({max_elapsed_seconds}s).")
+            error(f"[LLM] ⏰ Retry budget exceeded ({max_elapsed_seconds}s) for model={_model_name}")
             raise RuntimeError("Retry budget exceeded")
+
+        if attempt > 0:
+            info(f"[LLM] 🔄 Retry attempt {attempt+1}/{max_retries} for model={_model_name} (elapsed={elapsed:.0f}s)")
 
         try:
             response = requests.post(url, headers=headers, json=payload, timeout=request_timeout)
 
             if response.status_code == 200:
+                elapsed_now = time.time() - start_time
+                info(f"[LLM] ✅ API call succeeded: model={_model_name} elapsed={elapsed_now:.1f}s")
                 return response
             if response.status_code in (429,) or response.status_code >= 500:
                 # Honor Retry-After when present
@@ -103,7 +112,7 @@ def process_step(args):
     # Small start jitter to avoid hitting rate limit exactly simultaneously
     time.sleep(random.uniform(0.5, 1.5))
     
-    debug(f"Generating Image for step: {step['step_title']}")
+    info(f"[LLM] Generating image for step: {step['step_title']}")
     
     # Append style keywords to ensure consistency
     img_prompt = f"Generate an image of {step['image_prompt']}, {UNIFIED_STYLE}"
@@ -193,7 +202,7 @@ def process_step(args):
                         break
                 
                 if b64_data:
-                    debug(f"Image generated successfully for step: {step['step_title']}")
+                    info(f"[LLM] ✅ Image generated successfully for step: {step['step_title']}")
                     return {
                         "title": step['step_title'],
                         "description": step['description'],

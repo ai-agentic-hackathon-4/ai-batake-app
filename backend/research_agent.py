@@ -123,7 +123,7 @@ def analyze_seed_packet(image_bytes: bytes) -> str:
         
         headers = {"Content-Type": "application/json"}
         
-        debug("Sending request to Gemini 3 Flash for seed packet analysis")
+        info("[LLM] 📸 Sending seed packet image to Gemini 3 Flash for analysis")
         response = request_with_retry("POST", url, headers=headers, json=payload)
         response.raise_for_status()
         
@@ -183,6 +183,7 @@ def extract_structured_research_data(vegetable_name: str, report_text: str, quer
     }
     
     try:
+        info(f"[LLM] 📝 Extracting structured data via Gemini 3 Flash for: {vegetable_name}")
         gen_resp = request_with_retry("POST", gen_url, headers=headers, json=gen_payload)
         gen_resp.raise_for_status()
         
@@ -247,7 +248,7 @@ def perform_web_grounding_research(vegetable_name: str, packet_info: str) -> dic
     }
 
     try:
-        debug(f"Sending Web Grounding request for: {vegetable_name}")
+        info(f"[LLM] 📡 Sending Web Grounding request (gemini-3-flash-preview) for: {vegetable_name}")
         response = request_with_retry("POST", url, headers=headers, json=payload)
         response.raise_for_status()
         
@@ -305,7 +306,7 @@ def perform_deep_research(vegetable_name: str, packet_info: str) -> dict:
             "background": True
         }
         
-        debug(f"Starting Deep Research interaction for: {vegetable_name}")
+        info(f"[LLM] 🔬 Starting Deep Research interaction (deep-research-pro-preview) for: {vegetable_name}")
         response = request_with_retry("POST", start_url, headers=headers, json=payload)
         
         if response.status_code != 200:

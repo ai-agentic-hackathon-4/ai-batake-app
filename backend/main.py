@@ -246,10 +246,10 @@ def process_research(doc_id: str, vegetable_name: str, analysis_data: dict, mode
     try:
         # Perform Research based on mode
         if mode == "grounding":
-            debug(f"Calling perform_web_grounding_research for {vegetable_name}")
+            info(f"[LLM] Calling Web Grounding research for {vegetable_name}")
             research_result = perform_web_grounding_research(vegetable_name, str(analysis_data))
         else:
-            debug(f"Calling perform_deep_research for {vegetable_name}")
+            info(f"[LLM] Calling Deep Research for {vegetable_name}")
             research_result = perform_deep_research(vegetable_name, str(analysis_data))
         
         # Merge analysis data (like original instructions) if needed
@@ -426,7 +426,7 @@ async def process_seed_guide(job_id: str, image_source: str, image_model: str = 
     }, merge=True)
     
     async def progress_callback(msg: str):
-        debug(f"[Job {job_id}] Progress: {msg}")
+        info(f"[Job {job_id}] Progress: {msg}")
         await doc_ref.set({"message": msg}, merge=True)
 
     # Download image if source is a path/URL
@@ -444,7 +444,7 @@ async def process_seed_guide(job_id: str, image_source: str, image_model: str = 
             blob_name = image_source
             
         if blob_name:
-            debug(f"Downloading input image from GCS: {blob_name}")
+            info(f"Downloading input image from GCS: {blob_name}")
             image_bytes = await asyncio.to_thread(_download_from_gcs_sync, bucket_name, blob_name)
              
     except Exception as e:
@@ -565,7 +565,7 @@ async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: 
         
         # Pass blob_name (str) instead of content (bytes)
         background_tasks.add_task(process_seed_guide, job_id, blob_name, image_model=image_model, guide_image_mode=guide_image_mode)
-        debug(f"Background task queued for job {job_id}")
+        info(f"Background task queued for job {job_id}")
 
         return {"job_id": job_id, "status": "PENDING"}
         
@@ -579,7 +579,7 @@ async def generate_seed_guide_endpoint(background_tasks: BackgroundTasks, file: 
 async def get_seed_guide_job(job_id: str):
     """Polls the status of a seed guide job from Firestore."""
     try:
-        debug(f"Fetching job status: {job_id}")
+        info(f"Fetching job status: {job_id}")
         doc_ref = db.collection(COLLECTION_NAME).document(job_id)
         doc = await doc_ref.get()
         

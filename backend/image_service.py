@@ -89,7 +89,7 @@ def generate_picture_diary(date_str: str, summary: str):
     Generates a picture diary image using NanoBanana-pro (gemini-3-pro-image-preview).
     """
     try:
-        info(f"Starting picture diary generation for {date_str} using NanoBanana-pro...")
+        info(f"[LLM] 🎨 Starting picture diary generation for {date_str}...")
         
         # 1. Configuration & Auth
         api_key = os.environ.get("SEED_GUIDE_GEMINI_KEY")
@@ -179,7 +179,7 @@ def generate_picture_diary(date_str: str, summary: str):
 
         headers = {"Content-Type": "application/json"}
         
-        info(f"Requesting NanoBanana-pro image generation (Primary: {primary_model_id})...")
+        info(f"[LLM] 🎨 Requesting diary image generation (Primary: {primary_model_id})...")
         
         response = None
         primary_failed = False
@@ -204,7 +204,7 @@ def generate_picture_diary(date_str: str, summary: str):
             primary_failed = True
 
         if primary_failed:
-            info(f"Retrying with fallback model: {fallback_model_id}...")
+            info(f"[LLM] 🔄 Retrying with fallback model: {fallback_model_id}...")
             try:
                 response = call_api_with_backoff(
                     fallback_url,
@@ -222,7 +222,7 @@ def generate_picture_diary(date_str: str, summary: str):
         # Tertiary Fallback: Flash with Simplified Prompt
         if not response or response.status_code != 200:
             try:
-                info(f"Both attempts failed. Trying Tertiary (Flash + Simple Prompt) for diary...")
+                info(f"[LLM] 🔄 Trying tertiary (Flash + simple prompt) for diary...")
                 simple_prompt = f"A simple garden diary illustration, {summary}, soft colors"
                 simple_payload = {
                     "contents": [{ "role": "user", "parts": [{"text": simple_prompt}] }],
