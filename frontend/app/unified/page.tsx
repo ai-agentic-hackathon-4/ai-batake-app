@@ -44,7 +44,7 @@ export default function UnifiedPage() {
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState<string>('');
     const [currentStep, setCurrentStep] = useState(0); // For carousel navigation
-    const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
+    const [researchMode, setResearchMode] = useState<"agent" | "grounding">("grounding");
     const [imageModel, setImageModel] = useState<string>("pro");
     const [guideImageMode, setGuideImageMode] = useState<string>("single");
     const [showRawReport, setShowRawReport] = useState(false);
@@ -238,9 +238,15 @@ export default function UnifiedPage() {
                                 </Tabs>
                                 <p className="text-[10px] text-slate-400 text-center italic">
                                     {researchMode === "agent"
-                                        ? "Deep Research: AIが時間をかけて徹底的に調査します (約2-3分)"
+                                        ? "Deep Research: AIが時間をかけて徹底的に調査します (約20-30分)"
                                         : "Web Grounding: 最新のGoogle検索結果を元に素早く回答します (約1分)"}
                                 </p>
+                                {researchMode === "agent" && (
+                                    <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                                        <p className="text-[11px] text-amber-700">⚠️ Deep Researchは処理が非常に重く、完了まで<strong>20〜30分</strong>かかる場合があります。Web Groundingの利用をおすすめします。</p>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-3 pb-2 pt-1 border-t border-slate-100">
@@ -267,6 +273,12 @@ export default function UnifiedPage() {
                                         📸 ステップ別
                                     </button>
                                 </div>
+                                {guideImageMode === "per_step" && (
+                                    <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                                        <p className="text-[11px] text-amber-700">⚠️ ステップ別は各工程ごとに画像を生成するため、処理に<strong>かなり時間がかかります</strong>。通常は1枚絵（Pro）をおすすめします。</p>
+                                    </div>
+                                )}
                             </div>
 
                             {error && (
