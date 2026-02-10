@@ -395,8 +395,8 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         "Content-Type": "application/json"
     }
 
-    # 1. Analyze with Gemini 3 Pro (gemini-3-pro-preview)
-    model_id = "gemini-3-pro-preview"
+    # 1. Analyze with Gemini 3 Pro (gemini-3-flash-preview)
+    model_id = "gemini-3-flash-preview"
     steps = []
     
     image_b64 = base64.b64encode(image_bytes).decode('utf-8')

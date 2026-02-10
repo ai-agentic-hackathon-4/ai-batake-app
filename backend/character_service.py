@@ -53,14 +53,12 @@ async def analyze_seed_and_generate_character(image_bytes: bytes):
         raise RuntimeError(f"API call failed after {max_retries} retries")
 
     # 1. Identify Vegetable & Character Personality (Gemini 3 Pro)
-    model_id = "gemini-3-pro-preview"
+    model_id = "gemini-3-flash-preview"
     image_b64 = base64.b64encode(image_bytes).decode('utf-8')
     
     prompt_text = """
     このタネの画像を分析し、何の植物か特定してください。
     そして、その植物をモチーフにした「ゆるキャラ」の設定を考えてください。
-    背景は必ず白にしてください。
-    キャラクターは必ず1体のみ表示してください。
     
     
     以下のJSON形式で出力してください:
@@ -105,7 +103,14 @@ async def analyze_seed_and_generate_character(image_bytes: bytes):
     img_model_id = "gemini-3-pro-image-preview" 
     img_url = f"https://generativelanguage.googleapis.com/v1beta/models/{img_model_id}:generateContent?key={api_key}"
     
-    img_prompt = f"Generate an image of ONE single {data['image_prompt']}, solo character, centered, cute mascot character, simple design, white background, high quality, no other characters, single subject"
+    img_prompt = (
+        f"Generate an image of exactly ONE single {data['image_prompt']}. "
+        "STRICT RULES: "
+        "1. The background MUST be pure white (#FFFFFF), no patterns, no gradients, no scenery. "
+        "2. There MUST be exactly ONE character only, no duplicates, no other characters, no companions. "
+        "Solo character, centered composition, cute mascot character, simple clean design, "
+        "high quality, digital art style, single subject, isolated on white background."
+    )
     img_payload = {
         "contents": [{ "role": "user", "parts": [{"text": img_prompt}] }],
         "generationConfig": {} 

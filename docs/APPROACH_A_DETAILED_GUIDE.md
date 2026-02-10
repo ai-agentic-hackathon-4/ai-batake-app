@@ -297,7 +297,7 @@ except ImportError:
 # Configuration
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "ai-agentic-hackathon-4")
 LOCATION = "us-central1"
-GEMINI_MODEL = "gemini-3-pro-preview"  # Vertex AI Gemini 3 Pro
+GEMINI_MODEL = "gemini-3-flash-preview"  # Vertex AI Gemini 3 Pro
 VERTEX_AI_ENDPOINT = f"https://{LOCATION}-aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/{LOCATION}/publishers/google/models/{GEMINI_MODEL}:generateContent"
 
 logger = logging.getLogger(__name__)
