@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { FileUp, Loader2, Sparkles, CheckCircle2, AlertCircle, Microscope, Sprout, Info, ChevronLeft, ChevronRight, Upload, Activity, Search, LayoutDashboard } from 'lucide-react';
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
@@ -27,6 +28,7 @@ export default function UnifiedPage() {
     const [error, setError] = useState<string>('');
     const [currentStep, setCurrentStep] = useState(0); // For carousel navigation
     const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
+    const [imageModel, setImageModel] = useState<string>("pro");
     const [showRawReport, setShowRawReport] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
 
@@ -77,7 +79,7 @@ export default function UnifiedPage() {
         formData.append("file", file)
 
         try {
-            const res = await fetch(`/api/unified/start?research_mode=${researchMode}`, {
+            const res = await fetch(`/api/unified/start?research_mode=${researchMode}&image_model=${imageModel}`, {
                 method: "POST",
                 body: formData,
             })
@@ -182,6 +184,19 @@ export default function UnifiedPage() {
                                         ? "Deep Research: AIが時間をかけて徹底的に調査します (約2-3分)"
                                         : "Web Grounding: 最新のGoogle検索結果を元に素早く回答します (約1分)"}
                                 </p>
+                            </div>
+
+                            <div className="space-y-3 pb-2 pt-1 border-t border-slate-100">
+                                <p className="text-sm font-medium text-slate-700">図解生成モデルの選択</p>
+                                <Select value={imageModel} onValueChange={setImageModel}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="モデルを選択" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="pro">Gemini 3 Pro (高品質)</SelectItem>
+                                        <SelectItem value="flash">Gemini 2.5 Flash (高速)</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
 
                             {error && (

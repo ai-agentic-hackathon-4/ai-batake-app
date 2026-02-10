@@ -211,29 +211,28 @@ def _generate_images_parallel(steps, primary_img_url, fallback_img_url, headers)
         
     return final_steps
 
-async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=None):
+async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=None, image_model: str = "pro"):
     """
     Analyzes a seed image and generates a step-by-step planting guide with images using Vertex AI REST API.
     Args:
         image_bytes: The image content.
         progress_callback: Optional async function(message: str) to report progress.
+        image_model: "pro" for gemini-3-pro-image-preview or "flash" for gemini-2.5-flash-image
     """
-    info(f"Starting seed analysis and guide generation ({len(image_bytes)} bytes)")
+    info(f"Starting seed analysis and guide generation ({len(image_bytes)} bytes, model={image_model})")
     if progress_callback: await progress_callback("🌱 AI is analyzing the seed image (Gemini 3 Pro)...")
-
-    # API Key Authentication
+    
+    # ... (rest of authentication and analysis logic stays same)
     api_key = os.environ.get("SEED_GUIDE_GEMINI_KEY")
     if not api_key:
         error("SEED_GUIDE_GEMINI_KEY environment variable not set")
         raise RuntimeError("SEED_GUIDE_GEMINI_KEY environment variable not set")
         
-    # Headers: API Key mode does not use Bearer Token usually, but requires Content-Type
     headers = {
         "Content-Type": "application/json"
     }
 
     # 1. Analyze with Gemini 3 Pro (gemini-3-pro-preview)
-    # Using User's Reference Config (Thinking, Tools) and Endpoint Structure
     model_id = "gemini-3-pro-preview"
     steps = []
     
@@ -264,12 +263,11 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
     
     注意:
     - 日本語で出力してください。
-    - image_promptは画像生成AI(Nanobanana Pro)に入力するため、英語で具体的に記述してください。
+    - image_promptは画像生成AIに入力するため、英語で具体的に記述してください。
     - 家庭菜園初心者にもわかりやすく説明してください。
     - JSONオブジェクトのみを出力してください。Markdownコードブロックは不要です。
     """
 
-    # User Reference Configuration
     payload = {
         "contents": [
             {
@@ -291,16 +289,12 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         ]
     }
 
-    # Endpoint: Use aiplatform.googleapis.com (generateContent)
     url = (
         f"https://{API_ENDPOINT}/v1/publishers/google/"
         f"models/{model_id}:generateContent?key={api_key}"
     )
     
-    debug(f"Requesting Gemini 3 Pro Analysis: {url.split('?')[0]}?key=***")
-    
     try:
-        # User dedicated executor to avoid default loop executor issues
         loop = asyncio.get_running_loop()
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             response = await loop.run_in_executor(pool, lambda: call_api_with_backoff(url, payload, headers))
@@ -316,20 +310,15 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         steps = []
         
         try:
-            # Parse response.
             text_content = resp_json['candidates'][0]['content']['parts'][0]['text']
-            
-            # Clean up JSON markdown
             text = text_content.strip()
             if text.startswith("```json"): text = text[7:]
             if text.endswith("```"): text = text[:-3]
             
             data = json.loads(text.strip())
             
-            # Handle both list (old format fallback) and object (new format)
             if isinstance(data, list):
                 steps = data
-                # Infer title from first step or default
                 if steps and "title" in steps[0]:
                      guide_title = steps[0]["title"].split("：")[0] + "の育て方"
                 else:
@@ -349,21 +338,31 @@ async def analyze_seed_and_generate_guide(image_bytes: bytes, progress_callback=
         error(f"Seed analysis failed: {e}", exc_info=True)
         raise e
 
-    if progress_callback: await progress_callback(f"🎨 Generating illustrations for {len(steps)} steps (Nanobanana Pro)...")
+    if progress_callback: await progress_callback(f"🎨 Generating illustrations for {len(steps)} steps...")
 
-    # 2. Generate Images with primary model + fallback
-    primary_img_model_id = "gemini-3-pro-image-preview"
-    fallback_img_model_id = "gemini-2.5-flash-image"
+    # 2. Generate Images based on selected model
+    if image_model == "flash":
+        primary_img_model_id = "gemini-2.5-flash-image"
+        fallback_img_model_id = None # No fallback if flash fails (or could swap to pro, but usually flash is more available)
+        model_name_for_log = "Gemini 2.5 Flash Image"
+    else:
+        # Default to pro
+        primary_img_model_id = "gemini-3-pro-image-preview"
+        fallback_img_model_id = "gemini-2.5-flash-image"
+        model_name_for_log = "Gemini 3 Pro Image (with Flash fallback)"
+        
+    info(f"Using {model_name_for_log} for image generation")
     
-    # Url: https://aiplatform.googleapis.com/v1/publishers/google/models/{img_model_id}:generateContent?key={API_KEY}
     primary_img_url = (
         f"https://{API_ENDPOINT}/v1/publishers/google/"
         f"models/{primary_img_model_id}:generateContent?key={api_key}"
     )
-    fallback_img_url = (
-        f"https://{API_ENDPOINT}/v1/publishers/google/"
-        f"models/{fallback_img_model_id}:generateContent?key={api_key}"
-    )
+    fallback_img_url = None
+    if fallback_img_model_id:
+        fallback_img_url = (
+            f"https://{API_ENDPOINT}/v1/publishers/google/"
+            f"models/{fallback_img_model_id}:generateContent?key={api_key}"
+        )
     
     # Offload parallel image generation to thread
     final_steps = await asyncio.to_thread(

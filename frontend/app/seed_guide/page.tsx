@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Upload, ArrowLeft, ArrowRight, Sprout, AlertCircle, Loader2, BookOpen, Clock, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from 'next/link';
 
 interface Step {
@@ -31,6 +32,7 @@ export default function SeedGuidePage() {
 
     // Create Mode State
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [imageModel, setImageModel] = useState<string>("pro");
     const [error, setError] = useState<string | null>(null);
 
     // List/Detail Mode State
@@ -94,7 +96,7 @@ export default function SeedGuidePage() {
 
         try {
             // Updated endpoint name
-            const response = await fetch('/api/seed-guide/generate', {
+            const response = await fetch(`/api/seed-guide/generate?image_model=${imageModel}`, {
                 method: 'POST',
                 body: formData,
             });
@@ -298,6 +300,18 @@ export default function SeedGuidePage() {
                                             className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                             onChange={handleFileChange}
                                         />
+                                    </div>
+                                    <div className="grid w-full items-center gap-1.5 text-left">
+                                        <label className="text-xs font-medium text-muted-foreground ml-1">画像生成モデル</label>
+                                        <Select value={imageModel} onValueChange={setImageModel}>
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="モデルを選択" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="pro">Gemini 3 Pro (高品質)</SelectItem>
+                                                <SelectItem value="flash">Gemini 2.5 Flash (高速)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                     <button
                                         onClick={handleUpload}
