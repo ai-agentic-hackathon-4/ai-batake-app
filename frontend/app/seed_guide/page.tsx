@@ -419,23 +419,29 @@ export default function SeedGuidePage() {
                                             <div className="aspect-video bg-muted relative flex items-center justify-center border-b border-border">
                                                 {(() => {
                                                     const step = selectedGuide.steps[currentStepIndex];
-                                                    const imageUrl = step.image_url;
-                                                    const imageBase64 = step.image_base64;
+                                                    // Detect single image mode: only step 0 has image
+                                                    const stepsWithImages = selectedGuide.steps.filter((s: any) => s.image_url || s.image_base64);
+                                                    const isSingleImageMode = stepsWithImages.length <= 1 && (selectedGuide.steps[0]?.image_url || selectedGuide.steps[0]?.image_base64);
+
+                                                    // In single mode, always show step 0's image; in per_step mode, show current step's image
+                                                    const displayStep = isSingleImageMode ? selectedGuide.steps[0] : step;
+                                                    const imageUrl = displayStep.image_url;
+                                                    const imageBase64 = displayStep.image_base64;
 
                                                     if (imageBase64) {
                                                         return (
                                                             <img
                                                                 src={`data:image/jpeg;base64,${imageBase64}`}
-                                                                alt={step.title}
-                                                                className="w-full h-full object-cover animate-in fade-in duration-500"
+                                                                alt={isSingleImageMode ? "栽培ガイド" : step.title}
+                                                                className="w-full h-full object-contain bg-white animate-in fade-in duration-500"
                                                             />
                                                         );
                                                     } else if (imageUrl) {
                                                         return (
                                                             <img
                                                                 src={getProxiedImageUrl(imageUrl)}
-                                                                alt={step.title}
-                                                                className="w-full h-full object-cover animate-in fade-in duration-500"
+                                                                alt={isSingleImageMode ? "栽培ガイド" : step.title}
+                                                                className="w-full h-full object-contain bg-white animate-in fade-in duration-500"
                                                             />
                                                         );
                                                     } else {
