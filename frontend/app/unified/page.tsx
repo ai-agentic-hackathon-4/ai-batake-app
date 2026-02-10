@@ -27,6 +27,7 @@ export default function UnifiedPage() {
     const [error, setError] = useState<string>('');
     const [currentStep, setCurrentStep] = useState(0); // For carousel navigation
     const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
+    const [showRawReport, setShowRawReport] = useState(false);
 
     // Poll for status
     useEffect(() => {
@@ -606,6 +607,29 @@ export default function UnifiedPage() {
                                                 {/* Grounding Attribution */}
                                                 {status.research.result.grounding_metadata && (
                                                     <GroundingDisplay metadata={status.research.result.grounding_metadata} />
+                                                )}
+
+                                                {/* Raw Report Display */}
+                                                {status.research.result.raw_report && (
+                                                    <div className="mt-8 border-t border-slate-200 pt-6">
+                                                        <button
+                                                            onClick={() => setShowRawReport(!showRawReport)}
+                                                            className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors w-full group"
+                                                        >
+                                                            <div className={`p-1 rounded bg-slate-100 group-hover:bg-slate-200 transition-colors ${showRawReport ? 'rotate-90' : ''}`}>
+                                                                <ChevronRight className="h-3.5 w-3.5 transition-transform" />
+                                                            </div>
+                                                            調査レポートの原文を表示
+                                                        </button>
+
+                                                        {showRawReport && (
+                                                            <div className="mt-4 p-5 bg-slate-900 rounded-xl overflow-x-auto border border-slate-800 shadow-inner animate-in fade-in slide-in-from-top-2 duration-300">
+                                                                <pre className="text-xs text-slate-300 font-mono leading-relaxed whitespace-pre-wrap">
+                                                                    {status.research.result.raw_report}
+                                                                </pre>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
                                         ) : (

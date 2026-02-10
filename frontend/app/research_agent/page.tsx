@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical, Droplets, Thermometer, Sun, Sprout, Check, Send, AlertCircle, ArrowRight, ArrowLeft, Search, ExternalLink, Trash2 } from "lucide-react";
+import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical, Droplets, Thermometer, Sun, Sprout, Check, Send, AlertCircle, ArrowRight, ArrowLeft, Search, ExternalLink, Trash2, ChevronRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import Link from "next/link";
 import { GroundingDisplay } from "@/components/grounding-display";
@@ -22,6 +22,7 @@ export default function ResearchDashboard() {
     const [fileName, setFileName] = useState("Click to browse or drag file here");
     const [applyingToAgent, setApplyingToAgent] = useState(false);
     const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
+    const [showRawReport, setShowRawReport] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Poll for data
@@ -504,6 +505,29 @@ export default function ResearchDashboard() {
                                         {/* Grounding Attribution */}
                                         {selectedVeg.instructions.grounding_metadata && (
                                             <GroundingDisplay metadata={selectedVeg.instructions.grounding_metadata} />
+                                        )}
+
+                                        {/* Raw Report Display */}
+                                        {selectedVeg.instructions.raw_report && (
+                                            <div className="mt-8 border-t border-border pt-6">
+                                                <button
+                                                    onClick={() => setShowRawReport(!showRawReport)}
+                                                    className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors w-full group uppercase tracking-wider"
+                                                >
+                                                    <div className={`p-1 rounded bg-muted group-hover:bg-muted/80 transition-colors ${showRawReport ? 'rotate-90' : ''}`}>
+                                                        <ChevronRight className="h-3 w-3 transition-transform" />
+                                                    </div>
+                                                    Show Raw Research Report
+                                                </button>
+
+                                                {showRawReport && (
+                                                    <div className="mt-4 p-5 bg-slate-900 rounded-xl overflow-x-auto border border-slate-800 shadow-inner animate-in fade-in slide-in-from-top-2 duration-300">
+                                                        <pre className="text-[10px] text-slate-300 font-mono leading-relaxed whitespace-pre-wrap">
+                                                            {selectedVeg.instructions.raw_report}
+                                                        </pre>
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </>
