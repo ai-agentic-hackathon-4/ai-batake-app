@@ -240,21 +240,19 @@ export default function CharacterPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-green-50 to-background flex flex-col font-sans">
+        <div className="min-h-screen bg-background flex flex-col font-sans">
             {/* Header */}
-            <header className="border-b border-border/50 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Link href="/" className="mr-2 p-2 hover:bg-green-100 rounded-full transition-colors">
-                            <ArrowLeft className="h-5 w-5 text-green-700" />
-                        </Link>
-                        <div className="p-2 rounded-xl bg-gradient-to-br from-green-400 to-emerald-600 shadow-md">
-                            <Sparkles className="h-6 w-6 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-800 tracking-tight">AI Character Maker</h1>
-                            <p className="text-xs text-green-600 font-medium">種から生まれる不思議なお友達</p>
-                        </div>
+            <header className="border-b border-border bg-card">
+                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-3">
+                    <Link href="/" className="mr-2 p-1 hover:bg-accent rounded-full transition-colors">
+                        <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+                    </Link>
+                    <div className="p-2 rounded-lg bg-primary/10">
+                        <Sparkles className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-semibold text-card-foreground">AI Character Maker</h1>
+                        <p className="text-sm text-muted-foreground">種から生まれる不思議なお友達</p>
                     </div>
                 </div>
             </header>
