@@ -1,4 +1,8 @@
-# 育成日記機能 - 実装方法の比較検討 (Implementation Approach Comparison)
+> [!NOTE]
+> **[HISTORICAL DOCUMENT]** この比較ドキュメントは設計段階で作成されたものです。
+> **方式A（Cloud Scheduler + HTTP Endpoint）が採用・実装済み** です。現在の実装は `backend/main.py` の `/api/diary/auto-generate` エンドポイントおよび `backend/diary_service.py` を参照してください。
+
+# 日記自動生成 実装方式比較検討 (Implementation Approach Comparison)
 
 ## 🎯 要件の再確認
 

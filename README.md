@@ -11,8 +11,10 @@ AI Batake Appは、家庭菜園や農業を支援するためのAIプラット�
 - **Deep Research**: Gemini AIを活用した詳細な栽培条件の調査
 - **栽培ガイド生成**: ステップバイステップの栽培手順と画像の自動生成
 - **AIキャラクター作成**: 種袋画像からオリジナルの野菜キャラクターを生成
+- **統合シード機能**: 種袋解析・Deep Research・栽培ガイド・キャラクター生成をワンクリックで実行
 - **AIアクティビティログ**: エージェントの自律動作内容をタイムラインで表示
 - **自動栽培日記生成**: 毎日のセンサーデータと天気情報から栽培日記を自動生成 (by Cloud Scheduler)
+- **絵日記画像生成**: AI生成キャラクターを含む絵日記風画像の自動生成
 
 ## 🛠️ 技術スタック
 
@@ -25,7 +27,7 @@ AI Batake Appは、家庭菜園や農業を支援するためのAIプラット�
 | Google Cloud Firestore | - | NoSQL データベース |
 | Google Cloud Storage | - | 画像ストレージ |
 | Google Vertex AI | - | AI エージェント基盤 |
-| Gemini API | - | 画像解析・Deep Research |
+| Gemini API | - | 画像解析・Deep Research・日記/画像生成 |
 | Google Cloud Scheduler | - | 定期実行ジョブ (日記生成) |
 
 ### フロントエンド
@@ -55,19 +57,27 @@ ai-batake-app/
 │   ├── db.py                  # Firestore データベース操作
 │   ├── research_agent.py      # 種袋解析・Deep Research
 │   ├── seed_service.py        # 非同期栽培ガイド生成
+│   ├── diary_service.py       # 自動栽培日記生成サービス
+│   ├── image_service.py       # 絵日記画像生成サービス
+│   ├── character_service.py   # AIキャラクター生成サービス
+│   ├── logger.py              # 構造化ロギング
 │   ├── requirements.txt       # Python 依存関係
-│   └── tests/                 # テストファイル
+│   └── tests/                 # テストファイル (473テスト)
 │
 ├── frontend/                   # Next.js フロントエンド
 │   ├── app/                   # App Router ページ
 │   │   ├── page.tsx          # ランディングページ
 │   │   ├── dashboard/        # ダッシュボード
 │   │   ├── research_agent/   # Research Agent UI
-│   │   └── seed_guide/       # 栽培ガイド生成 UI
+│   │   ├── seed_guide/       # 栽培ガイド生成 UI
+│   │   ├── unified/          # 統合シード機能 UI
+│   │   ├── diary/            # 栽培日記表示
+│   │   └── character/        # キャラクター管理
 │   ├── components/            # React コンポーネント
 │   │   ├── ui/               # 基本 UI コンポーネント
 │   │   ├── metric-card.tsx   # センサーメトリクス表示
 │   │   ├── weather-card.tsx  # 天気情報表示
+│   │   ├── ai-activity-log.tsx # AIアクティビティログ
 │   │   └── ...
 │   └── lib/                   # ユーティリティ関数
 │
@@ -141,6 +151,9 @@ graph TB
         DB[ダッシュボード]
         RA[Research Agent]
         SG[Seed Guide]
+        UNI[統合シード機能]
+        DIARY[栽培日記]
+        CHAR[キャラクター]
     end
 
     subgraph "バックエンド (FastAPI)"
@@ -148,6 +161,10 @@ graph TB
         AGT[Agent Module]
         RES[Research Module]
         SEED[Seed Service]
+        DSVC[Diary Service]
+        ISVC[Image Service]
+        CSVC[Character Service]
+        LOG[Logger]
     end
 
     subgraph "Google Cloud"
@@ -166,18 +183,30 @@ graph TB
     LP --> DB
     LP --> RA
     LP --> SG
+    LP --> UNI
+    LP --> DIARY
+    LP --> CHAR
 
     DB --> API
     RA --> API
     SG --> API
+    UNI --> API
+    DIARY --> API
+    CHAR --> API
 
     API --> AGT
     API --> RES
     API --> SEED
+    API --> DSVC
+    API --> ISVC
+    API --> CSVC
 
     AGT --> VAI
     RES --> GEM
     SEED --> GEM
+    DSVC --> GEM
+    ISVC --> GEM
+    CSVC --> GEM
 
     API --> FS
     API --> GCS
@@ -219,40 +248,67 @@ sequenceDiagram
     BE->>DB: エージェント設定更新 (edge_agent)
 ```
 
-### 栽培ガイド生成フロー (非同期ジョブ)
+### 統合シード機能フロー (POST /api/unified/start)
 
 ```mermaid
 sequenceDiagram
-    participant U as ユーザー
-    participant FE as Frontend
+    participant C as Client
+    participant M as main.py
+    participant R as research_agent.py (Phase 1/2)
+    participant S as seed_service.py (Phase 3)
+    participant CF as Character Func (Phase 1)
+    participant F as Firestore
+
+    C->>M: POST /api/unified/start (画像)
+    M->>F: Unified Job 作成 (PROCESSING)
+    M->>F: Sub-Jobs 作成 (Research/Guide/Char)
+    M-->>C: {job_id, sub_job_ids...}
+
+    Note over M: BackgroundTask (Unified Runner)
+
+    par Phase 1: Character & Basic Analysis
+        M->>CF: キャラクター生成
+        CF->>F: Character Job 完了
+        M->>R: 基本解析 (Vegetable Name)
+        R->>F: Vegetable Doc 作成 (Status: researching)
+    end
+    
+    Note over M: Phase 1 完了待ち (await gather)
+
+    par Phase 2 & 3: Deep Research & Guide (並列)
+        M->>R: perform_deep_research()
+        R->>F: Vegetable Doc 更新 (Status: completed)
+        M->>S: process_seed_guide()
+        S->>F: Guide Job 完了
+    end
+
+    C->>M: GET /api/unified/jobs/{job_id}
+    M->>F: Unified Job & Sub-Jobs 状態取得
+    M-->>C: {job_status, research_status, guide_status, char_status}
+```
+
+### 栽培日記自動生成フロー
+
+```mermaid
+sequenceDiagram
+    participant SCH as Cloud Scheduler
     participant BE as Backend
-    participant GM as Gemini 3 Pro
-    participant IMG as Nanobanana Pro
+    participant GM as Gemini API
+    participant IMG as Image Service
     participant DB as Firestore
 
-    U->>FE: 種袋画像をアップロード
-    FE->>BE: POST /api/seed-guide/jobs
-    BE->>DB: ジョブ作成 (PENDING)
-    BE-->>FE: job_id 返却
-
-    Note over BE: バックグラウンドタスク
-    BE->>DB: ステータス更新 (PROCESSING)
-    BE->>GM: 画像解析 + ステップ生成
-    GM-->>BE: 栽培ステップ (JSON)
+    SCH->>BE: POST /api/diary/auto-generate (18:00 JST)
+    BE->>DB: 日記ステータス初期化 (processing)
     
-    loop 各ステップ
-        BE->>IMG: 画像生成リクエスト
-        IMG-->>BE: Base64 画像
-    end
-    
-    BE->>DB: 結果保存 (COMPLETED)
-
-    loop ポーリング
-        FE->>BE: GET /api/seed-guide/jobs/{job_id}
-        BE-->>FE: ジョブステータス
-    end
-    
-    FE->>U: ウィザード形式で表示
+    Note over BE: 同期処理
+    BE->>DB: データ収集 (ログ・センサー・野菜・画像)
+    BE->>GM: AI日記生成 (リトライ付き)
+    GM-->>BE: 日記コンテンツ (JSON)
+    BE->>IMG: 絵日記画像生成
+    IMG->>GM: 画像生成リクエスト
+    GM-->>IMG: 画像データ
+    IMG-->>BE: 画像URL
+    BE->>DB: 日記保存 (completed)
 ```
 
 ## 🧪 テスト
@@ -280,33 +336,71 @@ npm test
 | ダッシュボード | `/dashboard` | センサーデータ・天気・成長段階の表示 |
 | Research Agent | `/research_agent` | 種袋解析と詳細リサーチ |
 | Seed Guide | `/seed_guide` | 非同期栽培ガイド生成 |
+| 統合シード機能 | `/unified` | Research・Guide・Character のワンクリック統合実行 |
+| 栽培日記 | `/diary` | 自動生成された栽培日記の閲覧 |
+| キャラクター | `/character` | AI生成キャラクターの管理 |
 
 ## 🔗 API エンドポイント
 
+### センサー・天気
 | メソッド | エンドポイント | 説明 |
 |---------|---------------|------|
 | POST | `/api/weather` | 天気情報取得 |
 | GET | `/api/sensors/latest` | 最新センサーデータ取得 |
 | GET | `/api/sensor-history` | センサー履歴取得 |
+
+### 野菜・種袋
+| メソッド | エンドポイント | 説明 |
+|---------|---------------|------|
 | GET | `/api/vegetables/latest` | 最新野菜データ取得 |
 | GET | `/api/vegetables` | 全野菜リスト取得 |
 | POST | `/api/vegetables/{doc_id}/select` | 育成情報の選択・エージェント適用 |
+| DELETE | `/api/vegetables/{doc_id}` | 野菜データ削除 |
 | POST | `/api/register-seed` | 種袋登録・解析開始 |
 | GET | `/api/plant-camera/latest` | 最新植物画像取得 |
+| GET | `/api/agent-logs` | エージェント実行ログ取得 |
+| GET | `/api/agent-logs/oldest` | 最古のエージェントログ (播種日数計算用) |
+
+### 栽培ガイド
+| メソッド | エンドポイント | 説明 |
+|---------|---------------|------|
 | POST | `/api/seed-guide/jobs` | 栽培ガイドジョブ作成 |
 | GET | `/api/seed-guide/jobs/{job_id}` | ジョブステータス取得 |
-| GET | `/api/agent-logs` | エージェント実行ログ取得 |
+| POST | `/api/seed-guide/save` | 栽培ガイド保存 |
+| GET | `/api/seed-guide/saved` | 保存済みガイド一覧 |
+| GET | `/api/seed-guide/saved/{doc_id}` | 保存済みガイド取得 |
+| DELETE | `/api/seed-guide/saved/{doc_id}` | 保存済みガイド削除 |
+| GET | `/api/seed-guide/image/{job_id}/{step_index}` | ガイド画像プロキシ |
+
+### キャラクター
+| メソッド | エンドポイント | 説明 |
+|---------|---------------|------|
 | POST | `/api/seed-guide/character` | キャラクター生成ジョブ作成 |
+| GET | `/api/seed-guide/character/{job_id}` | キャラクタージョブステータス |
+| GET | `/api/characters` | キャラクター一覧 |
+| POST | `/api/characters/{job_id}/select` | キャラクター選択 |
 | GET | `/api/character` | 最新キャラクター情報取得 |
 | GET | `/api/character/image` | キャラクター画像取得 (プロキシ) |
+
+### 統合シード機能
+| メソッド | エンドポイント | 説明 |
+|---------|---------------|------|
+| POST | `/api/unified/start` | 統合ジョブ開始 (Research + Guide + Character) |
+| GET | `/api/unified/jobs/{job_id}` | 統合ジョブステータス取得 |
+
+### 栽培日記
+| メソッド | エンドポイント | 説明 |
+|---------|---------------|------|
 | POST | `/api/diary/auto-generate` | 栽培日記自動生成 (Scheduler用) |
 | POST | `/api/diary/generate-manual` | 栽培日記手動生成 (SSE) |
+| POST | `/api/diary/generate-daily` | 日次日記生成 |
 | GET | `/api/diary/list` | 栽培日記一覧取得 |
 | GET | `/api/diary/{date}` | 指定日の日記取得 |
+| GET | `/api/diary/{date}/image` | 日記絵日記画像取得 (プロキシ) |
 
 ## 📄 ライセンス
 
-© 2025 Smart Farm AI Team
+© 2026 チーム笑顔隊
 
 ## 🤝 コントリビューション
 
