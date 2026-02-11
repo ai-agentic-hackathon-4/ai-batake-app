@@ -920,11 +920,11 @@ async def get_character_image(path: str):
 @app.get("/api/character/message")
 async def get_character_message():
     """
-    Generates a contextual message from the active character based on
-    current sensor data and weather conditions.
+    Returns a message from the active character using comments from agent execution logs.
+    Falls back to default messages if no logs are available.
     """
     try:
-        info("Fetching character message")
+        info("Fetching character message from agent logs")
         
         # 1. Get active character
         char_doc_ref = db.collection(col("growing_diaries")).document("Character")
@@ -940,43 +940,28 @@ async def get_character_message():
             }
         
         character_data = char_doc.to_dict()
+        vegetable_name = character_data.get("vegetable_name", "野菜")
         
-        # 2. Get latest sensor data
-        sensor_data = {}
+        # 2. Get latest agent execution log and extract comment
+        message = None
         try:
-            sensor_logs = await asyncio.to_thread(get_recent_sensor_logs, limit=1)
-            if sensor_logs and len(sensor_logs) > 0:
-                sensor_data = sensor_logs[0]
+            logs = await asyncio.to_thread(get_agent_execution_logs, limit=1)
+            if logs and len(logs) > 0:
+                log = logs[0]
+                # Extract comment from data field
+                comment = log.get('data', {}).get('comment', '')
+                if comment:
+                    message = comment
+                    info(f"Using comment from agent log: {comment[:50]}...")
         except Exception as e:
-            warning(f"Failed to fetch sensor data: {e}")
+            warning(f"Failed to fetch agent logs: {e}")
         
-        # 3. Get weather data (using hardcoded data similar to WeatherCard for now)
-        weather_data = {
-            "temp": 26,
-            "condition": "晴れ時々曇り",
-            "forecast": [
-                {"time": "9時", "temp": 24, "icon": "Sun"},
-                {"time": "12時", "temp": 28, "icon": "Sun"},
-                {"time": "15時", "temp": 27, "icon": "Cloud"},
-                {"time": "18時", "temp": 23, "icon": "CloudRain"},
-            ]
-        }
+        # 3. Fallback to default message if no comment found
+        if not message:
+            message = f"こんにちは！今日も{vegetable_name}を元気に育てていこうね🌱✨"
+            debug("No agent log comment found, using fallback message")
         
-        # 4. Import and call message generation function
-        try:
-            from backend.character_service import generate_character_message
-        except ImportError:
-            from character_service import generate_character_message
-        
-        # Run blocking function in thread pool
-        message = await asyncio.to_thread(
-            generate_character_message,
-            character_data,
-            sensor_data,
-            weather_data
-        )
-        
-        # 5. Prepare avatar URL
+        # 4. Prepare avatar URL
         avatar_url = None
         if character_data.get("image_uri"):
             gcs_uri = character_data["image_uri"]
@@ -991,7 +976,7 @@ async def get_character_message():
             else:
                 avatar_url = character_data["image_uri"]
         
-        info(f"Character message generated for {character_data.get('name', 'Unknown')}")
+        info(f"Character message retrieved for {character_data.get('name', 'Unknown')}")
         return {
             "character_name": character_data.get("name", "お友達"),
             "message": message,
@@ -999,8 +984,9 @@ async def get_character_message():
         }
         
     except Exception as e:
-        error(f"Failed to generate character message: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to generate message: {str(e)}")
+        error(f"Failed to get character message: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get message: {str(e)}")
+
 
 
 @app.post("/api/seed-guide/character")
