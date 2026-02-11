@@ -917,6 +917,78 @@ async def get_character_image(path: str):
         error(f"Error serving character image: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/character/message")
+async def get_character_message():
+    """
+    Returns a message from the active character using comments from agent execution logs.
+    Falls back to default messages if no logs are available.
+    """
+    try:
+        info("Fetching character message from agent logs")
+        
+        # 1. Get active character
+        char_doc_ref = db.collection(col("growing_diaries")).document("Character")
+        char_doc = await char_doc_ref.get()
+        
+        if not char_doc.exists:
+            # No character selected, return default message
+            debug("No character selected, returning default message")
+            return {
+                "character_name": "お友達",
+                "message": "こんにちは！栽培を始める準備はできてるかな？🌱",
+                "avatar_url": None
+            }
+        
+        character_data = char_doc.to_dict()
+        vegetable_name = character_data.get("vegetable_name", "野菜")
+        
+        # 2. Get latest agent execution log and extract comment
+        message = None
+        try:
+            logs = await asyncio.to_thread(get_agent_execution_logs, limit=1)
+            if logs and len(logs) > 0:
+                log = logs[0]
+                # Extract comment from data field
+                comment = log.get('data', {}).get('comment', '')
+                if comment:
+                    message = comment
+                    info(f"Using comment from agent log: {comment[:50]}...")
+        except Exception as e:
+            warning(f"Failed to fetch agent logs: {e}")
+        
+        # 3. Fallback to default message if no comment found
+        if not message:
+            message = f"こんにちは！今日も{vegetable_name}を元気に育てていこうね🌱✨"
+            debug("No agent log comment found, using fallback message")
+        
+        # 4. Prepare avatar URL
+        avatar_url = None
+        if character_data.get("image_uri"):
+            gcs_uri = character_data["image_uri"]
+            bucket_name = "ai-agentic-hackathon-4-bk"
+            prefix = f"https://storage.googleapis.com/{bucket_name}/"
+            
+            if gcs_uri.startswith(prefix):
+                blob_path = gcs_uri[len(prefix):]
+                import urllib.parse
+                encoded_path = urllib.parse.quote(blob_path)
+                avatar_url = f"/api/character/image?path={encoded_path}"
+            else:
+                avatar_url = character_data["image_uri"]
+        
+        info(f"Character message retrieved for {character_data.get('name', 'Unknown')}")
+        return {
+            "character_name": character_data.get("name", "お友達"),
+            "message": message,
+            "avatar_url": avatar_url
+        }
+        
+    except Exception as e:
+        error(f"Failed to get character message: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get message: {str(e)}")
+
+
+
 @app.post("/api/seed-guide/character")
 async def create_character_job(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """Starts an async job for character generation."""
@@ -1053,6 +1125,8 @@ async def auto_generate_diary_endpoint(key: Optional[str] = None):
     """
     Endpoint for Cloud Scheduler to trigger automatic diary generation.
     Secured by a simple API key check.
+    Runs synchronously (awaits completion) to prevent Cloud Run CPU throttling
+    from killing background tasks.
     """
     secret_key = os.environ.get("DIARY_API_KEY")
     if secret_key and key != secret_key:
@@ -1063,15 +1137,15 @@ async def auto_generate_diary_endpoint(key: Optional[str] = None):
         current_date_str = datetime.now().date().isoformat()
         info(f"Auto-generating diary for today: {current_date_str}")
         
-        asyncio.create_task(process_daily_diary(current_date_str))
+        await process_daily_diary(current_date_str)
         
         return {
-            "status": "accepted",
+            "status": "completed",
             "date": current_date_str,
-            "message": "Automatic diary generation started"
+            "message": "Automatic diary generation completed"
         }
     except Exception as e:
-        error(f"Failed to trigger auto-generation: {e}")
+        error(f"Failed to auto-generate diary: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1260,9 +1334,11 @@ async def get_seed_guide_image(job_id: str, step_index: int):
 
 
 @app.post("/api/diary/generate-daily")
-async def generate_daily_diary_endpoint(background_tasks: BackgroundTasks):
+async def generate_daily_diary_endpoint():
     """
     Trigger daily diary generation.
+    Runs synchronously (awaits completion) to prevent Cloud Run CPU throttling
+    from killing background tasks.
     """
     if process_daily_diary is None:
         raise HTTPException(status_code=503, detail="Diary service not available")
@@ -1270,14 +1346,18 @@ async def generate_daily_diary_endpoint(background_tasks: BackgroundTasks):
     try:
         from datetime import datetime, timedelta
         target_date = (datetime.now() - timedelta(hours=1)).date()
-        background_tasks.add_task(process_daily_diary, target_date.isoformat())
+        target_date_str = target_date.isoformat()
+        info(f"Generating daily diary for: {target_date_str}")
+        
+        await process_daily_diary(target_date_str)
+        
         return {
-            "status": "accepted",
-            "date": target_date.isoformat(),
-            "message": "Diary generation started"
+            "status": "completed",
+            "date": target_date_str,
+            "message": "Diary generation completed"
         }
     except Exception as e:
-        error(f"Error starting diary generation: {e}")
+        error(f"Error in diary generation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
