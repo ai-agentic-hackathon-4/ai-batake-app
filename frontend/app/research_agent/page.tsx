@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical, Droplets, Thermometer, Sun, Sprout, Check, Send, AlertCircle, ArrowRight, ArrowLeft, Search, ExternalLink, Trash2, ChevronRight, Loader2 } from "lucide-react";
+import { Leaf, Plus, CloudUpload, Clock, X, FlaskConical, Droplets, Thermometer, Sun, Sprout, Check, Send, AlertCircle, ArrowRight, ArrowLeft, Search, ExternalLink, Trash2, ChevronRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import Link from "next/link";
 import { GroundingDisplay } from "@/components/grounding-display";
@@ -275,8 +275,8 @@ export default function ResearchDashboard() {
                                     <div className="flex justify-between items-start mb-4 gap-2">
                                         <div className="flex items-center gap-3 min-w-0 flex-1">
                                             <div className={`p-2 rounded-lg shrink-0 ${isProcessing ? "bg-amber-100 text-amber-600" :
-                                                isFailed ? "bg-red-100 text-red-600" :
-                                                    "bg-primary/10 text-primary"
+                                                    isFailed ? "bg-red-100 text-red-600" :
+                                                        "bg-primary/10 text-primary"
                                                 }`}>
                                                 {isProcessing ? <Clock className="h-5 w-5" /> :
                                                     isFailed ? <AlertCircle className="h-5 w-5" /> :
@@ -439,7 +439,7 @@ export default function ResearchDashboard() {
                                             className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 shadow-sm"
                                         >
                                             {applyingToAgent ? (
-                                                <Loader2 className="h-8 w-8 animate-spin" />
+                                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                                             ) : (
                                                 <>
                                                     <Send className="w-4 h-4" /> Apply Config
