@@ -178,7 +178,7 @@ export default function UnifiedPage() {
         status.character.status.toLowerCase() === "completed";
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-background flex flex-col">
             {/* Header */}
             <header className="border-b border-border bg-card">
                 <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3">
@@ -196,26 +196,35 @@ export default function UnifiedPage() {
             </header>
 
             {/* Main Content */}
-            <main className="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-3">
+            <main className="flex-1 w-full max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex flex-col">
 
                 {/* Upload Section */}
                 {!jobId && (
-                    <div className="flex items-center justify-center">
-                        <Card className="max-w-xl w-full border-dashed border-2">
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-center text-lg">種の袋をスキャン</CardTitle>
+                    <div className="flex-1 flex items-center justify-center py-8 w-full p-4">
+                        <Card className="max-w-2xl w-full border-2 shadow-2xl rounded-2xl overflow-hidden border-slate-100">
+                            <CardHeader className="pb-4 bg-slate-50/50 border-b border-slate-100">
+                                <CardTitle className="text-center text-xl font-bold text-slate-800">種の袋をスキャン</CardTitle>
+                                <CardDescription className="text-center text-xs">AIが情報を読み取り、栽培プランとキャラクターを生成します</CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-3">
-                                <div className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors border border-slate-200"
+                            <CardContent className="p-6 space-y-6">
+                                {/* Upload Box */}
+                                <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-2xl cursor-pointer hover:bg-slate-100 transition-all border-2 border-dashed border-slate-200 hover:border-primary/50 group"
                                     onClick={() => document.getElementById('file-upload')?.click()}>
                                     {preview ? (
-                                        <img src={preview} alt="Preview" className="max-h-40 rounded shadow-md" />
-                                    ) : (
-                                        <div className="text-center space-y-1">
-                                            <div className="bg-white p-3 rounded-full shadow-sm inline-block">
-                                                <Upload className="h-6 w-6 text-primary" />
+                                        <div className="relative">
+                                            <img src={preview} alt="Preview" className="max-h-56 rounded-xl shadow-lg border-4 border-white" />
+                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded-xl">
+                                                <p className="bg-white/90 px-3 py-1 rounded-full text-xs font-bold shadow-sm">変更する</p>
                                             </div>
-                                            <p className="text-xs text-slate-500">クリックして画像をアップロード</p>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center space-y-3">
+                                            <div className="bg-white p-4 rounded-full shadow-md inline-block group-hover:scale-110 transition-transform">
+                                                <Upload className="h-8 w-8 text-primary" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-700">クリックして画像をアップロード</p>
+                                            </div>
                                         </div>
                                     )}
                                     <input
@@ -227,68 +236,84 @@ export default function UnifiedPage() {
                                     />
                                 </div>
 
-                                <div className="space-y-2 pb-1">
-                                    <p className="text-xs font-medium text-slate-700">リサーチモードの選択</p>
-                                    <Tabs value={researchMode} onValueChange={(val) => setResearchMode(val as any)} className="w-full">
-                                        <TabsList className="grid w-full grid-cols-2">
-                                            <TabsTrigger value="agent" className="text-xs">Deep Research</TabsTrigger>
-                                            <TabsTrigger value="grounding" className="text-xs">Web Grounding</TabsTrigger>
-                                        </TabsList>
-                                    </Tabs>
-                                    <p className="text-[10px] text-slate-400 text-center italic">
-                                        {researchMode === "agent"
-                                            ? "Deep Research: AIが時間をかけて徹底的に調査します (約20-30分)"
-                                            : "Web Grounding: 最新のGoogle検索結果を元に素早く回答します (約1分)"}
-                                    </p>
-                                    {researchMode === "agent" && (
-                                        <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Research Mode */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <Search className="h-4 w-4 text-slate-400" />
+                                            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">リサーチモード</p>
+                                        </div>
+                                        <Tabs value={researchMode} onValueChange={(val) => setResearchMode(val as any)} className="w-full">
+                                            <TabsList className="grid w-full grid-cols-2 bg-slate-100 h-9 p-1">
+                                                <TabsTrigger value="agent" className="text-[10px] sm:text-xs">Deep</TabsTrigger>
+                                                <TabsTrigger value="grounding" className="text-[10px] sm:text-xs">Grounding</TabsTrigger>
+                                            </TabsList>
+                                        </Tabs>
+                                        <p className="text-[10px] text-slate-500 leading-relaxed min-h-[32px]">
+                                            {researchMode === "agent"
+                                                ? "AIが時間をかけて徹底的に調査します (20-30分)"
+                                                : "最新のGoogle検索結果を元に素早く回答します (1分)"}
+                                        </p>
+                                    </div>
+
+                                    {/* Illustration Mode */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <Sparkles className="h-4 w-4 text-slate-400" />
+                                            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">図解モード</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setGuideImageMode("single")}
+                                                className={`flex-1 text-[10px] sm:text-xs h-9 rounded-md border-2 font-bold transition-all ${guideImageMode === "single"
+                                                    ? "bg-white text-primary border-primary shadow-sm"
+                                                    : "bg-slate-50 text-slate-500 border-transparent hover:border-slate-200"
+                                                    }`}
+                                            >
+                                                🖼️ 1枚絵
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setGuideImageMode("per_step")}
+                                                className={`flex-1 text-[10px] sm:text-xs h-9 rounded-md border-2 font-bold transition-all ${guideImageMode === "per_step"
+                                                    ? "bg-white text-primary border-primary shadow-sm"
+                                                    : "bg-slate-50 text-slate-500 border-transparent hover:border-slate-200"
+                                                    }`}
+                                            >
+                                                📸 ステップ
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 leading-relaxed min-h-[32px]">
+                                            {guideImageMode === "single"
+                                                ? "Proモデルによる高品質な1枚の俯瞰図を作成します"
+                                                : "全工程ごとの挿絵を個別に生成します"}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Message Area (Reserved Height to prevent shift) */}
+                                <div className="space-y-4 min-h-[64px] flex flex-col justify-center">
+                                    {/* Warning Banners */}
+                                    {(researchMode === "agent" || guideImageMode === "per_step") && (
+                                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
                                             <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-                                            <p className="text-[11px] text-amber-700">⚠️ Deep Researchは処理が非常に重く、完了まで<strong>20〜30分</strong>かかる場合があります。Web Groundingの利用をおすすめします。</p>
+                                            <p className="text-[10px] text-amber-700 leading-normal">
+                                                <strong>注意:</strong> 現在の選択モードは処理に<strong>10分以上</strong>かかる場合があります。素早い結果を希望される場合は、Grounding / 1枚絵モードをお勧めします。
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {error && (
+                                        <div className="p-3 bg-red-50 text-red-600 text-xs rounded-xl flex items-center gap-2 border border-red-100">
+                                            <AlertCircle className="h-4 w-4" />
+                                            {error}
                                         </div>
                                     )}
                                 </div>
-
-                                <div className="space-y-2 pb-1 pt-1 border-t border-slate-100">
-                                    <p className="text-xs font-medium text-slate-700">栽培ガイドの図解モード選択</p>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setGuideImageMode("single")}
-                                            className={`flex-1 text-xs px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "single"
-                                                ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-md"
-                                                : "bg-white text-slate-600 border-slate-200 hover:border-green-300"
-                                                }`}
-                                        >
-                                            🖼️ 1枚絵（Pro）
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setGuideImageMode("per_step")}
-                                            className={`flex-1 text-xs px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "per_step"
-                                                ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-md"
-                                                : "bg-white text-slate-600 border-slate-200 hover:border-green-300"
-                                                }`}
-                                        >
-                                            📸 ステップ別
-                                        </button>
-                                    </div>
-                                    {guideImageMode === "per_step" && (
-                                        <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
-                                            <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-                                            <p className="text-[11px] text-amber-700">⚠️ ステップ別は各工程ごとに画像を生成するため、処理に<strong>かなり時間がかかります</strong>。通常は1枚絵（Pro）をおすすめします。</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {error && (
-                                    <div className="p-3 bg-red-50 text-red-600 text-sm rounded flex items-center gap-2">
-                                        <AlertCircle className="h-4 w-4" />
-                                        {error}
-                                    </div>
-                                )}
 
                                 <Button
-                                    className="w-full h-10 text-base"
+                                    className="w-full h-12 text-base font-bold rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"
                                     disabled={!file || isUploading}
                                     onClick={startAnalysis}
                                 >
@@ -311,7 +336,7 @@ export default function UnifiedPage() {
 
                 {/* Post-Upload Processing State */}
                 {jobId && !status && (
-                    <div className="flex flex-col items-center justify-center py-12 space-y-4 animate-in fade-in zoom-in-95 duration-700">
+                    <div className="flex-1 flex flex-col items-center justify-center py-12 space-y-4 animate-in fade-in zoom-in-95 duration-700">
                         <div className="relative">
                             <div className="absolute inset-0 bg-green-100 rounded-full animate-ping opacity-75"></div>
                             <div className="relative bg-white p-4 rounded-full shadow-xl border-4 border-green-50">
@@ -340,11 +365,7 @@ export default function UnifiedPage() {
 
                                     {/* CAHARCTER Status (First) */}
                                     <div className="flex items-start gap-2 sm:gap-3 min-w-0">
-                                        <div className="mt-1 shrink-0">
-                                            {(status.character.status === 'COMPLETED' || status.character.status === 'FAILED')
-                                                ? getStatusIcon(status.character.status)
-                                                : <Loader2 className="h-5 w-5 animate-spin text-pink-400" />}
-                                        </div>
+                                        <div className="mt-1 shrink-0">{getStatusIcon(status.character.status)}</div>
                                         <div className="min-w-0">
                                             <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                                                 <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">キャラクター</span>
@@ -352,7 +373,11 @@ export default function UnifiedPage() {
                                             <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
                                                 {status.character.status === 'COMPLETED' ? '完了' :
                                                     status.character.status === 'FAILED' ? '失敗' :
-                                                        status.character.status === 'PENDING' ? '待機中...' : '芽吹き中...'}
+                                                        status.character.status === 'PENDING' ? '待機中...' : (
+                                                            <span className="flex items-center gap-1">
+                                                                芽吹き中... <Loader2 className="h-3 w-3 animate-spin" />
+                                                            </span>
+                                                        )}
                                             </p>
                                         </div>
                                     </div>
@@ -362,7 +387,7 @@ export default function UnifiedPage() {
                                         <div className="mt-1 shrink-0">
                                             {(status.research.status === 'COMPLETED' || status.research.status === 'FAILED')
                                                 ? getStatusIcon(status.research.status)
-                                                : <Loader2 className="h-5 w-5 animate-spin text-purple-400" />}
+                                                : <Loader2 className="h-4 w-4 animate-spin text-purple-500" />}
                                         </div>
                                         <div className="min-w-0">
                                             <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
@@ -377,11 +402,7 @@ export default function UnifiedPage() {
 
                                     {/* GUIDE Status (Third) */}
                                     <div className="flex items-start gap-2 sm:gap-3 min-w-0">
-                                        <div className="mt-1 shrink-0">
-                                            {(status.guide.status === 'COMPLETED' || status.guide.status === 'FAILED')
-                                                ? getStatusIcon(status.guide.status)
-                                                : <Loader2 className="h-5 w-5 animate-spin text-emerald-400" />}
-                                        </div>
+                                        <div className="mt-1 shrink-0">{getStatusIcon(status.guide.status)}</div>
                                         <div className="min-w-0">
                                             <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                                                 <Sprout className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">栽培ガイド</span>
@@ -568,7 +589,7 @@ export default function UnifiedPage() {
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <Loader2 className="h-8 w-8 animate-spin text-emerald-300" />
+                                                        <Loader2 className="h-10 w-10 animate-spin text-emerald-300" />
                                                         <p className="text-base">種から命が芽吹いています...</p>
                                                         <p className="text-xs">種の声を聞いています</p>
                                                     </>
@@ -711,7 +732,7 @@ export default function UnifiedPage() {
                                                 </div>
                                             ) : (
                                                 <div className="py-8 text-center text-slate-400 space-y-3">
-                                                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-green-300" />
+                                                    <Loader2 className="h-10 w-10 animate-spin mx-auto text-green-300" />
                                                     <p className="text-base">栽培ガイド執筆中...</p>
                                                 </div>
                                             )}
@@ -868,7 +889,7 @@ export default function UnifiedPage() {
                                                         </div>
                                                     ) : (
                                                         <>
-                                                            <Loader2 className="h-8 w-8 animate-spin text-purple-300" />
+                                                            <Loader2 className="h-12 w-12 animate-spin text-purple-300" />
                                                             <p className="text-lg">詳細リサーチ実行中...</p>
                                                             <p className="text-sm">※完了まで少し時間がかかります</p>
                                                         </>
