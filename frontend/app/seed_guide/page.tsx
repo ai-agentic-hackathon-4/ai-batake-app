@@ -320,14 +320,14 @@ export default function SeedGuidePage() {
                                         />
                                     </div>
                                     <div className="grid w-full items-center gap-1.5 text-left pb-4">
-                                        <label className="text-xs font-medium text-muted-foreground ml-1">栽培ガイドの図解モード選択</label>
+                                        <label className="text-xs font-medium text-muted-foreground ml-1">🎨 図解モード</label>
                                         <div className="flex gap-2">
                                             <button
                                                 type="button"
                                                 onClick={() => setGuideImageMode("single")}
                                                 className={`flex-1 text-sm px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "single"
-                                                    ? "bg-primary text-primary-foreground border-primary shadow-md"
-                                                    : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                                        ? "bg-primary text-primary-foreground border-primary shadow-md"
+                                                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
                                                     }`}
                                             >
                                                 🖼️ 1枚絵（Pro）
@@ -336,8 +336,8 @@ export default function SeedGuidePage() {
                                                 type="button"
                                                 onClick={() => setGuideImageMode("per_step")}
                                                 className={`flex-1 text-sm px-3 py-2 rounded-lg border font-medium transition-all ${guideImageMode === "per_step"
-                                                    ? "bg-primary text-primary-foreground border-primary shadow-md"
-                                                    : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                                        ? "bg-primary text-primary-foreground border-primary shadow-md"
+                                                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
                                                     }`}
                                             >
                                                 📸 ステップ別
@@ -380,7 +380,7 @@ export default function SeedGuidePage() {
                                 <div className="h-6 w-32 bg-muted rounded"></div>
                                 <Card className="overflow-hidden border-border shadow-sm">
                                     <div className="aspect-video bg-muted relative flex items-center justify-center border-b border-border">
-                                        <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
+                                        <Loader2 className="h-12 w-12 text-muted-foreground animate-spin" />
                                     </div>
                                     <CardContent className="pt-6 space-y-4">
                                         <div className="h-8 w-3/4 bg-muted rounded"></div>
