@@ -1,6 +1,5 @@
 import Link from "next/link"
 import { Leaf, Sprout, Microscope, Activity, BookOpen, Sparkles } from "lucide-react"
-import Image from "next/image"
 
 export default function LandingPage() {
     return (
@@ -8,18 +7,15 @@ export default function LandingPage() {
             <div className="flex-1 flex flex-col items-center justify-center px-4 py-4 max-w-5xl w-full mx-auto">
 
                 {/* Compact Hero */}
-                <div className="flex flex-col items-center justify-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <div className="relative w-full max-w-5xl mx-auto aspect-[16/9] mb-4 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_100%)]">
-                        <Image
-                            src="/saib-AI.png"
-                            alt="Saib-AI"
-                            fill
-                            className="object-contain"
-                            priority
-                        />
+                <div className="text-center mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <div className="mx-auto p-3 bg-primary/10 rounded-full w-fit mb-2">
+                        <Leaf className="h-8 w-8 text-primary" />
                     </div>
-                    <p className="text-lg md:text-2xl text-slate-600 font-bold max-w-xl mx-auto leading-relaxed opacity-90 text-center -mt-4 md:-mt-10 relative z-10">
-                        育てる苦労はAIへ。<br className="md:hidden" />育つ喜びはあなたへ。
+                    <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
+                        AI Batake App
+                    </h1>
+                    <p className="text-sm text-slate-500 mt-1 max-w-lg mx-auto">
+                        AIを活用したスマート農業プラットフォーム
                     </p>
                 </div>
 
