@@ -917,6 +917,92 @@ async def get_character_image(path: str):
         error(f"Error serving character image: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/character/message")
+async def get_character_message():
+    """
+    Generates a contextual message from the active character based on
+    current sensor data and weather conditions.
+    """
+    try:
+        info("Fetching character message")
+        
+        # 1. Get active character
+        char_doc_ref = db.collection(col("growing_diaries")).document("Character")
+        char_doc = await char_doc_ref.get()
+        
+        if not char_doc.exists:
+            # No character selected, return default message
+            debug("No character selected, returning default message")
+            return {
+                "character_name": "お友達",
+                "message": "こんにちは！栽培を始める準備はできてるかな？🌱",
+                "avatar_url": None
+            }
+        
+        character_data = char_doc.to_dict()
+        
+        # 2. Get latest sensor data
+        sensor_data = {}
+        try:
+            sensor_logs = await asyncio.to_thread(get_recent_sensor_logs, limit=1)
+            if sensor_logs and len(sensor_logs) > 0:
+                sensor_data = sensor_logs[0]
+        except Exception as e:
+            warning(f"Failed to fetch sensor data: {e}")
+        
+        # 3. Get weather data (using hardcoded data similar to WeatherCard for now)
+        weather_data = {
+            "temp": 26,
+            "condition": "晴れ時々曇り",
+            "forecast": [
+                {"time": "9時", "temp": 24, "icon": "Sun"},
+                {"time": "12時", "temp": 28, "icon": "Sun"},
+                {"time": "15時", "temp": 27, "icon": "Cloud"},
+                {"time": "18時", "temp": 23, "icon": "CloudRain"},
+            ]
+        }
+        
+        # 4. Import and call message generation function
+        try:
+            from backend.character_service import generate_character_message
+        except ImportError:
+            from character_service import generate_character_message
+        
+        # Run blocking function in thread pool
+        message = await asyncio.to_thread(
+            generate_character_message,
+            character_data,
+            sensor_data,
+            weather_data
+        )
+        
+        # 5. Prepare avatar URL
+        avatar_url = None
+        if character_data.get("image_uri"):
+            gcs_uri = character_data["image_uri"]
+            bucket_name = "ai-agentic-hackathon-4-bk"
+            prefix = f"https://storage.googleapis.com/{bucket_name}/"
+            
+            if gcs_uri.startswith(prefix):
+                blob_path = gcs_uri[len(prefix):]
+                import urllib.parse
+                encoded_path = urllib.parse.quote(blob_path)
+                avatar_url = f"/api/character/image?path={encoded_path}"
+            else:
+                avatar_url = character_data["image_uri"]
+        
+        info(f"Character message generated for {character_data.get('name', 'Unknown')}")
+        return {
+            "character_name": character_data.get("name", "お友達"),
+            "message": message,
+            "avatar_url": avatar_url
+        }
+        
+    except Exception as e:
+        error(f"Failed to generate character message: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to generate message: {str(e)}")
+
+
 @app.post("/api/seed-guide/character")
 async def create_character_job(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """Starts an async job for character generation."""

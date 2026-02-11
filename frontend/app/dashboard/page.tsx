@@ -10,6 +10,7 @@ import { AIActivityLog } from "@/components/ai-activity-log"
 import { WeatherCard } from "@/components/weather-card"
 import { GrowthStageCard } from "@/components/growth-stage-card"
 import { LoadingOverlay } from "@/components/loading-overlay"
+import { CharacterMessage } from "@/components/character-message"
 
 export default function Dashboard() {
     const [isLoading, setIsLoading] = useState(true)
@@ -101,6 +102,10 @@ export default function Dashboard() {
                         <WeatherCard />
                         <GrowthStageCard />
                     </div>
+
+                    {/* Character Message Section */}
+                    <CharacterMessage />
+
 
                     {/* Metrics Section */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
