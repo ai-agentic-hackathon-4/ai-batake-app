@@ -7,9 +7,9 @@ import { PlantCamera } from "@/components/plant-camera"
 import { MetricCard } from "@/components/metric-card"
 import { EnvironmentChart } from "@/components/environment-chart"
 import { AIActivityLog } from "@/components/ai-activity-log"
-import { WeatherCard } from "@/components/weather-card"
 import { GrowthStageCard } from "@/components/growth-stage-card"
 import { LoadingOverlay } from "@/components/loading-overlay"
+import { CharacterMessage } from "@/components/character-message"
 
 export default function Dashboard() {
     const [isLoading, setIsLoading] = useState(true)
@@ -29,7 +29,7 @@ export default function Dashboard() {
         const fetchInitialData = async () => {
             try {
                 // We only need the latest sensor data for the top-level MetricCards
-                // Other components (PlantCamera, WeatherCard, EnvironmentChart, AIActivityLog) fetch their own data
+                // Other components (PlantCamera, EnvironmentChart, AIActivityLog) fetch their own data
                 const res = await fetch('/api/sensors/latest')
                 if (res.ok) {
                     const data = await res.json()
@@ -81,6 +81,9 @@ export default function Dashboard() {
                 <header className="border-b border-border bg-card">
                     <div className="max-w-7xl mx-auto px-6 py-4">
                         <div className="flex items-center gap-3">
+                            <Link href="/" className="mr-2 p-1 hover:bg-accent rounded-full transition-colors">
+                                <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+                            </Link>
                             <div className="p-2 rounded-lg bg-primary/10">
                                 <Leaf className="h-6 w-6 text-primary" />
                             </div>
@@ -97,10 +100,12 @@ export default function Dashboard() {
                     {/* Plant Camera Section */}
                     <PlantCamera />
 
+                    {/* Character Message and Growth Stage Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <WeatherCard />
+                        <CharacterMessage />
                         <GrowthStageCard />
                     </div>
+
 
                     {/* Metrics Section */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

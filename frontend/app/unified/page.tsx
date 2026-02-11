@@ -178,7 +178,7 @@ export default function UnifiedPage() {
         status.character.status.toLowerCase() === "completed";
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-background flex flex-col">
             {/* Header */}
             <header className="border-b border-border bg-card">
                 <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3">
@@ -196,24 +196,35 @@ export default function UnifiedPage() {
             </header>
 
             {/* Main Content */}
-            <main className="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-3">
+            <main className="flex-1 w-full max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex flex-col">
 
-            {/* Upload Section */}
-            {!jobId && (
-                <div className="flex items-center justify-center">
-                    <Card className="max-w-xl w-full border-dashed border-2">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-center text-lg">種の袋をスキャン</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors border border-slate-200"
-                                onClick={() => document.getElementById('file-upload')?.click()}>
-                                {preview ? (
-                                    <img src={preview} alt="Preview" className="max-h-40 rounded shadow-md" />
-                                ) : (
-                                    <div className="text-center space-y-1">
-                                        <div className="bg-white p-3 rounded-full shadow-sm inline-block">
-                                            <Upload className="h-6 w-6 text-primary" />
+                {/* Upload Section */}
+                {!jobId && (
+                    <div className="flex-1 flex items-center justify-center py-8 w-full p-4">
+                        <Card className="max-w-2xl w-full border-2 shadow-2xl rounded-2xl overflow-hidden border-slate-100">
+                            <CardHeader className="pb-4 bg-slate-50/50 border-b border-slate-100">
+                                <CardTitle className="text-center text-xl font-bold text-slate-800">種の袋をスキャン</CardTitle>
+                                <CardDescription className="text-center text-xs">AIが情報を読み取り、栽培プランとキャラクターを生成します</CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-6 space-y-6">
+                                {/* Upload Box */}
+                                <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-2xl cursor-pointer hover:bg-slate-100 transition-all border-2 border-dashed border-slate-200 hover:border-primary/50 group"
+                                    onClick={() => document.getElementById('file-upload')?.click()}>
+                                    {preview ? (
+                                        <div className="relative">
+                                            <img src={preview} alt="Preview" className="max-h-56 rounded-xl shadow-lg border-4 border-white" />
+                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded-xl">
+                                                <p className="bg-white/90 px-3 py-1 rounded-full text-xs font-bold shadow-sm">変更する</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center space-y-3">
+                                            <div className="bg-white p-4 rounded-full shadow-md inline-block group-hover:scale-110 transition-transform">
+                                                <Upload className="h-8 w-8 text-primary" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-700">クリックして画像をアップロード</p>
+                                            </div>
                                         </div>
                                         <p className="text-xs text-slate-500">クリックして画像をアップロード</p>
                                     </div>
@@ -280,155 +291,175 @@ export default function UnifiedPage() {
                                 )}
                             </div>
 
-                            {error && (
-                                <div className="p-3 bg-red-50 text-red-600 text-sm rounded flex items-center gap-2">
-                                    <AlertCircle className="h-4 w-4" />
-                                    {error}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Research Mode */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <Search className="h-4 w-4 text-slate-400" />
+                                            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">リサーチモード</p>
+                                        </div>
+                                        <Tabs value={researchMode} onValueChange={(val) => setResearchMode(val as any)} className="w-full">
+                                            <TabsList className="grid w-full grid-cols-2 bg-slate-100 h-9 p-1">
+                                                <TabsTrigger value="agent" className="text-[10px] sm:text-xs">Deep</TabsTrigger>
+                                                <TabsTrigger value="grounding" className="text-[10px] sm:text-xs">Grounding</TabsTrigger>
+                                            </TabsList>
+                                        </Tabs>
+                                        <p className="text-[10px] text-slate-500 leading-relaxed min-h-[32px]">
+                                            {researchMode === "agent"
+                                                ? "AIが時間をかけて徹底的に調査します (20-30分)"
+                                                : "最新のGoogle検索結果を元に素早く回答します (1分)"}
+                                        </p>
+                                    </div>
+
+                                    {/* Illustration Mode */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <Sparkles className="h-4 w-4 text-slate-400" />
+                                            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">図解モード</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setGuideImageMode("single")}
+                                                className={`flex-1 text-[10px] sm:text-xs h-9 rounded-md border-2 font-bold transition-all ${guideImageMode === "single"
+                                                    ? "bg-white text-primary border-primary shadow-sm"
+                                                    : "bg-slate-50 text-slate-500 border-transparent hover:border-slate-200"
+                                                    }`}
+                                            >
+                                                🖼️ 1枚絵
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setGuideImageMode("per_step")}
+                                                className={`flex-1 text-[10px] sm:text-xs h-9 rounded-md border-2 font-bold transition-all ${guideImageMode === "per_step"
+                                                    ? "bg-white text-primary border-primary shadow-sm"
+                                                    : "bg-slate-50 text-slate-500 border-transparent hover:border-slate-200"
+                                                    }`}
+                                            >
+                                                📸 ステップ
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 leading-relaxed min-h-[32px]">
+                                            {guideImageMode === "single"
+                                                ? "Proモデルによる高品質な1枚の俯瞰図を作成します"
+                                                : "全工程ごとの挿絵を個別に生成します"}
+                                        </p>
+                                    </div>
                                 </div>
-                            )}
 
-                            <Button
-                                className="w-full h-10 text-base"
-                                disabled={!file || isUploading}
-                                onClick={startAnalysis}
-                            >
-                                {isUploading ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                        アップロード中...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Sparkles className="mr-2 h-5 w-5" />
-                                        解析を開始
-                                    </>
-                                )}
-                            </Button>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
+                                {/* Message Area (Reserved Height to prevent shift) */}
+                                <div className="space-y-4 min-h-[64px] flex flex-col justify-center">
+                                    {/* Warning Banners */}
+                                    {(researchMode === "agent" || guideImageMode === "per_step") && (
+                                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                            <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                                            <p className="text-[10px] text-amber-700 leading-normal">
+                                                <strong>注意:</strong> 現在の選択モードは処理に<strong>10分以上</strong>かかる場合があります。素早い結果を希望される場合は、Grounding / 1枚絵モードをお勧めします。
+                                            </p>
+                                        </div>
+                                    )}
 
-            {/* Post-Upload Processing State */}
-            {jobId && !status && (
-                <div className="flex flex-col items-center justify-center py-12 space-y-4 animate-in fade-in zoom-in-95 duration-700">
-                    <div className="relative">
-                        <div className="absolute inset-0 bg-green-100 rounded-full animate-ping opacity-75"></div>
-                        <div className="relative bg-white p-4 rounded-full shadow-xl border-4 border-green-50">
-                            <Sprout className="h-10 w-10 text-green-600 animate-bounce" />
-                        </div>
-                    </div>
-                    <div className="text-center space-y-1">
-                        <h2 className="text-xl font-bold text-slate-700">解析を開始しています...</h2>
-                        <p className="text-slate-500 text-sm">種の袋から情報を読み取っています</p>
-                    </div>
-                </div>
-            )}
-
-            {/* Progress & Results Section */}
-            {jobId && status && (
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-
-                    {/* Sidebar Status */}
-                    <Card className="lg:col-span-1 h-fit">
-                        <CardHeader className="pb-2 px-3 sm:px-6">
-                            <CardTitle className="text-sm sm:text-base">進行状況</CardTitle>
-                        </CardHeader>
-                        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-                            {/* Mobile: horizontal, Desktop: vertical */}
-                            <div className="flex flex-row lg:flex-col gap-3 sm:gap-4 overflow-x-auto lg:overflow-x-visible">
-
-                            {/* CAHARCTER Status (First) */}
-                            <div className="flex items-start gap-2 sm:gap-3 min-w-0">
-                                <div className="mt-1 shrink-0">{getStatusIcon(status.character.status)}</div>
-                                <div className="min-w-0">
-                                    <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-                                        <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">キャラクター</span>
-                                    </p>
-                                    <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
-                                        {status.character.status === 'COMPLETED' ? '完了' :
-                                            status.character.status === 'FAILED' ? '失敗' :
-                                                status.character.status === 'PENDING' ? '待機中...' : (
-                                                    <span className="flex items-center gap-1">
-                                                        芽吹き中... <Loader2 className="h-3 w-3 animate-spin" />
-                                                    </span>
-                                                )}
-                                    </p>
+                                    {error && (
+                                        <div className="p-3 bg-red-50 text-red-600 text-xs rounded-xl flex items-center gap-2 border border-red-100">
+                                            <AlertCircle className="h-4 w-4" />
+                                            {error}
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-
-                            {/* RESEARCH Status (Second) */}
-                            <div className="flex items-start gap-2 sm:gap-3 min-w-0">
-                                <div className="mt-1 shrink-0">
-                                    {(status.research.status === 'COMPLETED' || status.research.status === 'FAILED')
-                                        ? getStatusIcon(status.research.status)
-                                        : <Loader2 className="h-4 w-4 animate-spin text-purple-500" />}
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-                                        <Microscope className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">リサーチ</span>
-                                    </p>
-                                    <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
-                                        {status.research.status === 'COMPLETED' ? '完了' :
-                                            status.research.status === 'FAILED' ? '失敗' : '調査中...'}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* GUIDE Status (Third) */}
-                            <div className="flex items-start gap-2 sm:gap-3 min-w-0">
-                                <div className="mt-1 shrink-0">{getStatusIcon(status.guide.status)}</div>
-                                <div className="min-w-0">
-                                    <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-                                        <Sprout className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">栽培ガイド</span>
-                                    </p>
-                                    <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
-                                        {status.guide.status === 'COMPLETED' ? '完了' :
-                                            status.guide.status === 'FAILED' ? '失敗' :
-                                                status.guide.status === 'PENDING' ? '待機中...' : '生成中...'}
-                                    </p>
-                                </div>
-                            </div>
-                            </div>
 
                             {/* Dashboard Link (Enabled only when all done) */}
                             <div className="pt-3 sm:pt-4 mt-3 sm:mt-0 border-t border-slate-100">
                                 <Button
-                                    className="w-full justify-between"
-                                    variant={isAllCompleted ? "default" : "outline"}
-                                    disabled={!isAllCompleted}
-                                    onClick={() => window.location.href = '/dashboard'}
+                                    className="w-full h-12 text-base font-bold rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"
+                                    disabled={!file || isUploading}
+                                    onClick={startAnalysis}
                                 >
                                     <span>ダッシュボードへ</span>
                                     <LayoutDashboard className="h-4 w-4" />
                                 </Button>
-                                {!isAllCompleted && jobId && (
-                                    <p className="text-[10px] text-slate-400 text-center mt-2 italic">
-                                        全ての解析が完了すると移動できます
-                                    </p>
-                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
+
+                {/* Post-Upload Processing State */}
+                {jobId && !status && (
+                    <div className="flex-1 flex flex-col items-center justify-center py-12 space-y-4 animate-in fade-in zoom-in-95 duration-700">
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-green-100 rounded-full animate-ping opacity-75"></div>
+                            <div className="relative bg-white p-4 rounded-full shadow-xl border-4 border-green-50">
+                                <Sprout className="h-10 w-10 text-green-600 animate-bounce" />
                             </div>
+                        </div>
+                        <div className="text-center space-y-1">
+                            <h2 className="text-xl font-bold text-slate-700">解析を開始しています...</h2>
+                            <p className="text-slate-500 text-sm">種の袋から情報を読み取っています</p>
+                        </div>
+                    </div>
+                )}
 
-                        </CardContent>
-                    </Card>
+                {/* Progress & Results Section */}
+                {jobId && status && (
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-                    {/* Main Content Area */}
-                    <div className="lg:col-span-3 space-y-4">
+                        {/* Sidebar Status */}
+                        <Card className="lg:col-span-1 h-fit">
+                            <CardHeader className="pb-2 px-3 sm:px-6">
+                                <CardTitle className="text-sm sm:text-base">進行状況</CardTitle>
+                            </CardHeader>
+                            <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+                                {/* Mobile: horizontal, Desktop: vertical */}
+                                <div className="flex flex-row lg:flex-col gap-3 sm:gap-4 overflow-x-auto lg:overflow-x-visible">
 
-                        {/* 1. Immediate Seed Summary (Shows as soon as Research is done) */}
-                        {status.research.result && (
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <Card className="bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-100">
-                                    <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
-                                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                                            <div className="p-1.5 sm:p-2 bg-white rounded-full shadow-sm shrink-0">
-                                                <Sprout className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <h2 className="text-base sm:text-lg font-bold text-slate-800 truncate">
-                                                    {status.research.result.name}
-                                                </h2>
-                                            </div>
+                                    {/* CAHARCTER Status (First) */}
+                                    <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                                        <div className="mt-1 shrink-0">{getStatusIcon(status.character.status)}</div>
+                                        <div className="min-w-0">
+                                            <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                                                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">キャラクター</span>
+                                            </p>
+                                            <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
+                                                {status.character.status === 'COMPLETED' ? '完了' :
+                                                    status.character.status === 'FAILED' ? '失敗' :
+                                                        status.character.status === 'PENDING' ? '待機中...' : (
+                                                            <span className="flex items-center gap-1">
+                                                                芽吹き中... <Loader2 className="h-3 w-3 animate-spin" />
+                                                            </span>
+                                                        )}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* RESEARCH Status (Second) */}
+                                    <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                                        <div className="mt-1 shrink-0">
+                                            {(status.research.status === 'COMPLETED' || status.research.status === 'FAILED')
+                                                ? getStatusIcon(status.research.status)
+                                                : <Loader2 className="h-4 w-4 animate-spin text-purple-500" />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                                                <Microscope className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">リサーチ</span>
+                                            </p>
+                                            <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
+                                                {status.research.status === 'COMPLETED' ? '完了' :
+                                                    status.research.status === 'FAILED' ? '失敗' : '調査中...'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* GUIDE Status (Third) */}
+                                    <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                                        <div className="mt-1 shrink-0">{getStatusIcon(status.guide.status)}</div>
+                                        <div className="min-w-0">
+                                            <p className="font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                                                <Sprout className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">栽培ガイド</span>
+                                            </p>
+                                            <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
+                                                {status.guide.status === 'COMPLETED' ? '完了' :
+                                                    status.guide.status === 'FAILED' ? '失敗' :
+                                                        status.guide.status === 'PENDING' ? '待機中...' : '生成中...'}
+                                            </p>
                                         </div>
                                         {/* Optional: Add quick action or status summary here */}
                                     </CardContent>
@@ -706,9 +737,19 @@ export default function UnifiedPage() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="py-8 text-center text-slate-400 space-y-3">
-                                                <Loader2 className="h-10 w-10 animate-spin mx-auto text-green-300" />
-                                                <p className="text-base">栽培ガイド執筆中...</p>
+                                            <div className="flex flex-col items-center justify-center p-8 text-slate-400 space-y-3">
+                                                {status.character.status === 'FAILED' ? (
+                                                    <>
+                                                        <AlertCircle className="h-10 w-10 text-red-300" />
+                                                        <p>キャラクター召喚に失敗しました...</p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Loader2 className="h-10 w-10 animate-spin text-emerald-300" />
+                                                        <p className="text-base">種から命が芽吹いています...</p>
+                                                        <p className="text-xs">種の声を聞いています</p>
+                                                    </>
+                                                )}
                                             </div>
                                         )}
                                     </CardContent>
@@ -862,18 +903,176 @@ export default function UnifiedPage() {
                                                             <Upload className="mr-2 h-4 w-4" /> もう一度撮影・アップロードする
                                                         </Button>
                                                     </div>
-                                                ) : (
-                                                    <>
-                                                        <Loader2 className="h-12 w-12 animate-spin text-purple-300" />
-                                                        <p className="text-lg">詳細リサーチ実行中...</p>
-                                                        <p className="text-sm">※完了まで少し時間がかかります</p>
-                                                    </>
-                                                )}
+                                                </div>
+                                            ) : (
+                                                <div className="py-8 text-center text-slate-400 space-y-3">
+                                                    <Loader2 className="h-10 w-10 animate-spin mx-auto text-green-300" />
+                                                    <p className="text-base">栽培ガイド執筆中...</p>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </TabsContent>
+
+                                {/* Research Tab */}
+                                <TabsContent value="research" className="mt-3">
+                                    <Card>
+                                        <CardHeader className="pb-2 px-3 sm:px-6">
+                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                                <CardTitle className="flex items-center gap-2 text-purple-600 text-sm sm:text-base">
+                                                    <Microscope className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" /> リサーチデータ
+                                                </CardTitle>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200 text-xs sm:text-sm w-full sm:w-auto"
+                                                    onClick={handleApplyToAgent}
+                                                    disabled={isApplying || !status.research.id || status.research.status?.toLowerCase() !== 'completed'}
+                                                >
+                                                    {isApplying ? (
+                                                        <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin mr-1.5" />
+                                                    ) : (
+                                                        <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+                                                    )}
+                                                    エージェントに適応
+                                                </Button>
                                             </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
+                                        </CardHeader>
+                                        <CardContent className="px-3 sm:px-6">
+                                            {status.research.status?.toLowerCase() === 'completed' && status.research.result ? (
+                                                <div className="space-y-2 sm:space-y-3">
+                                                    {/* Name */}
+                                                    {status.research.result.name && (
+                                                        <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                                                            <h3 className="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                                                <Sprout className="h-4 w-4" /> 野菜名
+                                                            </h3>
+                                                            <p className="text-slate-700">{status.research.result.name}</p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Temperature */}
+                                                    {status.research.result.optimal_temp_range && (
+                                                        <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                                                            <h3 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                                                                <Activity className="h-4 w-4" /> 最適温度
+                                                            </h3>
+                                                            <p className="text-slate-700">{status.research.result.optimal_temp_range}</p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Humidity */}
+                                                    {status.research.result.optimal_humidity_range && (
+                                                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                                                            <h3 className="font-semibold text-blue-800 mb-2">💧 最適湿度</h3>
+                                                            <p className="text-slate-700">{status.research.result.optimal_humidity_range}</p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Soil Moisture */}
+                                                    {status.research.result.soil_moisture_standard && (
+                                                        <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
+                                                            <h3 className="font-semibold text-amber-800 mb-2">🌱 土壌水分量</h3>
+                                                            <p className="text-slate-700">{status.research.result.soil_moisture_standard}</p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Watering */}
+                                                    {status.research.result.watering_instructions && (
+                                                        <div className="bg-cyan-50 p-3 rounded-lg border border-cyan-200">
+                                                            <h3 className="font-semibold text-cyan-800 mb-2">💦 水やり方法</h3>
+                                                            <p className="text-slate-700 whitespace-pre-wrap">{status.research.result.watering_instructions}</p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Light Requirements */}
+                                                    {status.research.result.light_requirements && (
+                                                        <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                                                            <h3 className="font-semibold text-yellow-800 mb-2">☀️ 日照条件</h3>
+                                                            <p className="text-slate-700">{status.research.result.light_requirements}</p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Care Tips */}
+                                                    {status.research.result.care_tips && (
+                                                        <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
+                                                            <h3 className="font-semibold text-purple-800 mb-2">📝 栽培のコツ</h3>
+                                                            <p className="text-slate-700 whitespace-pre-wrap">{status.research.result.care_tips}</p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Summary Prompt */}
+                                                    {status.research.result.summary_prompt && (
+                                                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                                            <h3 className="font-semibold text-slate-800 mb-2">📋 詳細情報</h3>
+                                                            <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{status.research.result.summary_prompt}</p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Grounding Attribution */}
+                                                    {status.research.result.grounding_metadata && (
+                                                        <GroundingDisplay metadata={status.research.result.grounding_metadata} />
+                                                    )}
+
+                                                    {/* Raw Report Display */}
+                                                    {status.research.result.raw_report && (
+                                                        <div className="mt-8 border-t border-slate-200 pt-6">
+                                                            <button
+                                                                onClick={() => setShowRawReport(!showRawReport)}
+                                                                className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors w-full group"
+                                                            >
+                                                                <div className={`p-1 rounded bg-slate-100 group-hover:bg-slate-200 transition-colors ${showRawReport ? 'rotate-90' : ''}`}>
+                                                                    <ChevronRight className="h-3.5 w-3.5 transition-transform" />
+                                                                </div>
+                                                                AIの調査レポート原文を表示
+                                                            </button>
+
+                                                            {showRawReport && (
+                                                                <div className="mt-3 p-3 sm:p-5 bg-slate-900 rounded-xl overflow-x-auto border border-slate-800 shadow-inner animate-in fade-in slide-in-from-top-2 duration-300">
+                                                                    <pre className="text-[10px] sm:text-xs text-slate-300 font-mono leading-relaxed whitespace-pre-wrap break-all sm:break-normal">
+                                                                        {status.research.result.raw_report}
+                                                                    </pre>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="py-8 flex flex-col items-center justify-center text-slate-400 space-y-3">
+                                                    {status.research.status?.toLowerCase() === 'failed' ? (
+                                                        <div className="text-center space-y-3">
+                                                            <AlertCircle className="h-12 w-12 text-red-400 mx-auto" />
+                                                            <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
+                                                                <h3 className="text-lg font-bold text-red-800 mb-2">読み取りエラー</h3>
+                                                                <p className="text-red-700 font-medium">
+                                                                    {status.research.error || "リサーチに失敗しました"}
+                                                                </p>
+                                                            </div>
+                                                            <Button
+                                                                onClick={() => {
+                                                                    setJobId(null);
+                                                                    setFile(null);
+                                                                    setPreview(null);
+                                                                    setStatus(null);
+                                                                }}
+                                                                variant="default"
+                                                                className="bg-red-500 hover:bg-red-600 text-white"
+                                                            >
+                                                                <Upload className="mr-2 h-4 w-4" /> もう一度撮影・アップロードする
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <Loader2 className="h-12 w-12 animate-spin text-purple-300" />
+                                                            <p className="text-lg">詳細リサーチ実行中...</p>
+                                                            <p className="text-sm">※完了まで少し時間がかかります</p>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </TabsContent>
 
                         </Tabs>
                     </div>
