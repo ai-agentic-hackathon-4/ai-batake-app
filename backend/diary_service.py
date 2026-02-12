@@ -46,17 +46,19 @@ async def request_with_retry_async(method: str, url: str, **kwargs) -> httpx.Res
     min_delay = 1.0
     start_time = time.time()
     
+    last_status_code = None
     last_exc: Exception | None = None
     async with httpx.AsyncClient() as client:
         for i in range(max_retries):
             elapsed = time.time() - start_time
             if elapsed >= max_elapsed_seconds:
-                warning(f"[LLM] ⏰ Retry budget exceeded ({max_elapsed_seconds}s)")
+                warning(f"[LLM] ⏰ Retry budget exceeded ({max_elapsed_seconds}s). Last status: {last_status_code}")
                 break
             try:
                 info(f"[LLM] 🔄 API Request attempt {i+1}/{max_retries}: {method} {url[:80]}... (elapsed={elapsed:.0f}s)")
                 response = await client.request(method, url, **kwargs)
-                info(f"[LLM] API Response status: {response.status_code}")
+                last_status_code = response.status_code
+                info(f"[LLM] API Response status: {last_status_code}")
                 
                 if response.status_code == 429 or response.status_code >= 500:
                     sleep_time = random.uniform(min_delay, max_delay)
@@ -74,13 +76,15 @@ async def request_with_retry_async(method: str, url: str, **kwargs) -> httpx.Res
             info("[LLM] Final API Request attempt...")
             return await client.request(method, url, **kwargs)
 
-    # Reached here only via 'break' (time budget exceeded)
+    # Reached here only via 'break' (time budget exceeded) or loop exhaustion
+    if last_status_code == 429:
+        raise RuntimeError("AI model rate limit exceeded (429). Please try again later.")
     if last_exc:
         raise last_exc
     raise httpx.HTTPStatusError(
-        f"Retry budget exhausted after {max_elapsed_seconds}s",
+        f"Retry budget exhausted after {max_elapsed_seconds}s (Status: {last_status_code})",
         request=httpx.Request(method, url),
-        response=response,  # noqa: F821 – last response from loop
+        response=response,  # noqa: F821
     )
 
 
@@ -530,8 +534,14 @@ async def process_daily_diary(target_date_str: str, progress_callback=None):
         info(f"[Diary] ✅ Diary generated successfully for {target_date_str} in {generation_time_ms}ms")
         
     except Exception as e:
-        error(f"Failed to generate diary for {target_date_str}: {e}")
-        await mark_diary_failed_async(diary_id, str(e))
+        error_msg = str(e)
+        if "429" in error_msg:
+            friendly_msg = "AIモデルの利用制限（429: Too Many Requests）に達しました。しばらく待ってから再度お試しください。"
+        else:
+            friendly_msg = f"エラーが発生しました: {error_msg}"
+            
+        error(f"Failed to generate diary for {target_date_str}: {error_msg}")
+        await mark_diary_failed_async(diary_id, friendly_msg)
 
 
 def get_all_diaries(limit: int = 30, offset: int = 0) -> List[Dict]:

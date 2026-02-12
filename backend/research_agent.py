@@ -76,7 +76,10 @@ def request_with_retry(method, url, **kwargs):
     # 最後の試行
     try:
         info(f"[LLM] 🔄 Final retry attempt for {method} {url[:80]}...")
-        return requests.request(method, url, **kwargs)
+        final_resp = requests.request(method, url, **kwargs)
+        if final_resp.status_code == 429:
+             raise RuntimeError("AI model rate limit exceeded (429). Please try again later.")
+        return final_resp
     except requests.exceptions.RequestException as e:
         error(f"Final request attempt failed: {e}")
         raise

@@ -41,12 +41,14 @@ async def analyze_seed_and_generate_character(image_bytes: bytes):
         max_elapsed_seconds = 1800  # 30 minutes
         start_time = time.time()
         
+        last_status_code = None
         for attempt in range(max_retries):
             elapsed = time.time() - start_time
             if elapsed >= max_elapsed_seconds:
-                raise RuntimeError(f"API call failed: retry budget exceeded ({max_elapsed_seconds}s)")
+                raise RuntimeError(f"API call failed: retry budget exceeded ({max_elapsed_seconds}s). Last status: {last_status_code}")
             try:
                 response = requests.post(url, headers=headers, json=payload, timeout=60)
+                last_status_code = response.status_code
                 if response.status_code == 200:
                     return response
                 elif response.status_code == 429 or response.status_code >= 500:
@@ -60,7 +62,10 @@ async def analyze_seed_and_generate_character(image_bytes: bytes):
                 delay = min(base_delay * (2 ** attempt), max_delay) + random.uniform(0, 1)
                 warning(f"Request error: {e}. Retrying in {delay:.1f}s... (attempt {attempt+1}/{max_retries}, elapsed={elapsed:.0f}s)")
                 time.sleep(delay)
-        raise RuntimeError(f"API call failed after {max_retries} retries")
+        
+        if last_status_code == 429:
+            raise RuntimeError("API rate limit exceeded (429). Please try again later.")
+        raise RuntimeError(f"API call failed after {max_retries} retries. Last status: {last_status_code}")
 
     # 1. Identify Vegetable & Character Personality (Gemini 3 Pro)
     model_id = "gemini-3-flash-preview"

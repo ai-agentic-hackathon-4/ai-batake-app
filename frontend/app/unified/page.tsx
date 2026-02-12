@@ -16,8 +16,8 @@ interface UnifiedJobStatus {
     created_at: string
     image_url?: string
     research: { status: string; id?: string; result?: any; error?: string }
-    guide: { status: string; result?: any; steps?: any[]; error?: string }
-    character: { status: string; id?: string; result?: any; error?: string }
+    guide: { status: string; result?: any; steps?: any[]; error?: string; message?: string }
+    character: { status: string; id?: string; result?: any; error?: string; message?: string }
 }
 
 const getProxiedImageUrl = (url?: string) => {
@@ -372,7 +372,7 @@ export default function UnifiedPage() {
                                             </p>
                                             <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
                                                 {status.character.status === 'COMPLETED' ? '完了' :
-                                                    status.character.status === 'FAILED' ? '失敗' :
+                                                    status.character.status === 'FAILED' ? (status.character.message || '失敗') :
                                                         status.character.status === 'PENDING' ? '待機中...' : (
                                                             <span className="flex items-center gap-1">
                                                                 芽吹き中... <Loader2 className="h-3 w-3 animate-spin" />
@@ -395,7 +395,7 @@ export default function UnifiedPage() {
                                             </p>
                                             <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
                                                 {status.research.status === 'COMPLETED' ? '完了' :
-                                                    status.research.status === 'FAILED' ? '失敗' : '調査中...'}
+                                                    status.research.status === 'FAILED' ? (status.research.result?.error || '失敗') : '調査中...'}
                                             </p>
                                         </div>
                                     </div>
@@ -409,7 +409,7 @@ export default function UnifiedPage() {
                                             </p>
                                             <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
                                                 {status.guide.status === 'COMPLETED' ? '完了' :
-                                                    status.guide.status === 'FAILED' ? '失敗' :
+                                                    status.guide.status === 'FAILED' ? (status.guide.message || '失敗') :
                                                         status.guide.status === 'PENDING' ? '待機中...' : '生成中...'}
                                             </p>
                                         </div>

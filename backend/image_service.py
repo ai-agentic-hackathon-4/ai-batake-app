@@ -40,14 +40,16 @@ def call_api_with_backoff(
 ):
     start_time = time.time()
 
+    last_status_code = None
     for attempt in range(max_retries):
         elapsed = time.time() - start_time
         if elapsed >= max_elapsed_seconds:
-            error(f"Retry budget exceeded ({max_elapsed_seconds}s).")
-            raise RuntimeError("Retry budget exceeded")
+            error(f"Retry budget exceeded ({max_elapsed_seconds}s). Last status: {last_status_code}")
+            raise RuntimeError(f"Retry budget exceeded (Last status: {last_status_code})")
 
         try:
             response = requests.post(url, headers=headers, json=payload, timeout=240)
+            last_status_code = response.status_code
 
             if response.status_code == 200:
                 return response
@@ -82,8 +84,10 @@ def call_api_with_backoff(
             )
             time.sleep(delay)
 
-    error(f"Max retries ({max_retries}) exceeded.")
-    raise RuntimeError(f"Max retries ({max_retries}) exceeded.")
+    error(f"Max retries ({max_retries}) exceeded. Last status: {last_status_code}")
+    if last_status_code == 429:
+        raise RuntimeError("AI model rate limit exceeded (429). Please try again later.")
+    raise RuntimeError(f"Max retries ({max_retries}) exceeded. Last status: {last_status_code}")
 
 def generate_picture_diary(date_str: str, summary: str):
     """

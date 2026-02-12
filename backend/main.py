@@ -293,8 +293,14 @@ def process_research(doc_id: str, vegetable_name: str, analysis_data: dict, mode
         info(f"[Background] Research completed for {vegetable_name}")
         
     except Exception as e:
-        error(f"[Background] Research failed for {vegetable_name}: {e}", exc_info=True)
-        update_vegetable_status(doc_id, "failed", {"error": str(e)})
+        error_msg = str(e)
+        if "429" in error_msg:
+            friendly_msg = "AIモデルの利用制限（429: Too Many Requests）に達しました。しばらく待ってから再度お試しください。"
+        else:
+            friendly_msg = f"エラーが発生しました: {error_msg}"
+            
+        error(f"[Background] Research failed for {vegetable_name}: {error_msg}", exc_info=True)
+        update_vegetable_status(doc_id, "FAILED", {"error": friendly_msg})
 
 @app.post("/api/register-seed")
 async def register_seed(background_tasks: BackgroundTasks, file: UploadFile = File(...), research_mode: str = "agent"):
@@ -557,10 +563,16 @@ async def process_seed_guide(job_id: str, image_source: str, guide_image_mode: s
                 "message": "Analysis service not available"
             }, merge=True)
     except Exception as e:
-        error(f"[SeedGuide] failed job={job_id} error={str(e)}", exc_info=True)
+        error_msg = str(e)
+        if "429" in error_msg:
+            friendly_msg = "AIモデルの利用制限（429: Too Many Requests）に達しました。しばらく待ってから再度お試しください。"
+        else:
+            friendly_msg = f"エラーが発生しました: {error_msg}"
+            
+        error(f"[SeedGuide] failed job={job_id} error={error_msg}", exc_info=True)
         await doc_ref.set({
             "status": "FAILED",
-            "message": str(e)
+            "message": friendly_msg
         }, merge=True)
 
 @app.post("/api/seed-guide/generate")
@@ -744,10 +756,16 @@ async def process_character_generation(job_id: str, image_bytes: bytes):
                 "message": "Analysis service not available"
             })
     except Exception as e:
-        error(f"[Character] failed job={job_id} error={str(e)}", exc_info=True)
+        error_msg = str(e)
+        if "429" in error_msg:
+            friendly_msg = "AIモデルの利用制限（429: Too Many Requests）に達しました。しばらく待ってから再度お試しください。"
+        else:
+            friendly_msg = f"エラーが発生しました: {error_msg}"
+            
+        error(f"[Character] failed job={job_id} error={error_msg}", exc_info=True)
         await doc_ref.update({
             "status": "FAILED",
-            "message": str(e)
+            "message": friendly_msg
         })
 
 @app.get("/api/character/jobs/{job_id}")
@@ -1581,8 +1599,13 @@ async def start_unified_job(background_tasks: BackgroundTasks, file: UploadFile 
                         
                     return vegetable_name, analysis_data
                 except Exception as e:
-                    error(f"[Unified] basic_analysis_failed job={job_id} error={e}")
-                    update_vegetable_status(research_doc_id, "failed", {"error": str(e)})
+                    error_msg = str(e)
+                    if "429" in error_msg:
+                        friendly_msg = "AIモデルの利用制限（429: Too Many Requests）に達しました。しばらく待ってから再度お試しください。"
+                    else:
+                        friendly_msg = f"エラーが発生しました: {error_msg}"
+                    error(f"[Unified] basic_analysis_failed job={job_id} error={error_msg}")
+                    update_vegetable_status(research_doc_id, "FAILED", {"error": friendly_msg})
                     return None, None
 
             # Run Phase 1

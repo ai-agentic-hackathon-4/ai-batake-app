@@ -46,17 +46,19 @@ def call_api_with_backoff(
     if "/models/" in url:
         _model_name = url.split("/models/")[1].split(":")[0]
 
+    last_status_code = None
     for attempt in range(max_retries):
         elapsed = time.time() - start_time
         if elapsed >= max_elapsed_seconds:
-            error(f"[LLM] ⏰ Retry budget exceeded ({max_elapsed_seconds}s) for model={_model_name}")
-            raise RuntimeError("Retry budget exceeded")
+            error(f"[LLM] ⏰ Retry budget exceeded ({max_elapsed_seconds}s) for model={_model_name}. Last status: {last_status_code}")
+            raise RuntimeError(f"Retry budget exceeded (Last status: {last_status_code})")
 
         if attempt > 0:
             info(f"[LLM] 🔄 Retry attempt {attempt+1}/{max_retries} for model={_model_name} (elapsed={elapsed:.0f}s)")
 
         try:
             response = requests.post(url, headers=headers, json=payload, timeout=request_timeout)
+            last_status_code = response.status_code
 
             if response.status_code == 200:
                 elapsed_now = time.time() - start_time
@@ -93,8 +95,10 @@ def call_api_with_backoff(
             )
             time.sleep(delay)
 
-    error(f"Max retries ({max_retries}) exceeded.")
-    raise RuntimeError(f"Max retries ({max_retries}) exceeded.")
+    error(f"Max retries ({max_retries}) exceeded (model={_model_name}). Last status: {last_status_code}")
+    if last_status_code == 429:
+        raise RuntimeError(f"AI model rate limit exceeded (429) for {_model_name}. Please try again later.")
+    raise RuntimeError(f"Max retries ({max_retries}) exceeded. Last status: {last_status_code}")
 
 # Define a consistent style for all images
 UNIFIED_STYLE = "soft digital illustration, warm sunlight, gentle pastel colors, white background, home gardening context, consistent character design, high quality"
