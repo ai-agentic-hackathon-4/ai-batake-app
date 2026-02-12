@@ -88,7 +88,7 @@ export default function Dashboard() {
                                 <Leaf className="h-6 w-6 text-primary" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-semibold text-card-foreground">Smart Farm Dashboard</h1>
+                                <h1 className="text-xl font-semibold text-card-foreground">Saib-AI Dashboard</h1>
                                 <p className="text-sm text-muted-foreground">AI栽培管理システム</p>
                             </div>
                         </div>

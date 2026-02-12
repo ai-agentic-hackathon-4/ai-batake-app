@@ -1,6 +1,6 @@
-# 🌱 AI Batake App - Backend
+# 🌱 Saib-AI - Backend
 
-FastAPIで構築されたAI Batake Appのバックエンドサーバーです。センサーデータの管理、AI連携、栽培ガイド生成などの機能を提供します。
+FastAPIで構築されたSaib-AIのバックエンドサーバーです。センサーデータの管理、AI連携、栽培ガイド生成などの機能を提供します。
 
 ## 📋 概要
 

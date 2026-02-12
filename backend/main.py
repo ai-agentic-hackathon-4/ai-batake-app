@@ -1780,7 +1780,7 @@ async def startup_event():
     startup_session = generate_session_id()
     set_session_id(startup_session)
     set_request_id("startup")
-    info("AI Batake Backend started successfully")
+    info("Saib-AI Backend started successfully")
     info(f"Project ID: {project_id}")
     info(f"Firestore collection: {COLLECTION_NAME}")
 

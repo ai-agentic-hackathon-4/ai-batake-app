@@ -19,9 +19,9 @@ export default function ResearchDashboard() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedVeg, setSelectedVeg] = useState<Vegetable | null>(null);
     const [uploading, setUploading] = useState(false);
-    const [fileName, setFileName] = useState("Click to browse or drag file here");
+    const [fileName, setFileName] = useState("クリックしてファイルを選択するか、ここにドラッグしてください");
     const [applyingToAgent, setApplyingToAgent] = useState(false);
-    const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
+    const [researchMode, setResearchMode] = useState<"agent" | "grounding">("grounding");
     const [showRawReport, setShowRawReport] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -68,11 +68,11 @@ export default function ResearchDashboard() {
                 closeModal();
                 fetchVegetables();
             } else {
-                alert("Upload failed");
+                alert("アップロードに失敗しました");
             }
         } catch (error) {
             console.error(error);
-            alert("Error uploading file");
+            alert("アップロード中にエラーが発生しました");
         } finally {
             setUploading(false);
         }
@@ -86,13 +86,13 @@ export default function ResearchDashboard() {
                 method: "POST",
             });
             if (res.ok) {
-                alert("Instructions applied to edge agent!");
+                alert("エージェントに設定を適用しました！");
             } else {
-                alert("Failed to apply instructions.");
+                alert("設定の適用に失敗しました。");
             }
         } catch (e) {
             console.error(e);
-            alert("An error occurred.");
+            alert("エラーが発生しました。");
         } finally {
             setApplyingToAgent(false);
         }
@@ -113,7 +113,7 @@ export default function ResearchDashboard() {
 
     const openModal = () => {
         setIsModalOpen(true);
-        setFileName("Click to browse or drag file here");
+        setFileName("クリックしてファイルを選択するか、ここにドラッグしてください");
         if (fileInputRef.current) fileInputRef.current.value = "";
     }
 
@@ -124,6 +124,19 @@ export default function ResearchDashboard() {
 
     // Helper to format instruction keys
     const formatKey = (key: string) => {
+        const keyMap: Record<string, string> = {
+            "optimal_temp_range": "最適温度範囲",
+            "optimal_humidity_range": "最適湿度範囲",
+            "soil_moisture_standard": "土壌水分基準",
+            "watering_instructions": "水やり方法",
+            "light_requirements": "日照条件",
+            "care_tips": "栽培のアドバイス",
+            "summary_prompt": "AIエージェント用要約",
+            "volumetric_water_content": "目標土壌水分量(VWC)"
+        };
+
+        if (keyMap[key]) return keyMap[key];
+
         return key
             .replace(/_/g, " ")
             .replace(/([A-Z])/g, ' $1')
@@ -139,9 +152,9 @@ export default function ResearchDashboard() {
     // Categorize instructions
     const categorizeInstructions = (instructions: Record<string, any>) => {
         const categories = {
-            care: { icon: Sprout, label: "Cultivation & Care", color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100", items: [] as [string, any][] },
-            environment: { icon: Thermometer, label: "Environment", color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-100", items: [] as [string, any][] },
-            water_soil: { icon: Droplets, label: "Water & Soil", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100", items: [] as [string, any][] },
+            care: { icon: Sprout, label: "栽培と手入れ", color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100", items: [] as [string, any][] },
+            environment: { icon: Thermometer, label: "環境条件", color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-100", items: [] as [string, any][] },
+            water_soil: { icon: Droplets, label: "水と土壌", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100", items: [] as [string, any][] },
         };
 
         Object.entries(instructions).forEach(([key, value]) => {
@@ -223,7 +236,7 @@ export default function ResearchDashboard() {
                             : "bg-primary/10 text-primary border-primary/20"
                             }`}>
                             <div className={`w-2 h-2 rounded-full ${isSystemExecuting ? "bg-blue-500 animate-pulse" : "bg-primary"}`}></div>
-                            {isSystemExecuting ? "EXECUTING RESEARCH..." : "SYSTEM IDLE"}
+                            {isSystemExecuting ? "リサーチ実行中..." : "待機中"}
                         </div>
                     </div>
                 </div>
@@ -231,7 +244,7 @@ export default function ResearchDashboard() {
 
             <main className="max-w-7xl mx-auto px-6 py-8 flex-1 w-full">
                 <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-2xl font-bold tracking-tight">Vegetable Research</h2>
+                    <h2 className="text-2xl font-bold tracking-tight">野菜リサーチ</h2>
                     <button
                         onClick={openModal}
                         className="inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 gap-2"
@@ -247,16 +260,16 @@ export default function ResearchDashboard() {
                         <div className="p-4 rounded-full bg-muted mb-4">
                             <FlaskConical className="h-8 w-8 text-muted-foreground" />
                         </div>
-                        <h3 className="text-lg font-semibold mb-2">No Research Data Yet</h3>
+                        <h3 className="text-lg font-semibold mb-2">リサーチデータがまだありません</h3>
                         <p className="text-muted-foreground mb-6 max-w-sm">
-                            Upload a seed packet image to start AI-powered deep research and get optimal growing instructions.
+                            種袋の画像をアップロードして、AIによる詳細なリサーチと最適な栽培指針を取得しましょう。
                         </p>
                         <button
                             onClick={openModal}
                             className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 h-10 px-6 gap-2"
                         >
                             <Plus className="w-4 h-4" />
-                            Register Your First Seed
+                            最初の種を登録
                         </button>
                     </div>
                 ) : (
@@ -292,7 +305,7 @@ export default function ResearchDashboard() {
                                                 isFailed ? "bg-red-50 text-red-600 border-red-200" :
                                                     "bg-blue-50 text-blue-600 border-blue-200"
                                                 }`}>
-                                                {isProcessing ? "ANALYZING" : isFailed ? "FAILED" : "READY"}
+                                                {isProcessing ? "解析中" : isFailed ? "失敗" : "完了"}
                                             </span>
                                             <button
                                                 onClick={(e) => {
@@ -338,9 +351,9 @@ export default function ResearchDashboard() {
                         </button>
 
                         <div className="mb-6">
-                            <h2 className="text-xl font-semibold">New Seed Analysis</h2>
+                            <h2 className="text-xl font-semibold">新しい種のリサーチ</h2>
                             <p className="text-sm text-muted-foreground mt-1">
-                                Upload a seed packet image for AI analysis.
+                                AIによる解析を行うため、種袋の画像をアップロードしてください。
                             </p>
                         </div>
 
@@ -351,7 +364,7 @@ export default function ResearchDashboard() {
                             >
                                 <CloudUpload className="mx-auto h-10 w-10 text-muted-foreground mb-4" />
                                 <p className="text-sm font-medium">{fileName}</p>
-                                <p className="text-xs text-muted-foreground mt-1">JPG, PNG supported</p>
+                                <p className="text-xs text-muted-foreground mt-1">JPG, PNG形式に対応</p>
                                 <input
                                     type="file"
                                     ref={fileInputRef}
@@ -362,7 +375,7 @@ export default function ResearchDashboard() {
                             </div>
 
                             <div className="space-y-3 px-1">
-                                <p className="text-sm font-medium">Research Mode</p>
+                                <p className="text-sm font-medium">リサーチモード</p>
                                 <div className="flex gap-2 p-1 bg-muted rounded-lg">
                                     <button
                                         type="button"
@@ -386,12 +399,22 @@ export default function ResearchDashboard() {
                                 </p>
                             </div>
 
+                            {/* Warning Banner */}
+                            {researchMode === "agent" && (
+                                <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                                    <p className="text-[10px] text-amber-700 leading-normal">
+                                        <strong>注意:</strong> 現在の選択モードは処理に<strong>10分以上</strong>かかる場合があります。素早い結果を希望される場合は、Groundingモードをお勧めします。
+                                    </p>
+                                </div>
+                            )}
+
                             <button
                                 type="submit"
                                 disabled={uploading}
                                 className="w-full inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-10 px-4 py-2"
                             >
-                                {uploading ? "Analyzing..." : "Start Analysis"}
+                                {uploading ? "解析中..." : "解析を開始"}
                             </button>
                         </form>
                     </div>
@@ -412,7 +435,7 @@ export default function ResearchDashboard() {
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-bold tracking-tight">{selectedVeg.name}</h2>
-                                    <p className="text-sm text-muted-foreground">AI Analysis Result</p>
+                                    <p className="text-sm text-muted-foreground">AIリサーチ結果</p>
                                 </div>
                             </div>
                             <button
@@ -430,8 +453,8 @@ export default function ResearchDashboard() {
                                     {/* Action Banner */}
                                     <div className="flex flex-col sm:flex-row items-center justify-between bg-muted/40 p-5 rounded-xl border border-border gap-4">
                                         <div>
-                                            <p className="text-base font-semibold">Ready to Deploy</p>
-                                            <p className="text-sm text-muted-foreground">Sync these environmental parameters to your edge device.</p>
+                                            <p className="text-base font-semibold">エージェントへ適用可能</p>
+                                            <p className="text-sm text-muted-foreground">これらの環境パラメータをエージェントに同期します。</p>
                                         </div>
                                         <button
                                             onClick={handleApplyToAgent}
@@ -442,7 +465,7 @@ export default function ResearchDashboard() {
                                                 <Loader2 className="h-8 w-8 animate-spin" />
                                             ) : (
                                                 <>
-                                                    <Send className="w-4 h-4" /> Apply Config
+                                                    <Send className="w-4 h-4" /> 設定を適用
                                                 </>
                                             )}
                                         </button>
@@ -452,11 +475,11 @@ export default function ResearchDashboard() {
                                     {selectedVeg.instructions.volumetric_water_content && (
                                         <div className="bg-card rounded-xl p-6 border border-border shadow-sm flex items-center justify-between">
                                             <div>
-                                                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Target Soil Moisture</h3>
+                                                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">目標土壌水分量</h3>
                                                 <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-400">
                                                     {selectedVeg.instructions.volumetric_water_content}
                                                 </p>
-                                                <p className="text-sm text-muted-foreground mt-1 font-medium">Volumetric Water Content (VWC)</p>
+                                                <p className="text-sm text-muted-foreground mt-1 font-medium">体積含水率 (VWC)</p>
                                             </div>
                                             <div className="w-32 h-32">
                                                 <VWCGauge value={selectedVeg.instructions.volumetric_water_content} />
@@ -468,7 +491,7 @@ export default function ResearchDashboard() {
                                     {selectedVeg.instructions.description && (
                                         <div className="bg-muted/20 p-6 rounded-xl border border-border">
                                             <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-                                                <AlertCircle className="w-4 h-4 text-primary" /> Overview
+                                                <AlertCircle className="w-4 h-4 text-primary" /> 概要
                                             </h3>
                                             <p className="text-sm text-muted-foreground leading-relaxed">
                                                 {selectedVeg.instructions.description}
@@ -534,7 +557,7 @@ export default function ResearchDashboard() {
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                                     <FlaskConical className="h-16 w-16 mb-4 opacity-20" />
-                                    <p className="text-lg font-medium">No detailed data available.</p>
+                                    <p className="text-lg font-medium">詳細データがありません。</p>
                                 </div>
                             )}
                         </div>

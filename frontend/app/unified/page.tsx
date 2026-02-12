@@ -251,8 +251,8 @@ export default function UnifiedPage() {
                                         </Tabs>
                                         <p className="text-[10px] text-slate-500 leading-relaxed min-h-[32px]">
                                             {researchMode === "agent"
-                                                ? "AIが時間をかけて徹底的に調査します (20-30分)"
-                                                : "最新のGoogle検索結果を元に素早く回答します (1分)"}
+                                                ? "AIがWebを巡回して徹底的に調査します (約2-3分)"
+                                                : "Google検索結果から素早く情報を取得します (約1分)"}
                                         </p>
                                     </div>
 
@@ -771,7 +771,7 @@ export default function UnifiedPage() {
                                                     {status.research.result.name && (
                                                         <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
                                                             <h3 className="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
-                                                                <Sprout className="h-4 w-4" /> 野菜名
+                                                                <Sprout className="h-4 w-4" /> 野菜の名前
                                                             </h3>
                                                             <p className="text-slate-700">{status.research.result.name}</p>
                                                         </div>
@@ -806,7 +806,7 @@ export default function UnifiedPage() {
                                                     {/* Watering */}
                                                     {status.research.result.watering_instructions && (
                                                         <div className="bg-cyan-50 p-3 rounded-lg border border-cyan-200">
-                                                            <h3 className="font-semibold text-cyan-800 mb-2">💦 水やり方法</h3>
+                                                            <h3 className="font-semibold text-purple-800 mb-2">🚿 水やり方法</h3>
                                                             <p className="text-slate-700 whitespace-pre-wrap">{status.research.result.watering_instructions}</p>
                                                         </div>
                                                     )}
@@ -821,8 +821,8 @@ export default function UnifiedPage() {
 
                                                     {/* Care Tips */}
                                                     {status.research.result.care_tips && (
-                                                        <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
-                                                            <h3 className="font-semibold text-purple-800 mb-2">📝 栽培のコツ</h3>
+                                                        <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                                                            <h3 className="font-semibold text-emerald-800 mb-2">🌱 栽培のアドバイス</h3>
                                                             <p className="text-slate-700 whitespace-pre-wrap">{status.research.result.care_tips}</p>
                                                         </div>
                                                     )}
