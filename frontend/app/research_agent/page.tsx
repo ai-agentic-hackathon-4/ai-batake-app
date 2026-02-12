@@ -21,7 +21,7 @@ export default function ResearchDashboard() {
     const [uploading, setUploading] = useState(false);
     const [fileName, setFileName] = useState("クリックしてファイルを選択するか、ここにドラッグしてください");
     const [applyingToAgent, setApplyingToAgent] = useState(false);
-    const [researchMode, setResearchMode] = useState<"agent" | "grounding">("agent");
+    const [researchMode, setResearchMode] = useState<"agent" | "grounding">("grounding");
     const [showRawReport, setShowRawReport] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -398,6 +398,16 @@ export default function ResearchDashboard() {
                                         : "高速調査 (約1分): Google検索結果を直接利用して信頼性の高い情報を素早く取得します"}
                                 </p>
                             </div>
+
+                            {/* Warning Banner */}
+                            {researchMode === "agent" && (
+                                <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                                    <p className="text-[10px] text-amber-700 leading-normal">
+                                        <strong>注意:</strong> 現在の選択モードは処理に<strong>10分以上</strong>かかる場合があります。素早い結果を希望される場合は、Groundingモードをお勧めします。
+                                    </p>
+                                </div>
+                            )}
 
                             <button
                                 type="submit"
