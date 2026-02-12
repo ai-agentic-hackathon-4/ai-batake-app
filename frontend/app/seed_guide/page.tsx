@@ -519,15 +519,6 @@ export default function SeedGuidePage() {
                     </div>
                 )}
             </main>
-
-            {/* Footer */}
-            <footer className="border-t border-border bg-card mt-auto">
-                <div className="max-w-7xl mx-auto px-6 py-4">
-                    <p className="text-sm text-muted-foreground text-center">
-                        © 2025 Smart Farm AI - ハッカソンデモ
-                    </p>
-                </div>
-            </footer>
         </div>
     );
 }
