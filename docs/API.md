@@ -1,6 +1,6 @@
 # API Reference
 
-AI Batake App が提供する全APIエンドポイントのリファレンスです。
+Saib-AI が提供する全APIエンドポイントのリファレンスです。
 
 ## 基本情報
 
