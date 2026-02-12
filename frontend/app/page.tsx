@@ -103,11 +103,6 @@ export default function LandingPage() {
                 </div>
 
             </div>
-
-            {/* Footer */}
-            <footer className="text-center text-xs text-slate-300 py-2">
-                © 2025 Smart Farm AI チーム
-            </footer>
         </div>
     )
 }
