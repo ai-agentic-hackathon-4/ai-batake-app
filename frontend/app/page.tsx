@@ -4,7 +4,7 @@ import Image from "next/image"
 
 export default function LandingPage() {
     return (
-        <div className="h-screen bg-gradient-to-b from-green-50 to-white flex flex-col overflow-hidden">
+        <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col">
             <div className="flex-1 flex flex-col items-center justify-center px-4 py-4 max-w-5xl w-full mx-auto">
 
                 {/* Compact Hero */}
@@ -29,7 +29,7 @@ export default function LandingPage() {
                         <div className="absolute top-0 right-0 p-2 opacity-10">
                             <Sparkles className="w-40 h-40 text-white" />
                         </div>
-                        <div className="relative z-10 flex items-center gap-4">
+                        <div className="relative z-10 flex flex-col md:flex-row items-center md:items-center gap-4 text-center md:text-left">
                             <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm group-hover:bg-white/30 transition-colors shrink-0">
                                 <Sparkles className="w-8 h-8 text-white" />
                             </div>
@@ -39,7 +39,7 @@ export default function LandingPage() {
                                     種袋の画像ひとつで、キャラクター・栽培ガイド・詳細リサーチを一括生成
                                 </p>
                             </div>
-                            <div className="bg-white text-green-600 px-5 py-1.5 rounded-full font-bold text-sm shadow-md group-hover:scale-105 transition-transform shrink-0">
+                            <div className="bg-white text-green-600 px-5 py-2 md:py-1.5 rounded-full font-bold text-sm shadow-md group-hover:scale-105 transition-transform shrink-0 w-full md:w-auto text-center">
                                 スタート
                             </div>
                         </div>
