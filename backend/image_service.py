@@ -185,31 +185,31 @@ def generate_picture_diary(date_str: str, summary: str):
         
         response = None
         
-        # Attempt 1: Vertex AI
+        # Attempt 1: Gemini API
         try:
-            info(f"[LLM] 🎨 Attempting Primary (Vertex AI)...")
+            info(f"[LLM] 🎨 Attempting Primary (Gemini API)...")
             response = call_api_with_backoff(
-                vertex_url,
+                gemini_url,
                 payload,
                 headers,
-                max_retries=5 , # Reduced retries for primary to fail faster to fallback
+                max_retries=5, # Reduced retries for primary to fail faster to fallback
                 max_elapsed_seconds=60,
                 base_delay=1.0,
                 max_delay=5.0
             )
         except Exception as e:
-            warning(f"Primary (Vertex AI) failed with exception: {e}")
+            warning(f"Primary (Gemini API) failed with exception: {e}")
             response = None # Ensure we trigger fallback
 
         # Check if primary failed (either exception or non-200)
         if not response or response.status_code != 200:
             status = response.status_code if response else "Exception"
-            warning(f"Primary (Vertex AI) failed (status: {status}). Switching to Fallback (Gemini API)...")
+            warning(f"Primary (Gemini API) failed (status: {status}). Switching to Fallback (Vertex AI)...")
             
-            # Attempt 2: Gemini API
+            # Attempt 2: Vertex AI
             try:
                 response = call_api_with_backoff(
-                    gemini_url,
+                    vertex_url,
                     payload,
                     headers,
                     max_retries=5,
@@ -218,12 +218,12 @@ def generate_picture_diary(date_str: str, summary: str):
                     max_delay=5.0
                 )
                 if response and response.status_code == 200:
-                    info(f"[LLM] 🎨 Fallback (Gemini API) succeeded!")
+                    info(f"[LLM] 🎨 Fallback (Vertex AI) succeeded!")
                 else:
                     status = response.status_code if response else "Unknown"
-                    warning(f"Fallback (Gemini API) also failed (status: {status}).")
+                    warning(f"Fallback (Vertex AI) also failed (status: {status}).")
             except Exception as e:
-                 warning(f"Fallback (Gemini API) failed with exception: {e}")
+                 warning(f"Fallback (Vertex AI) failed with exception: {e}")
 
         if not response or response.status_code != 200:
             status = response.status_code if response else "Unknown"

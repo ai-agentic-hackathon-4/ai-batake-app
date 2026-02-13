@@ -231,15 +231,15 @@ class TestGeneratePictureDiary:
         # Verify calls were made to both endpoints
         assert mock_api_call.call_count == 2
         
-        # First call should be to Vertex AI with test-key
+        # First call should be to Gemini API with fallback-key
         args1, _ = mock_api_call.call_args_list[0]
-        assert "aiplatform.googleapis.com" in args1[0]
-        assert "key=test-key" in args1[0]
+        assert "generativelanguage.googleapis.com" in args1[0]
+        assert "key=fallback-key" in args1[0]
         
-        # Second call should be to Gemini API with fallback-key
+        # Second call should be to Vertex AI with test-key
         args2, _ = mock_api_call.call_args_list[1]
-        assert "generativelanguage.googleapis.com" in args2[0]
-        assert "key=fallback-key" in args2[0]
+        assert "aiplatform.googleapis.com" in args2[0]
+        assert "key=test-key" in args2[0]
 
     @patch('db.db', None)
     @patch('image_service.call_api_with_backoff')
