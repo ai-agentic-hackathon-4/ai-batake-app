@@ -479,23 +479,23 @@ export default function UnifiedPage() {
                                                 {/* Left: Character Image */}
                                                 <div className="flex justify-center items-center">
                                                     {status.character.result.image_url ? (
-                                                        <div className="relative inline-block w-full max-w-[200px] sm:max-w-md">
+                                                        <div className="relative inline-block w-full max-w-[280px] sm:max-w-md">
                                                             <div className="absolute inset-0 bg-yellow-100 rounded-full blur-2xl opacity-50 -z-10 transform scale-110"></div>
                                                             <img
                                                                 src={status.character.result.image_url.startsWith('http') && !status.character.result.image_url.includes('/api/') ? status.character.result.image_url : `${status.character.result.image_url}`}
                                                                 alt="Character"
                                                                 className="w-full mx-auto object-contain z-0 hover:scale-105 transition-transform duration-500 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-white shadow-[0_0_0_2px_rgba(255,182,193,0.4)] sm:shadow-[0_0_0_4px_rgba(255,182,193,0.4)] bg-white"
-                                                                style={{ maxHeight: '200px' }}
+                                                                style={{ maxHeight: '320px' }}
                                                             />
                                                         </div>
                                                     ) : status.character.result.image_base64 ? (
-                                                        <div className="relative inline-block w-full max-w-[200px] sm:max-w-md">
+                                                        <div className="relative inline-block w-full max-w-[280px] sm:max-w-md">
                                                             <div className="absolute inset-0 bg-yellow-100 rounded-full blur-2xl opacity-50 -z-10 transform scale-110"></div>
                                                             <img
                                                                 src={`data:image/png;base64,${status.character.result.image_base64}`}
                                                                 alt="Character"
                                                                 className="w-full mx-auto object-contain z-0 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-white shadow-[0_0_0_2px_rgba(255,182,193,0.4)] sm:shadow-[0_0_0_4px_rgba(255,182,193,0.4)] bg-white"
-                                                                style={{ maxHeight: '200px' }}
+                                                                style={{ maxHeight: '320px' }}
                                                             />
                                                         </div>
                                                     ) : (
