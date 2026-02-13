@@ -4,7 +4,7 @@ import Image from "next/image"
 
 export default function LandingPage() {
     return (
-        <div className="h-screen bg-gradient-to-b from-green-50 to-white flex flex-col overflow-hidden">
+        <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col">
             <div className="flex-1 flex flex-col items-center justify-center px-4 py-4 max-w-5xl w-full mx-auto">
 
                 {/* Compact Hero */}
