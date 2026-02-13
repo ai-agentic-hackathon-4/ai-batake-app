@@ -38,7 +38,7 @@ export default function Dashboard() {
                             temperature: data.temperature,
                             humidity: data.humidity,
                             soil_moisture: data.soil_moisture ?? "--",
-                            illuminance: data.illuminance ?? "--"
+                            illuminance: data.illuminance !== undefined ? Math.round(Number(data.illuminance)) : "--"
                         })
                     }
                 }
@@ -62,7 +62,7 @@ export default function Dashboard() {
                         temperature: data.temperature,
                         humidity: data.humidity,
                         soil_moisture: data.soil_moisture ?? "--",
-                        illuminance: data.illuminance ?? "--"
+                        illuminance: data.illuminance !== undefined ? Math.round(Number(data.illuminance)) : "--"
                     })
                 }
             } catch (e) {
