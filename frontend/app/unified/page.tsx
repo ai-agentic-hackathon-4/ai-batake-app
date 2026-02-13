@@ -251,8 +251,8 @@ export default function UnifiedPage() {
                                         </Tabs>
                                         <p className="text-[10px] text-slate-500 leading-relaxed min-h-[32px]">
                                             {researchMode === "agent"
-                                                ? "AIが時間をかけて徹底的に調査します (20-30分)"
-                                                : "最新のGoogle検索結果を元に素早く回答します (1分)"}
+                                                ? "AIがWebを巡回して徹底的に調査します (約2-3分)"
+                                                : "Google検索結果から素早く情報を取得します (約1分)"}
                                         </p>
                                     </div>
 
@@ -292,8 +292,8 @@ export default function UnifiedPage() {
                                     </div>
                                 </div>
 
-                                {/* Message Area (Reserved Height to prevent shift) */}
-                                <div className="space-y-4 min-h-[64px] flex flex-col justify-center">
+                                {/* Message Area */}
+                                <div className="space-y-4">
                                     {/* Warning Banners */}
                                     {(researchMode === "agent" || guideImageMode === "per_step") && (
                                         <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -479,23 +479,23 @@ export default function UnifiedPage() {
                                                 {/* Left: Character Image */}
                                                 <div className="flex justify-center items-center">
                                                     {status.character.result.image_url ? (
-                                                        <div className="relative inline-block w-full max-w-[200px] sm:max-w-md">
+                                                        <div className="relative inline-block w-full max-w-[280px] sm:max-w-md">
                                                             <div className="absolute inset-0 bg-yellow-100 rounded-full blur-2xl opacity-50 -z-10 transform scale-110"></div>
                                                             <img
                                                                 src={status.character.result.image_url.startsWith('http') && !status.character.result.image_url.includes('/api/') ? status.character.result.image_url : `${status.character.result.image_url}`}
                                                                 alt="Character"
                                                                 className="w-full mx-auto object-contain z-0 hover:scale-105 transition-transform duration-500 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-white shadow-[0_0_0_2px_rgba(255,182,193,0.4)] sm:shadow-[0_0_0_4px_rgba(255,182,193,0.4)] bg-white"
-                                                                style={{ maxHeight: '200px' }}
+                                                                style={{ maxHeight: '320px' }}
                                                             />
                                                         </div>
                                                     ) : status.character.result.image_base64 ? (
-                                                        <div className="relative inline-block w-full max-w-[200px] sm:max-w-md">
+                                                        <div className="relative inline-block w-full max-w-[280px] sm:max-w-md">
                                                             <div className="absolute inset-0 bg-yellow-100 rounded-full blur-2xl opacity-50 -z-10 transform scale-110"></div>
                                                             <img
                                                                 src={`data:image/png;base64,${status.character.result.image_base64}`}
                                                                 alt="Character"
                                                                 className="w-full mx-auto object-contain z-0 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-white shadow-[0_0_0_2px_rgba(255,182,193,0.4)] sm:shadow-[0_0_0_4px_rgba(255,182,193,0.4)] bg-white"
-                                                                style={{ maxHeight: '200px' }}
+                                                                style={{ maxHeight: '320px' }}
                                                             />
                                                         </div>
                                                     ) : (
@@ -771,7 +771,7 @@ export default function UnifiedPage() {
                                                     {status.research.result.name && (
                                                         <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
                                                             <h3 className="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
-                                                                <Sprout className="h-4 w-4" /> 野菜名
+                                                                <Sprout className="h-4 w-4" /> 野菜の名前
                                                             </h3>
                                                             <p className="text-slate-700">{status.research.result.name}</p>
                                                         </div>
@@ -806,7 +806,7 @@ export default function UnifiedPage() {
                                                     {/* Watering */}
                                                     {status.research.result.watering_instructions && (
                                                         <div className="bg-cyan-50 p-3 rounded-lg border border-cyan-200">
-                                                            <h3 className="font-semibold text-cyan-800 mb-2">💦 水やり方法</h3>
+                                                            <h3 className="font-semibold text-purple-800 mb-2">🚿 水やり方法</h3>
                                                             <p className="text-slate-700 whitespace-pre-wrap">{status.research.result.watering_instructions}</p>
                                                         </div>
                                                     )}
@@ -821,8 +821,8 @@ export default function UnifiedPage() {
 
                                                     {/* Care Tips */}
                                                     {status.research.result.care_tips && (
-                                                        <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
-                                                            <h3 className="font-semibold text-purple-800 mb-2">📝 栽培のコツ</h3>
+                                                        <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                                                            <h3 className="font-semibold text-emerald-800 mb-2">🌱 栽培のアドバイス</h3>
                                                             <p className="text-slate-700 whitespace-pre-wrap">{status.research.result.care_tips}</p>
                                                         </div>
                                                     )}

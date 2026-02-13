@@ -24,7 +24,7 @@ export function MetricCard({ title, value, unit, icon: Icon, status = "normal" }
             </CardHeader>
             <CardContent>
                 <div className="flex items-baseline gap-1">
-                    <span className={`text-4xl font-bold ${statusColors[status]}`}>{value}</span>
+                    <span className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${statusColors[status]}`}>{value}</span>
                     <span className="text-lg text-muted-foreground">{unit}</span>
                 </div>
             </CardContent>

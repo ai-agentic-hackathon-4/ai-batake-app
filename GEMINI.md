@@ -1,7 +1,7 @@
 # AI Context Rules
 
 ## 1. Project Overview
-AI Batake App は、AIを活用したスマート農業プラットフォームです。センサーデータのリアルタイム監視、種袋画像からの栽培情報の自動抽出、およびAIエージェントによる栽培ガイドの生成を行います。
+Saib-AI は、AIを活用したスマート農業プラットフォームです。センサーデータのリアルタイム監視、種袋画像からの栽培情報の自動抽出、およびAIエージェントによる栽培ガイドの生成を行います。
 
 This is an AI-powered smart farming platform that provides:
 - Real-time environmental monitoring (temperature, humidity, soil moisture)

@@ -1,7 +1,7 @@
-# AI Batake App - Copilot Instructions
+# Saib-AI - Copilot Instructions
 
 ## Project Overview
-AI Batake App is a smart gardening application that uses AI agents to analyze seed packets and provide growing instructions. The application is deployed on Google Cloud Run and uses Google Cloud Platform services.
+Saib-AI is a smart gardening application that uses AI agents to analyze seed packets and provide growing instructions. The application is deployed on Google Cloud Run and uses Google Cloud Platform services.
 
 ## Tech Stack
 

@@ -37,7 +37,7 @@ export function LoadingOverlay({ isVisible }: { isVisible: boolean }) {
 
             <div className="mt-8 text-center space-y-2">
                 <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-green-400">
-                    AI Batake
+                    Saib-AI
                 </h2>
                 <p className="text-muted-foreground animate-pulse">
                     データを取得中...

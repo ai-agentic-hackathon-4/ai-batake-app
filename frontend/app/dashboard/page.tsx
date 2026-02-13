@@ -38,7 +38,7 @@ export default function Dashboard() {
                             temperature: data.temperature,
                             humidity: data.humidity,
                             soil_moisture: data.soil_moisture ?? "--",
-                            illuminance: data.illuminance ?? "--"
+                            illuminance: data.illuminance !== undefined ? Math.round(Number(data.illuminance)) : "--"
                         })
                     }
                 }
@@ -62,7 +62,7 @@ export default function Dashboard() {
                         temperature: data.temperature,
                         humidity: data.humidity,
                         soil_moisture: data.soil_moisture ?? "--",
-                        illuminance: data.illuminance ?? "--"
+                        illuminance: data.illuminance !== undefined ? Math.round(Number(data.illuminance)) : "--"
                     })
                 }
             } catch (e) {
@@ -88,7 +88,7 @@ export default function Dashboard() {
                                 <Leaf className="h-6 w-6 text-primary" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-semibold text-card-foreground">Smart Farm Dashboard</h1>
+                                <h1 className="text-xl font-semibold text-card-foreground">Saib-AI Dashboard</h1>
                                 <p className="text-sm text-muted-foreground">AI栽培管理システム</p>
                             </div>
                         </div>
@@ -121,13 +121,6 @@ export default function Dashboard() {
                     {/* AI Activity Log Section */}
                     <AIActivityLog />
                 </main>
-
-                {/* Footer */}
-                <footer className="border-t border-border bg-card mt-8">
-                    <div className="max-w-7xl mx-auto px-6 py-4">
-                        <p className="text-sm text-muted-foreground text-center">© 2025 Smart Farm AI - ハッカソンデモ</p>
-                    </div>
-                </footer>
             </div>
         </>
     )

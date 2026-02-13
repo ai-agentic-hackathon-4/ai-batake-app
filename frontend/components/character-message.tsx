@@ -74,11 +74,11 @@ export function CharacterMessage() {
     return (
         <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
             <CardContent className="pt-8 pb-8">
-                <div className="flex items-start gap-6">
+                <div className="flex flex-col md:flex-row items-center md:items-start gap-4 md:gap-6">
                     {/* Character Avatar */}
                     {data?.avatar_url ? (
                         <div className="relative flex-shrink-0">
-                            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg bg-white">
+                            <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white shadow-lg bg-white">
                                 <img
                                     src={data.avatar_url}
                                     alt={data.character_name}
@@ -90,14 +90,14 @@ export function CharacterMessage() {
                             </div>
                         </div>
                     ) : (
-                        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center flex-shrink-0 shadow-lg">
-                            <Sparkles className="h-14 w-14 text-white" />
+                        <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center flex-shrink-0 shadow-lg">
+                            <Sparkles className="h-10 w-10 md:h-14 md:w-14 text-white" />
                         </div>
                     )}
 
                     {/* Message Bubble */}
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-3">
+                    <div className="w-full md:w-auto flex-1 min-w-0">
+                        <div className="flex items-center justify-center md:justify-start gap-2 mb-3">
                             <span className="text-lg font-bold text-primary">
                                 {data?.character_name || "お友達"}
                             </span>
@@ -105,10 +105,10 @@ export function CharacterMessage() {
                         </div>
                         <div className="relative">
                             {/* Speech bubble tail */}
-                            <div className="absolute -left-2 top-2 w-0 h-0 border-t-8 border-t-transparent border-b-8 border-b-transparent border-r-8 border-r-card" />
+                            <div className="absolute left-1/2 -top-2 -translate-x-1/2 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-card border-t-0 md:-left-2 md:top-6 md:translate-x-0 md:border-t-8 md:border-t-transparent md:border-b-8 md:border-b-transparent md:border-r-8 md:border-r-card md:border-l-0" />
 
                             {/* Message content */}
-                            <div className="bg-card rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm border border-border">
+                            <div className="bg-card rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm border border-border text-center md:text-left">
                                 <p className="text-base leading-relaxed text-card-foreground whitespace-pre-wrap">
                                     {data?.message || "こんにちは！今日も元気に育てていこうね！🌱"}
                                 </p>
