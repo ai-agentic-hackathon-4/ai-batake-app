@@ -183,7 +183,7 @@ class TestGeneratePictureDiary:
     @patch('db.db', None)
     @patch('image_service.call_api_with_backoff')
     @patch('image_service.get_storage_client')
-    @patch.dict('os.environ', {'SEED_GUIDE_GEMINI_KEY': 'test-key'})
+    @patch.dict('os.environ', {'SEED_GUIDE_GEMINI_KEY': 'test-key', 'GEMINI_API_KEY': 'fallback-key'})
     def test_generate_picture_diary_fallback_success(self, mock_get_client, mock_api_call):
         """Test diary generation with primary failing, fallback succeeding"""
         mock_bucket = Mock()
@@ -227,6 +227,19 @@ class TestGeneratePictureDiary:
         assert result is not None
         assert "gs://" in result
         mock_output_blob.upload_from_string.assert_called_once()
+        
+        # Verify calls were made to both endpoints
+        assert mock_api_call.call_count == 2
+        
+        # First call should be to Gemini API with fallback-key
+        args1, _ = mock_api_call.call_args_list[0]
+        assert "generativelanguage.googleapis.com" in args1[0]
+        assert "key=fallback-key" in args1[0]
+        
+        # Second call should be to Vertex AI with test-key
+        args2, _ = mock_api_call.call_args_list[1]
+        assert "aiplatform.googleapis.com" in args2[0]
+        assert "key=test-key" in args2[0]
 
     @patch('db.db', None)
     @patch('image_service.call_api_with_backoff')

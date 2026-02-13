@@ -154,7 +154,14 @@ def generate_picture_diary(date_str: str, summary: str):
 
         # 3. Call NanoBanana-pro (gemini-3-pro-image-preview)
         model_id = "gemini-3-pro-image-preview"
-        url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{model_id}:generateContent?key={api_key}"
+        
+        # Fallback Key
+        gemini_api_key = os.environ.get("GEMINI_API_KEY")
+        
+        # Primary: Vertex AI
+        vertex_url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{model_id}:generateContent?key={api_key}"
+        # Fallback: Gemini API
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={gemini_api_key}"
         
         # Prompt based on Seed Service and User requirement
         prompt_text = f"NanoBanana-pro. Please generate a picture diary style illustration for the date {date_str}. Based on this character image, create an illustration that depicts the following event: {summary}. Maintain the character's appearance. Soft digital illustration style."
@@ -177,20 +184,46 @@ def generate_picture_diary(date_str: str, summary: str):
         info(f"[LLM] 🎨 Requesting diary image generation (model: {model_id})...")
         
         response = None
-
+        
+        # Attempt 1: Gemini API
         try:
+            info(f"[LLM] 🎨 Attempting Primary (Gemini API)...")
             response = call_api_with_backoff(
-                url,
+                gemini_url,
                 payload,
                 headers,
-                max_retries=500,
-                max_elapsed_seconds=1800,
+                max_retries=5, # Reduced retries for primary to fail faster to fallback
+                max_elapsed_seconds=60,
                 base_delay=1.0,
-                max_delay=5.0,
-                exp_base=1.1,
+                max_delay=5.0
             )
         except Exception as e:
-            warning(f"Diary image generation failed: {e}")
+            warning(f"Primary (Gemini API) failed with exception: {e}")
+            response = None # Ensure we trigger fallback
+
+        # Check if primary failed (either exception or non-200)
+        if not response or response.status_code != 200:
+            status = response.status_code if response else "Exception"
+            warning(f"Primary (Gemini API) failed (status: {status}). Switching to Fallback (Vertex AI)...")
+            
+            # Attempt 2: Vertex AI
+            try:
+                response = call_api_with_backoff(
+                    vertex_url,
+                    payload,
+                    headers,
+                    max_retries=5,
+                    max_elapsed_seconds=120,
+                    base_delay=1.0,
+                    max_delay=5.0
+                )
+                if response and response.status_code == 200:
+                    info(f"[LLM] 🎨 Fallback (Vertex AI) succeeded!")
+                else:
+                    status = response.status_code if response else "Unknown"
+                    warning(f"Fallback (Vertex AI) also failed (status: {status}).")
+            except Exception as e:
+                 warning(f"Fallback (Vertex AI) failed with exception: {e}")
 
         if not response or response.status_code != 200:
             status = response.status_code if response else "Unknown"
