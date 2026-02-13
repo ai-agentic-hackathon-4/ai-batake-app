@@ -192,7 +192,7 @@ def generate_picture_diary(date_str: str, summary: str):
                 vertex_url,
                 payload,
                 headers,
-                max_retries=3, # Reduced retries for primary to fail faster to fallback
+                max_retries=5 , # Reduced retries for primary to fail faster to fallback
                 max_elapsed_seconds=60,
                 base_delay=1.0,
                 max_delay=5.0
