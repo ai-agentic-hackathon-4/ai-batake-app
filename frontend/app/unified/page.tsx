@@ -292,8 +292,8 @@ export default function UnifiedPage() {
                                     </div>
                                 </div>
 
-                                {/* Message Area (Reserved Height to prevent shift) */}
-                                <div className="space-y-4 min-h-[64px] flex flex-col justify-center">
+                                {/* Message Area */}
+                                <div className="space-y-4">
                                     {/* Warning Banners */}
                                     {(researchMode === "agent" || guideImageMode === "per_step") && (
                                         <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
