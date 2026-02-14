@@ -203,7 +203,7 @@ export default function SeedGuidePage() {
         <div className="min-h-screen bg-background flex flex-col">
             {/* Header */}
             <header className="border-b border-border bg-card sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <Link href="/" className="mr-2 p-1 hover:bg-accent rounded-full transition-colors">
                             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
@@ -212,8 +212,8 @@ export default function SeedGuidePage() {
                             <Sprout className="h-6 w-6 text-primary" />
                         </div>
                         <div>
-                            <h1 className="text-xl font-semibold text-card-foreground">栽培ガイド生成</h1>
-                            <p className="text-sm text-muted-foreground">AI栽培アシスタント</p>
+                            <h1 className="text-lg sm:text-xl font-semibold text-card-foreground">栽培ガイド生成</h1>
+                            <p className="text-xs sm:text-sm text-muted-foreground">AI栽培アシスタント</p>
                         </div>
                     </div>
 
@@ -237,13 +237,13 @@ export default function SeedGuidePage() {
                 </div>
             </header>
 
-            <main className="flex-1 max-w-7xl mx-auto px-6 py-8 w-full">
+            <main className="flex-1 max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 w-full">
 
                 {/* --- LIST VIEW --- */}
                 {viewMode === 'list' && (
-                    <div className="max-w-4xl mx-auto space-y-6">
+                    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
                         <div className="flex justify-between items-center">
-                            <h2 className="text-2xl font-bold">作成済みのガイド</h2>
+                            <h2 className="text-xl sm:text-2xl font-bold">作成済みのガイド</h2>
                         </div>
 
                         {savedGuides.length === 0 ? (
@@ -299,9 +299,9 @@ export default function SeedGuidePage() {
                 {/* --- CREATE VIEW --- */}
                 {viewMode === 'create' && (
                     <div className="max-w-2xl mx-auto">
-                        <div className="text-center mb-8">
-                            <h2 className="text-3xl font-bold mb-2">新しい栽培ガイドの生成</h2>
-                            <p className="text-muted-foreground">種袋の写真をアップロードすると、AIが最適な栽培手順を画像付きで提案します。</p>
+                        <div className="text-center mb-6 sm:mb-8">
+                            <h2 className="text-2xl sm:text-3xl font-bold mb-2">新しい栽培ガイドの生成</h2>
+                            <p className="text-sm sm:text-base text-muted-foreground">種袋の写真をアップロードすると、AIが最適な栽培手順を画像付きで提案します。</p>
                         </div>
 
                         <Card>
@@ -373,7 +373,7 @@ export default function SeedGuidePage() {
 
                 {/* --- DETAIL VIEW --- */}
                 {viewMode === 'detail' && selectedGuide && (
-                    <div className="max-w-3xl mx-auto space-y-6">
+                    <div className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
                         {isLoadingDetails ? (
                             // Full Page Loading State
                             <div className="space-y-6 animate-pulse">
@@ -434,7 +434,7 @@ export default function SeedGuidePage() {
                                         </div>
 
                                         <Card className="overflow-hidden border-border shadow-sm">
-                                            <div className="h-[40vh] bg-muted relative flex items-center justify-center border-b border-border">
+                                            <div className="bg-muted relative flex items-center justify-center border-b border-border">
                                                 {(() => {
                                                     const step = selectedGuide.steps[currentStepIndex];
                                                     // Detect single image mode: only step 0 has image
@@ -451,7 +451,7 @@ export default function SeedGuidePage() {
                                                             <img
                                                                 src={`data:image/jpeg;base64,${imageBase64}`}
                                                                 alt={isSingleImageMode ? "栽培ガイド" : step.title}
-                                                                className="w-full h-full object-contain bg-white animate-in fade-in duration-500"
+                                                                className="w-full block bg-white animate-in fade-in duration-500"
                                                             />
                                                         );
                                                     } else if (imageUrl) {
@@ -459,7 +459,7 @@ export default function SeedGuidePage() {
                                                             <img
                                                                 src={getProxiedImageUrl(imageUrl)}
                                                                 alt={isSingleImageMode ? "栽培ガイド" : step.title}
-                                                                className="w-full h-full object-contain bg-white animate-in fade-in duration-500"
+                                                                className="w-full block bg-white animate-in fade-in duration-500"
                                                             />
                                                         );
                                                     } else {
@@ -472,43 +472,43 @@ export default function SeedGuidePage() {
                                                     }
                                                 })()}
                                             </div>
-                                            <CardContent className="py-4 space-y-2">
-                                                <h3 className="text-lg font-bold tracking-tight">{selectedGuide.steps[currentStepIndex].title}</h3>
+                                            <CardContent className="p-3 sm:py-4 sm:px-6 space-y-2">
+                                                <h3 className="text-base sm:text-lg font-bold tracking-tight">{selectedGuide.steps[currentStepIndex].title}</h3>
                                                 <div className="h-px w-full bg-border" />
-                                                <p className="text-sm leading-relaxed text-muted-foreground line-clamp-4">
+                                                <p className="text-sm leading-relaxed text-muted-foreground">
                                                     {selectedGuide.steps[currentStepIndex].description}
                                                 </p>
                                             </CardContent>
                                         </Card>
 
-                                        <div className="flex justify-between">
+                                        <div className="flex items-center justify-between gap-2">
                                             <button
                                                 onClick={handlePrev}
                                                 disabled={currentStepIndex === 0}
-                                                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1.5 gap-2"
+                                                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-2.5 sm:px-3 py-1.5 gap-1 sm:gap-2"
                                             >
-                                                <ArrowLeft className="h-4 w-4" /> 戻る
+                                                <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">戻る</span>
                                             </button>
 
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-1.5 sm:gap-2">
                                                 <button
                                                     onClick={() => handleDeleteGuide(selectedGuide.id)}
-                                                    className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-red-200 text-red-600 bg-red-50 shadow-sm hover:bg-red-100 h-9 px-3 py-1.5"
+                                                    className="inline-flex items-center justify-center gap-1 sm:gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-red-200 text-red-600 bg-red-50 shadow-sm hover:bg-red-100 h-9 px-2.5 sm:px-3 py-1.5"
                                                 >
-                                                    <Trash2 className="h-3.5 w-3.5" /> 削除
+                                                    <Trash2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">削除</span>
                                                 </button>
                                                 <button
                                                     onClick={() => setViewMode('list')}
-                                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1.5 gap-2"
+                                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-2.5 sm:px-3 py-1.5 gap-1 sm:gap-2"
                                                 >
                                                     一覧に戻る
                                                 </button>
                                                 <button
                                                     onClick={handleNext}
                                                     disabled={currentStepIndex === (selectedGuide.steps.length) - 1}
-                                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-3 py-1.5 gap-2"
+                                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-2.5 sm:px-3 py-1.5 gap-1 sm:gap-2"
                                                 >
-                                                    次へ <ArrowRight className="h-4 w-4" />
+                                                    <span className="hidden sm:inline">次へ</span> <ArrowRight className="h-4 w-4" />
                                                 </button>
                                             </div>
                                         </div>

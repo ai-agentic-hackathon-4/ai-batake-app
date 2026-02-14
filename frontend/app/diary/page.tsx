@@ -12,6 +12,7 @@ import {
     RefreshCw,
     BookOpen,
     ArrowLeft,
+    ChevronLeft,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -47,9 +48,16 @@ export default function DiaryPage() {
     const [diaries, setDiaries] = useState<GrowingDiary[]>([]);
     const [selectedDiary, setSelectedDiary] = useState<GrowingDiary | null>(null);
     const [loading, setLoading] = useState(true);
+    const [showDetail, setShowDetail] = useState(false);
 
     useEffect(() => {
         fetchDiaries();
+        // On large screens, always show detail
+        const handleResize = () => {
+            if (window.innerWidth >= 1024) setShowDetail(false);
+        };
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
     }, []);
 
     const fetchDiaries = async () => {
@@ -100,6 +108,11 @@ export default function DiaryPage() {
         }
     };
 
+    const handleSelectDiary = (diary: GrowingDiary) => {
+        setSelectedDiary(diary);
+        setShowDetail(true);
+    };
+
     return (
         <div className="min-h-screen bg-background">
             {/* Header */}
@@ -126,7 +139,7 @@ export default function DiaryPage() {
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+            <main className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-8">
                 {loading ? (
                     <div className="flex items-center justify-center h-64">
                         <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -140,26 +153,27 @@ export default function DiaryPage() {
                         </p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-1 flex flex-col">
-                            <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+                        {/* Diary List - hidden on mobile when detail is shown */}
+                        <div className={`lg:col-span-1 flex flex-col ${showDetail ? 'hidden lg:flex' : 'flex'}`}>
+                            <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 flex items-center gap-2">
                                 <Calendar className="w-5 h-5 text-primary" />
                                 日記一覧
                             </h2>
                             <div className="border border-border bg-card rounded-xl shadow-sm overflow-hidden flex flex-col lg:flex-1">
-                                <div className="overflow-y-auto p-4 space-y-3 custom-scrollbar h-[300px] lg:h-auto lg:flex-1">
+                                <div className="overflow-y-auto p-3 sm:p-4 space-y-2.5 sm:space-y-3 custom-scrollbar lg:h-auto lg:flex-1">
                                     {diaries.map((diary) => (
                                         <div
                                             key={diary.id}
-                                            onClick={() => setSelectedDiary(diary)}
-                                            className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${selectedDiary?.id === diary.id
+                                            onClick={() => handleSelectDiary(diary)}
+                                            className={`p-3 sm:p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md active:scale-[0.98] ${selectedDiary?.id === diary.id
                                                 ? "border-primary bg-primary/5"
                                                 : "border-border bg-card hover:border-primary/50"
                                                 }`}
                                         >
-                                            <div className="flex gap-4">
+                                            <div className="flex gap-3 sm:gap-4">
                                                 {diary.plant_image_url && (
-                                                    <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0 border border-border bg-muted/20">
+                                                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-md overflow-hidden flex-shrink-0 border border-border bg-muted/20">
                                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                                         <img
                                                             src={diary.plant_image_url}
@@ -190,62 +204,73 @@ export default function DiaryPage() {
                             </div>
                         </div>
 
-                        {/* Diary Detail */}
-                        <div className="lg:col-span-2">
+                        {/* Diary Detail - hidden on mobile when list is shown */}
+                        <div className={`lg:col-span-2 ${!showDetail ? 'hidden lg:block' : 'block'}`}>
                             {selectedDiary ? (
-                                <div className="space-y-6">
+                                <div className="space-y-4 sm:space-y-6">
                                     {/* Header */}
                                     <div className="flex items-center justify-between">
-                                        <div>
-                                            <h2 className="text-2xl font-bold">
-                                                {formatDate(selectedDiary.date)}
-                                            </h2>
-                                            {selectedDiary.vegetable_name && (
-                                                <p className="text-muted-foreground flex items-center gap-2 mt-1">
-                                                    <Sprout className="w-4 h-4" />
-                                                    {selectedDiary.vegetable_name}の育成記録
-                                                </p>
-                                            )}
+                                        <div className="flex items-center gap-2">
+                                            {/* Mobile back button */}
+                                            <button
+                                                onClick={() => setShowDetail(false)}
+                                                className="lg:hidden p-1.5 -ml-1.5 rounded-full hover:bg-accent transition-colors"
+                                                aria-label="一覧に戻る"
+                                            >
+                                                <ChevronLeft className="w-5 h-5 text-muted-foreground" />
+                                            </button>
+                                            <div>
+                                                <h2 className="text-xl sm:text-2xl font-bold">
+                                                    {formatDate(selectedDiary.date)}
+                                                </h2>
+                                                {selectedDiary.vegetable_name && (
+                                                    <p className="text-sm sm:text-base text-muted-foreground flex items-center gap-2 mt-0.5 sm:mt-1">
+                                                        <Sprout className="w-4 h-4" />
+                                                        {selectedDiary.vegetable_name}の育成記録
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
                                     {/* Statistics Cards */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        <div className="p-4 rounded-lg border border-border bg-card">
-                                            <div className="flex items-center gap-2 text-orange-500 mb-2">
-                                                <ThermometerSun className="w-5 h-5" />
-                                                <span className="text-sm font-medium">気温</span>
+                                    {/* Statistics Cards - 3 columns on all sizes */}
+                                    <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                                        <div className="p-2.5 sm:p-4 rounded-lg border border-border bg-card">
+                                            <div className="flex items-center gap-1.5 sm:gap-2 text-orange-500 mb-1 sm:mb-2">
+                                                <ThermometerSun className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                <span className="text-xs sm:text-sm font-medium">気温</span>
                                             </div>
-                                            <div className="text-2xl font-bold">
+                                            <div className="text-lg sm:text-2xl font-bold">
                                                 {selectedDiary.statistics.temperature.avg}°C
                                             </div>
-                                            <div className="text-xs text-muted-foreground mt-1">
+                                            <div className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
                                                 {selectedDiary.statistics.temperature.min}°C ~{" "}
                                                 {selectedDiary.statistics.temperature.max}°C
                                             </div>
                                         </div>
-                                        <div className="p-4 rounded-lg border border-border bg-card">
-                                            <div className="flex items-center gap-2 text-blue-500 mb-2">
-                                                <Droplets className="w-5 h-5" />
-                                                <span className="text-sm font-medium">湿度</span>
+                                        <div className="p-2.5 sm:p-4 rounded-lg border border-border bg-card">
+                                            <div className="flex items-center gap-1.5 sm:gap-2 text-blue-500 mb-1 sm:mb-2">
+                                                <Droplets className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                <span className="text-xs sm:text-sm font-medium">湿度</span>
                                             </div>
-                                            <div className="text-2xl font-bold">
+                                            <div className="text-lg sm:text-2xl font-bold">
                                                 {selectedDiary.statistics.humidity.avg}%
                                             </div>
-                                            <div className="text-xs text-muted-foreground mt-1">
+                                            <div className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
                                                 {selectedDiary.statistics.humidity.min}% ~{" "}
                                                 {selectedDiary.statistics.humidity.max}%
                                             </div>
                                         </div>
-                                        <div className="p-4 rounded-lg border border-border bg-card">
-                                            <div className="flex items-center gap-2 text-green-500 mb-2">
-                                                <CloudRain className="w-5 h-5" />
-                                                <span className="text-sm font-medium">土壌水分</span>
+                                        <div className="p-2.5 sm:p-4 rounded-lg border border-border bg-card">
+                                            <div className="flex items-center gap-1.5 sm:gap-2 text-green-500 mb-1 sm:mb-2">
+                                                <CloudRain className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                <span className="text-xs sm:text-sm font-medium">土壌水分</span>
                                             </div>
-                                            <div className="text-2xl font-bold">
+                                            <div className="text-lg sm:text-2xl font-bold">
                                                 {selectedDiary.statistics.soil_moisture.avg}%
                                             </div>
-                                            <div className="text-xs text-muted-foreground mt-1">
+                                            <div className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
                                                 {selectedDiary.statistics.soil_moisture.min}% ~{" "}
                                                 {selectedDiary.statistics.soil_moisture.max}%
                                             </div>
@@ -255,16 +280,14 @@ export default function DiaryPage() {
                                     {/* Picture Diary Image */}
                                     {selectedDiary.plant_image_url && (
                                         <div className="rounded-lg border border-border bg-card overflow-hidden">
-                                            <div className="relative aspect-square md:aspect-video w-full bg-muted/20">
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img
-                                                    src={selectedDiary.plant_image_url}
-                                                    alt="Picture Diary"
-                                                    className="object-contain w-full h-full"
-                                                />
-                                            </div>
-                                            <div className="p-4 border-t border-border">
-                                                <h3 className="text-base font-semibold flex items-center gap-2">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                                src={selectedDiary.plant_image_url}
+                                                alt="Picture Diary"
+                                                className="w-full block"
+                                            />
+                                            <div className="p-3 sm:p-4 border-t border-border">
+                                                <h3 className="text-sm sm:text-base font-semibold flex items-center gap-2">
                                                     <BookOpen className="w-4 h-4 text-pink-500" />
                                                     今日の絵日記 (Powered by NanoBanana-pro)
                                                 </h3>
@@ -273,33 +296,33 @@ export default function DiaryPage() {
                                     )}
 
                                     {/* AI Summary */}
-                                    <div className="rounded-lg border border-border bg-card p-6">
-                                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                    <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
+                                        <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-4 flex items-center gap-2">
                                             <Sprout className="w-5 h-5 text-primary" />
                                             今日の要約
                                         </h3>
-                                        <p className="text-foreground leading-relaxed">
+                                        <p className="text-sm sm:text-base text-foreground leading-relaxed">
                                             {selectedDiary.ai_summary}
                                         </p>
                                     </div>
 
                                     {/* Observations & Recommendations */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="rounded-lg border border-border bg-card p-6">
-                                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                                        <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
+                                            <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-4 flex items-center gap-2">
                                                 <TrendingUp className="w-5 h-5 text-blue-500" />
                                                 成長観察
                                             </h3>
-                                            <p className="text-muted-foreground leading-relaxed">
+                                            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
                                                 {selectedDiary.observations}
                                             </p>
                                         </div>
-                                        <div className="rounded-lg border border-border bg-card p-6">
-                                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                        <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
+                                            <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-4 flex items-center gap-2">
                                                 <Lightbulb className="w-5 h-5 text-yellow-500" />
                                                 明日への提案
                                             </h3>
-                                            <p className="text-muted-foreground leading-relaxed">
+                                            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
                                                 {selectedDiary.recommendations}
                                             </p>
                                         </div>
@@ -307,7 +330,7 @@ export default function DiaryPage() {
 
                                     {/* Events Timeline */}
                                     {selectedDiary.events && selectedDiary.events.length > 0 && (
-                                        <div className="rounded-lg border border-border bg-card p-6">
+                                        <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
                                             <h3 className="text-lg font-semibold mb-4">
                                                 主要イベント
                                             </h3>
