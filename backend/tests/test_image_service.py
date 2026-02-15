@@ -91,7 +91,7 @@ class TestGeneratePictureDiary:
         result = generate_picture_diary("2025-01-01", "Test summary")
         
         assert result is not None
-        assert "diaries/2025-01-01.png" in result
+        assert "diaries/dev/2025-01-01.png" in result
         mock_output_blob.upload_from_string.assert_called_once()
     
     @patch('db.db', None)
@@ -177,7 +177,7 @@ class TestGeneratePictureDiary:
         result = generate_picture_diary("2025-01-01", "Test summary")
         
         assert result is not None
-        assert "diaries/2025-01-01.png" in result
+        assert "diaries/dev/2025-01-01.png" in result
         mock_output_blob.upload_from_string.assert_called_once()
 
     @patch('db.db', None)
@@ -272,7 +272,7 @@ class TestGeneratePictureDiary:
         result = generate_picture_diary("2025-01-01", "Test summary")
         
         assert result is not None
-        assert "diaries/2025-01-01.png" in result
+        assert "diaries/dev/2025-01-01.png" in result
         mock_output_blob.upload_from_string.assert_called_once()
 
 
