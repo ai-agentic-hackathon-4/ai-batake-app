@@ -20,6 +20,7 @@ BUCKET_NAME = "ai-agentic-hackathon-4-bk"
 DEFAULT_CHARACTER_IMAGE_PATH = "character_image/image.png"
 DIARY_IMAGES_PATH = "diaries/"
 PROJECT_ID = "ai-agentic-hackathon-4"
+APP_ENV = os.environ.get("APP_ENV", "dev")
 
 # Final hardcoded placeholder image (Base64 of a simple 1x1 green pixel as safe failover)
 DEFAULT_PLACEHOLDER_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
@@ -250,7 +251,7 @@ def generate_picture_diary(date_str: str, summary: str):
                 generated_bytes = base64.b64decode(DEFAULT_PLACEHOLDER_B64)
 
         # 4. Save to GCS
-        output_filename = f"{DIARY_IMAGES_PATH}{date_str}.png"
+        output_filename = f"{DIARY_IMAGES_PATH}{APP_ENV}/{date_str}.png"
         output_blob = bucket.blob(output_filename)
         output_blob.upload_from_string(generated_bytes, content_type="image/png")
         
